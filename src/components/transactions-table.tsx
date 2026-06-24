@@ -128,7 +128,7 @@ export function TransactionsTable({
           <div className="col-span-2 lg:col-span-2 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search ID, customer, lab…"
+              placeholder="Fuzzy search: ID, customer, lab, provider, LOB…"
               className="pl-9"
               value={filters.search}
               onChange={(e) => { setFilters({ ...filters, search: e.target.value }); setPage(0); }}
