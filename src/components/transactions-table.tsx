@@ -14,6 +14,7 @@ import { exportToExcel } from "@/lib/export-xlsx";
 import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Badge } from "@/components/ui/badge";
+import { highlight, tokenize } from "@/lib/highlight";
 
 export type RepoFilter = "all" | "public_cloud" | "private_cloud";
 
@@ -28,6 +29,8 @@ interface Filters {
   startTo: string;
 }
 
+type SortMode = "recent" | "relevance";
+
 const initial: Filters = {
   search: "", month: "all", year: "all", customer: "all",
   provider: "all", lob: "all", startFrom: "", startTo: "",
@@ -39,6 +42,7 @@ export function TransactionsTable({
   const [filters, setFilters] = useState<Filters>(initial);
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [sortMode, setSortMode] = useState<SortMode>("recent");
   const pageSize = 25;
   const { user } = useAuth();
 
@@ -59,9 +63,9 @@ export function TransactionsTable({
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["transactions", repoFilter, filters, page],
+    queryKey: ["transactions", repoFilter, filters, page, sortMode],
     queryFn: async () => {
-      let fuzzyIds: string[] | null = null;
+      let scoreMap: Map<string, number> | null = null;
       if (filters.search.trim()) {
         const { data: matches, error: rpcErr } = await supabase.rpc("fuzzy_search_transactions", {
           q: filters.search.trim(),
@@ -69,9 +73,10 @@ export function TransactionsTable({
           max_rows: 500,
         });
         if (rpcErr) throw rpcErr;
-        fuzzyIds = (matches ?? []).map((m: { id: string }) => m.id);
-        if (fuzzyIds.length === 0) return { rows: [], count: 0 };
+        scoreMap = new Map((matches ?? []).map((m: { id: string; score: number }) => [m.id, Number(m.score)]));
+        if (scoreMap.size === 0) return { rows: [], count: 0, scoreMap };
       }
+      const fuzzy = scoreMap !== null;
       let q = supabase.from("transactions").select("*", { count: "exact" }).eq("is_deleted", false);
       if (repoFilter !== "all") q = q.eq("repository_type", repoFilter);
       if (filters.month !== "all") q = q.eq("month", Number(filters.month));
@@ -81,17 +86,37 @@ export function TransactionsTable({
       if (filters.lob !== "all") q = q.eq("line_of_business", filters.lob);
       if (filters.startFrom) q = q.gte("start_date", filters.startFrom);
       if (filters.startTo) q = q.lte("start_date", filters.startTo);
-      if (fuzzyIds) q = q.in("id", fuzzyIds);
+      if (fuzzy) {
+        q = q.in("id", Array.from(scoreMap!.keys()));
+        // Sort client-side; fetch all matching (already capped at 500).
+        const { data, error } = await q;
+        if (error) throw error;
+        const all = (data ?? []).slice();
+        const useRelevance = sortMode === "relevance";
+        all.sort((a, b) => {
+          if (useRelevance) {
+            const diff = (scoreMap!.get(b.id) ?? 0) - (scoreMap!.get(a.id) ?? 0);
+            if (diff !== 0) return diff;
+          }
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
+        const start = page * pageSize;
+        return { rows: all.slice(start, start + pageSize), allRows: all, count: all.length, scoreMap };
+      }
       q = q.order("created_at", { ascending: false }).range(page * pageSize, page * pageSize + pageSize - 1);
-      const { data, count, error } = await q;
+      const { data: pageData, count, error } = await q;
       if (error) throw error;
-      return { rows: data ?? [], count: count ?? 0 };
+      return { rows: pageData ?? [], count: count ?? 0, scoreMap: null };
     },
   });
 
   const rows = data?.rows ?? [];
+  const allRows = (data as { allRows?: typeof rows } | undefined)?.allRows ?? rows;
+  const scoreMap = data?.scoreMap ?? null;
   const total = data?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const searchTokens = useMemo(() => tokenize(filters.search), [filters.search]);
+  const isFuzzy = searchTokens.length > 0;
 
   const summary = useMemo(() => ({
     users: rows.reduce((s, r) => s + (r.total_users ?? 0), 0),
@@ -99,9 +124,10 @@ export function TransactionsTable({
   }), [rows]);
 
   function exportCurrent() {
+    const exportRows = isFuzzy ? allRows : rows;
     exportToExcel(
       repoFilter === "public_cloud" ? "public-cloud" : repoFilter === "private_cloud" ? "private-cloud" : "all-transactions",
-      rows.map((r) => ({
+      exportRows.map((r) => ({
         "Potential ID": r.potential_id,
         "Month": MONTH_NAMES[r.month - 1],
         "Year": r.year,
@@ -114,10 +140,11 @@ export function TransactionsTable({
         "End Date": r.end_date,
         "Total Users": r.total_users,
         "Selling Cost": Number(r.selling_cost),
+        ...(isFuzzy ? { "Relevance Score": Number((scoreMap?.get(r.id) ?? 0).toFixed(4)) } : {}),
         "Created At": r.created_at,
         "Updated At": r.updated_at,
       })),
-      { generatedBy: user?.email ?? "—", filters: { repository: repoFilter, ...filters } },
+      { generatedBy: user?.email ?? "—", filters: { repository: repoFilter, sortMode, ...filters } },
     );
   }
 
@@ -184,9 +211,16 @@ export function TransactionsTable({
             <span>Page users: <strong className="text-foreground">{fmtNumber(summary.users)}</strong></span>
             <span>Page revenue: <strong className="text-foreground">{fmtCurrency(summary.revenue)}</strong></span>
           </div>
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => { setFilters(initial); setPage(0); }}>Reset filters</Button>
-            <Button size="sm" onClick={exportCurrent}><Download className="h-4 w-4 mr-1" />Export</Button>
+          <div className="flex items-center gap-2">
+            <Select value={sortMode} onValueChange={(v) => { setSortMode(v as SortMode); setPage(0); }}>
+              <SelectTrigger className="h-8 w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent">Sort: Most recent</SelectItem>
+                <SelectItem value="relevance" disabled={!isFuzzy}>Sort: Relevance score</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button variant="ghost" size="sm" onClick={() => { setFilters(initial); setPage(0); setSortMode("recent"); }}>Reset</Button>
+            <Button size="sm" onClick={exportCurrent}><Download className="h-4 w-4 mr-1" />Export{isFuzzy ? ` (${allRows.length})` : ""}</Button>
           </div>
         </div>
       </Card>
@@ -206,30 +240,36 @@ export function TransactionsTable({
                 <TableHead>End</TableHead>
                 <TableHead className="text-right">Users</TableHead>
                 <TableHead className="text-right">Selling Cost</TableHead>
+                {isFuzzy && <TableHead className="text-right">Score</TableHead>}
                 <TableHead>Updated</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
-                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-10">Loading…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-10">Loading…</TableCell></TableRow>
               )}
               {!isLoading && rows.length === 0 && (
-                <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-10">No transactions match the current filters.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-10">No transactions match the current filters.</TableCell></TableRow>
               )}
               {rows.map((r) => (
                 <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setOpenId(r.id)}>
-                  <TableCell className="font-medium">{r.potential_id}</TableCell>
+                  <TableCell className="font-medium">{highlight(r.potential_id, searchTokens)}</TableCell>
                   <TableCell>{MONTH_NAMES[r.month - 1]} {r.year}</TableCell>
-                  <TableCell>{r.customer_name}</TableCell>
-                  <TableCell className="max-w-[240px] truncate">{r.lab_name}</TableCell>
+                  <TableCell>{highlight(r.customer_name, searchTokens)}</TableCell>
+                  <TableCell className="max-w-[240px] truncate">{highlight(r.lab_name, searchTokens)}</TableCell>
                   {showProviderFilter && (
-                    <TableCell><Badge variant="outline">{r.cloud_provider}</Badge></TableCell>
+                    <TableCell><Badge variant="outline">{highlight(r.cloud_provider, searchTokens)}</Badge></TableCell>
                   )}
-                  <TableCell>{r.line_of_business}</TableCell>
+                  <TableCell>{highlight(r.line_of_business, searchTokens)}</TableCell>
                   <TableCell>{fmtDate(r.start_date)}</TableCell>
                   <TableCell>{fmtDate(r.end_date)}</TableCell>
                   <TableCell className="text-right">{fmtNumber(r.total_users)}</TableCell>
                   <TableCell className="text-right">{fmtCurrency(r.selling_cost)}</TableCell>
+                  {isFuzzy && (
+                    <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
+                      {(scoreMap?.get(r.id) ?? 0).toFixed(2)}
+                    </TableCell>
+                  )}
                   <TableCell className="text-xs text-muted-foreground">{fmtDateTime(r.updated_at)}</TableCell>
                 </TableRow>
               ))}
