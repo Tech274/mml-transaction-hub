@@ -245,6 +245,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      fuzzy_search_transactions: {
+        Args: { max_rows?: number; q: string; threshold?: number }
+        Returns: {
+          id: string
+          score: number
+        }[]
+      }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
@@ -259,6 +266,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
     }
     Enums: {
       app_role:
