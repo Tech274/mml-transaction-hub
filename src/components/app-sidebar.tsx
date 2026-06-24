@@ -1,0 +1,89 @@
+import { Link, useRouterState } from "@tanstack/react-router";
+import {
+  LayoutDashboard, FilePlus2, ListTree, Cloud, Server, Users,
+  BarChart3, Settings, LogOut,
+} from "lucide-react";
+import {
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { useAuth, type AppRole } from "@/lib/auth-context";
+import { Button } from "@/components/ui/button";
+
+const nav: { to: string; label: string; icon: typeof LayoutDashboard; roles: AppRole[] | null }[] = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: null },
+  { to: "/entry", label: "Master ADR Entry", icon: FilePlus2, roles: ["admin", "ops_lead", "ops_user"] },
+  { to: "/transactions", label: "All Transactions", icon: ListTree, roles: null },
+  { to: "/public-cloud", label: "Public Cloud", icon: Cloud, roles: null },
+  { to: "/private-cloud", label: "Private Cloud", icon: Server, roles: null },
+  { to: "/customers", label: "Customers", icon: Users, roles: null },
+  { to: "/reports", label: "Reports", icon: BarChart3, roles: null },
+  { to: "/admin", label: "Admin Settings", icon: Settings, roles: ["admin"] },
+];
+
+export function AppSidebar() {
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
+  const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const { hasAnyRole, user, roles, signOut } = useAuth();
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b border-sidebar-border">
+        <div className="flex items-center gap-2 px-2 py-3">
+          <div className="h-8 w-8 rounded-md bg-sidebar-primary text-sidebar-primary-foreground grid place-items-center font-bold">
+            M
+          </div>
+          {!collapsed && (
+            <div className="leading-tight">
+              <div className="text-sm font-semibold">MakeMyLabs</div>
+              <div className="text-xs text-sidebar-foreground/60">Transaction Platform</div>
+            </div>
+          )}
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {nav
+                .filter((i) => !i.roles || hasAnyRole(i.roles))
+                .map((item) => {
+                  const active = pathname === item.to || pathname.startsWith(item.to + "/");
+                  return (
+                    <SidebarMenuItem key={item.to}>
+                      <SidebarMenuButton asChild isActive={active}>
+                        <Link to={item.to}>
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{item.label}</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="border-t border-sidebar-border">
+        {!collapsed && user && (
+          <div className="px-2 py-2 text-xs">
+            <div className="font-medium truncate">{user.email}</div>
+            <div className="text-sidebar-foreground/60 capitalize">{roles[0]?.replace("_", " ") ?? "no role"}</div>
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          onClick={signOut}
+        >
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span className="ml-2">Sign out</span>}
+        </Button>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
