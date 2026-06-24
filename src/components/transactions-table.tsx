@@ -61,6 +61,17 @@ export function TransactionsTable({
   const { data, isLoading } = useQuery({
     queryKey: ["transactions", repoFilter, filters, page],
     queryFn: async () => {
+      let fuzzyIds: string[] | null = null;
+      if (filters.search.trim()) {
+        const { data: matches, error: rpcErr } = await supabase.rpc("fuzzy_search_transactions", {
+          q: filters.search.trim(),
+          threshold: 0.25,
+          max_rows: 500,
+        });
+        if (rpcErr) throw rpcErr;
+        fuzzyIds = (matches ?? []).map((m: { id: string }) => m.id);
+        if (fuzzyIds.length === 0) return { rows: [], count: 0 };
+      }
       let q = supabase.from("transactions").select("*", { count: "exact" }).eq("is_deleted", false);
       if (repoFilter !== "all") q = q.eq("repository_type", repoFilter);
       if (filters.month !== "all") q = q.eq("month", Number(filters.month));
@@ -70,10 +81,7 @@ export function TransactionsTable({
       if (filters.lob !== "all") q = q.eq("line_of_business", filters.lob);
       if (filters.startFrom) q = q.gte("start_date", filters.startFrom);
       if (filters.startTo) q = q.lte("start_date", filters.startTo);
-      if (filters.search.trim()) {
-        const s = `%${filters.search.trim()}%`;
-        q = q.or(`potential_id.ilike.${s},customer_name.ilike.${s},lab_name.ilike.${s},line_of_business.ilike.${s},cloud_provider.ilike.${s}`);
-      }
+      if (fuzzyIds) q = q.in("id", fuzzyIds);
       q = q.order("created_at", { ascending: false }).range(page * pageSize, page * pageSize + pageSize - 1);
       const { data, count, error } = await q;
       if (error) throw error;
