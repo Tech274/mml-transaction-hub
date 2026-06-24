@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true;
     const loadRoles = async (u: User | null) => {
       if (!u) {
-        setRoles([]);
+        if (mounted) setRoles([]);
         return;
       }
       const { data } = await supabase.from("user_roles").select("role").eq("user_id", u.id);
