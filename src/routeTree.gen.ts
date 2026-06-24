@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authenticated/transactions'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPublicCloudRouteImport } from './routes/_authenticated/public-cloud'
 import { Route as AuthenticatedPrivateCloudRouteImport } from './routes/_authenticated/private-cloud'
 import { Route as AuthenticatedEntryRouteImport } from './routes/_authenticated/entry'
@@ -39,6 +40,11 @@ const AuthenticatedTransactionsRoute =
     path: '/transactions',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedPublicCloudRoute =
   AuthenticatedPublicCloudRouteImport.update({
     id: '/public-cloud',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/entry': typeof AuthenticatedEntryRoute
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
+  '/reports': typeof AuthenticatedReportsRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
 }
 export interface FileRoutesByTo {
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/entry': typeof AuthenticatedEntryRoute
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
+  '/reports': typeof AuthenticatedReportsRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
 }
 export interface FileRoutesById {
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/_authenticated/entry': typeof AuthenticatedEntryRoute
   '/_authenticated/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/_authenticated/public-cloud': typeof AuthenticatedPublicCloudRoute
+  '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
 }
 export interface FileRouteTypes {
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/entry'
     | '/private-cloud'
     | '/public-cloud'
+    | '/reports'
     | '/transactions'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -119,6 +129,7 @@ export interface FileRouteTypes {
     | '/entry'
     | '/private-cloud'
     | '/public-cloud'
+    | '/reports'
     | '/transactions'
   id:
     | '__root__'
@@ -130,6 +141,7 @@ export interface FileRouteTypes {
     | '/_authenticated/entry'
     | '/_authenticated/private-cloud'
     | '/_authenticated/public-cloud'
+    | '/_authenticated/reports'
     | '/_authenticated/transactions'
   fileRoutesById: FileRoutesById
 }
@@ -167,6 +179,13 @@ declare module '@tanstack/react-router' {
       path: '/transactions'
       fullPath: '/transactions'
       preLoaderRoute: typeof AuthenticatedTransactionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/public-cloud': {
@@ -213,6 +232,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedEntryRoute: typeof AuthenticatedEntryRoute
   AuthenticatedPrivateCloudRoute: typeof AuthenticatedPrivateCloudRoute
   AuthenticatedPublicCloudRoute: typeof AuthenticatedPublicCloudRoute
+  AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
   AuthenticatedTransactionsRoute: typeof AuthenticatedTransactionsRoute
 }
 
@@ -222,6 +242,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedEntryRoute: AuthenticatedEntryRoute,
   AuthenticatedPrivateCloudRoute: AuthenticatedPrivateCloudRoute,
   AuthenticatedPublicCloudRoute: AuthenticatedPublicCloudRoute,
+  AuthenticatedReportsRoute: AuthenticatedReportsRoute,
   AuthenticatedTransactionsRoute: AuthenticatedTransactionsRoute,
 }
 
