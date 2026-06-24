@@ -17,6 +17,7 @@ import { Route as AuthenticatedPublicCloudRouteImport } from './routes/_authenti
 import { Route as AuthenticatedPrivateCloudRouteImport } from './routes/_authenticated/private-cloud'
 import { Route as AuthenticatedEntryRouteImport } from './routes/_authenticated/entry'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -60,10 +61,16 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCustomersRoute = AuthenticatedCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/entry': typeof AuthenticatedEntryRoute
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/entry': typeof AuthenticatedEntryRoute
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/entry': typeof AuthenticatedEntryRoute
   '/_authenticated/private-cloud': typeof AuthenticatedPrivateCloudRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/customers'
     | '/dashboard'
     | '/entry'
     | '/private-cloud'
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/customers'
     | '/dashboard'
     | '/entry'
     | '/private-cloud'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/_authenticated/customers'
     | '/_authenticated/dashboard'
     | '/_authenticated/entry'
     | '/_authenticated/private-cloud'
@@ -185,10 +197,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/customers': {
+      id: '/_authenticated/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof AuthenticatedCustomersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEntryRoute: typeof AuthenticatedEntryRoute
   AuthenticatedPrivateCloudRoute: typeof AuthenticatedPrivateCloudRoute
@@ -197,6 +217,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEntryRoute: AuthenticatedEntryRoute,
   AuthenticatedPrivateCloudRoute: AuthenticatedPrivateCloudRoute,
