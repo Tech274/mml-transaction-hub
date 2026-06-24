@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authenticated/transactions'
+import { Route as AuthenticatedPublicCloudRouteImport } from './routes/_authenticated/public-cloud'
 import { Route as AuthenticatedEntryRouteImport } from './routes/_authenticated/entry'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 
@@ -36,6 +37,12 @@ const AuthenticatedTransactionsRoute =
     path: '/transactions',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedPublicCloudRoute =
+  AuthenticatedPublicCloudRouteImport.update({
+    id: '/public-cloud',
+    path: '/public-cloud',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedEntryRoute = AuthenticatedEntryRouteImport.update({
   id: '/entry',
   path: '/entry',
@@ -52,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/entry': typeof AuthenticatedEntryRoute
+  '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
 }
 export interface FileRoutesByTo {
@@ -59,6 +67,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/entry': typeof AuthenticatedEntryRoute
+  '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
 }
 export interface FileRoutesById {
@@ -68,13 +77,26 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/entry': typeof AuthenticatedEntryRoute
+  '/_authenticated/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/dashboard' | '/entry' | '/transactions'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/entry'
+    | '/public-cloud'
+    | '/transactions'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/dashboard' | '/entry' | '/transactions'
+  to:
+    | '/'
+    | '/auth'
+    | '/dashboard'
+    | '/entry'
+    | '/public-cloud'
+    | '/transactions'
   id:
     | '__root__'
     | '/'
@@ -82,6 +104,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/dashboard'
     | '/_authenticated/entry'
+    | '/_authenticated/public-cloud'
     | '/_authenticated/transactions'
   fileRoutesById: FileRoutesById
 }
@@ -121,6 +144,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTransactionsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/public-cloud': {
+      id: '/_authenticated/public-cloud'
+      path: '/public-cloud'
+      fullPath: '/public-cloud'
+      preLoaderRoute: typeof AuthenticatedPublicCloudRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/entry': {
       id: '/_authenticated/entry'
       path: '/entry'
@@ -141,12 +171,14 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEntryRoute: typeof AuthenticatedEntryRoute
+  AuthenticatedPublicCloudRoute: typeof AuthenticatedPublicCloudRoute
   AuthenticatedTransactionsRoute: typeof AuthenticatedTransactionsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEntryRoute: AuthenticatedEntryRoute,
+  AuthenticatedPublicCloudRoute: AuthenticatedPublicCloudRoute,
   AuthenticatedTransactionsRoute: AuthenticatedTransactionsRoute,
 }
 
