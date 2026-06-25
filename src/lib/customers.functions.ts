@@ -126,10 +126,10 @@ export const setCustomerActiveFn = createServerFn({ method: "POST" })
     if (!data.active && (!data.reason || data.reason.trim().length === 0)) {
       throw new Error("A deactivation reason is required.");
     }
-    const patch: Record<string, unknown> = { is_active: data.active };
-    // Store the reason only when deactivating; clear it on reactivation
-    patch.deactivation_reason = data.active ? null : (data.reason ?? null);
-    const { error } = await context.supabase.from("customers").update(patch).eq("id", data.id);
+    const { error } = await context.supabase.from("customers").update({
+      is_active: data.active,
+      deactivation_reason: data.active ? null : (data.reason ?? null),
+    }).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
