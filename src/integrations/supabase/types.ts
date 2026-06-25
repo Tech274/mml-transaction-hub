@@ -101,6 +101,39 @@ export type Database = {
         }
         Relationships: []
       }
+      role_audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          changed_by_email: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          target_email: string | null
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          target_email?: string | null
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          target_email?: string | null
+          target_user_id?: string
+        }
+        Relationships: []
+      }
       transaction_activity_log: {
         Row: {
           action: string
@@ -151,6 +184,7 @@ export type Database = {
           customer_name: string
           end_date: string
           id: string
+          input_cost: number
           is_deleted: boolean
           lab_name: string
           lab_type: string
@@ -173,6 +207,7 @@ export type Database = {
           customer_name: string
           end_date: string
           id?: string
+          input_cost?: number
           is_deleted?: boolean
           lab_name: string
           lab_type: string
@@ -195,6 +230,7 @@ export type Database = {
           customer_name?: string
           end_date?: string
           id?: string
+          input_cost?: number
           is_deleted?: boolean
           lab_name?: string
           lab_type?: string
