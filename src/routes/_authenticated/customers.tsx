@@ -29,14 +29,18 @@ type SortKey = "customer_name" | "account_manager_name" | "count" | "users" | "r
 const PAGE_SIZE = 25;
 const ASYNC_EXPORT_THRESHOLD = 200; // rows above this use the async progress flow
 
-type CustomersSearch = { am?: string; status?: "active" | "inactive" | "all"; q?: string };
+type CustomersSearch = { am?: string; status?: "active" | "inactive" | "all"; q?: string; range?: 3 | 6 | 12 };
 
 export const Route = createFileRoute("/_authenticated/customers")({
-  validateSearch: (s: Record<string, unknown>): CustomersSearch => ({
-    am: typeof s.am === "string" ? s.am : undefined,
-    status: s.status === "active" || s.status === "inactive" || s.status === "all" ? s.status : undefined,
-    q: typeof s.q === "string" ? s.q : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): CustomersSearch => {
+    const rangeNum = Number(s.range);
+    return {
+      am: typeof s.am === "string" ? s.am : undefined,
+      status: s.status === "active" || s.status === "inactive" || s.status === "all" ? s.status : undefined,
+      q: typeof s.q === "string" ? s.q : undefined,
+      range: rangeNum === 3 || rangeNum === 6 || rangeNum === 12 ? (rangeNum as 3 | 6 | 12) : undefined,
+    };
+  },
   component: CustomersPage,
 });
 
