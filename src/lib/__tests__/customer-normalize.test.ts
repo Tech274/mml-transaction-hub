@@ -75,8 +75,13 @@ describe("duplicate detection logic", () => {
     expect(isDuplicateEmail("a@example.com", "b@example.com")).toBe(false);
   });
   it("flags formatting variants of the same phone as duplicates", () => {
-    expect(isDuplicatePhone("+1 (415) 555-2671", "4155552671")).toBe(true);
+    expect(isDuplicatePhone("+1 (415) 555-2671", "1-415-555-2671")).toBe(true);
     expect(isDuplicatePhone("0091 98765 43210", "+919876543210")).toBe(true);
+  });
+  it("does not collapse different country codes into the same number", () => {
+    // 14155552671 (US) and 4155552671 (no country code) are intentionally
+    // distinct — we don't guess country codes.
+    expect(isDuplicatePhone("+1 (415) 555-2671", "4155552671")).toBe(false);
   });
   it("does not flag two missing/blank values as duplicates", () => {
     expect(isDuplicateEmail(null, null)).toBe(false);
