@@ -22,6 +22,7 @@ import {
   adminCreateUser, adminSetUserRoles, adminSetUserActive, adminUpdateUserProfile,
 } from "@/lib/admin.functions";
 import { format } from "date-fns";
+import { PERMISSIONS, type PermDef } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -95,6 +96,7 @@ function AdminPage() {
       <Tabs defaultValue="users" className="space-y-4">
         <TabsList>
           <TabsTrigger value="users">Users & Roles</TabsTrigger>
+          <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="audit">Role Audit Log</TabsTrigger>
         </TabsList>
 
@@ -129,6 +131,10 @@ function AdminPage() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="permissions">
+          <PermissionsMatrix />
         </TabsContent>
 
         <TabsContent value="audit">
