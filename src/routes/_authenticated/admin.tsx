@@ -320,6 +320,250 @@ function PermGroup({
   );
 }
 
+// ---- Preview-as-role + Preset templates ----
+const PRESET_ROLE_DEFAULTS: Record<string, string[]> = {
+  viewer: ["kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud"],
+  ops_user: [
+    "kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud",
+    "kpi_total_users", "kpi_current_month_users",
+    "chart_tx_by_month", "feature_master_adr_entry",
+  ],
+  ops_lead: [
+    "kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud",
+    "kpi_total_users", "kpi_current_month_users", "kpi_avg_cost",
+    "chart_tx_by_month", "chart_pub_priv", "chart_provider", "chart_lob",
+    "feature_master_adr_entry", "feature_customer_edit", "feature_excel_export", "feature_reports_access",
+  ],
+  finance: [
+    "kpi_total_revenue", "kpi_total_input_cost", "kpi_total_profit", "kpi_margin",
+    "kpi_avg_cost", "kpi_current_month_revenue", "kpi_current_month_profit",
+    "chart_revenue_by_month", "chart_top_revenue", "chart_top_profit",
+    "feature_excel_export", "feature_reports_access",
+  ],
+  leadership: PERMISSIONS.filter((p) => p.kind === "kpi").map((p) => p.key)
+    .concat(["feature_reports_access", "feature_excel_export"]),
+};
+const PRESETS = Object.keys(PRESET_ROLE_DEFAULTS);
+
+function PreviewAndPresetsBar({ previewRole, onApplied }: { previewRole: AppRole | null; onApplied: () => void }) {
+  const rolesList: AppRole[] = ["leadership", "finance", "ops_lead", "ops_user", "viewer"];
+  const [presetRole, setPresetRole] = useState<string>("viewer");
+  const [targetRole, setTargetRole] = useState<AppRole>("viewer");
+  const [applying, setApplying] = useState(false);
+
+  async function applyPreset() {
+    setApplying(true);
+    try {
+      const enabledKeys = new Set(PRESET_ROLE_DEFAULTS[presetRole] ?? []);
+      const upserts = PERMISSIONS.map((p) => ({
+        role: targetRole, key: p.key, kind: p.kind, enabled: enabledKeys.has(p.key),
+      }));
+      const { error } = await supabase.from("role_permissions").upsert(upserts, { onConflict: "role,key" });
+      if (error) throw error;
+      toast.success(`Applied "${ROLE_LABEL[presetRole as AppRole] ?? presetRole}" preset to ${ROLE_LABEL[targetRole]}`);
+      onApplied();
+    } catch (e) { toast.error((e as Error).message); } finally { setApplying(false); }
+  }
+
+  return (
+    <Card>
+      <CardContent className="pt-6 flex flex-wrap items-end gap-6">
+        <div className="space-y-1.5">
+          <Label className="text-xs">Preview as role</Label>
+          <div className="flex items-center gap-2">
+            <Select value={previewRole ?? "__none"} onValueChange={(v) => setPreviewRole(v === "__none" ? null : (v as AppRole))}>
+              <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none">Super Admin (you)</SelectItem>
+                {rolesList.map((r) => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {previewRole && (
+              <Button size="sm" variant="outline" onClick={() => setPreviewRole(null)}>Clear</Button>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground">Affects the dashboard & sidebar in your current session.</p>
+        </div>
+
+        <div className="space-y-1.5">
+          <Label className="text-xs">Apply preset template</Label>
+          <div className="flex items-center gap-2">
+            <Select value={presetRole} onValueChange={setPresetRole}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PRESETS.map((r) => <SelectItem key={r} value={r}>{ROLE_LABEL[r as AppRole] ?? r}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">→</span>
+            <Select value={targetRole} onValueChange={(v) => setTargetRole(v as AppRole)}>
+              <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {rolesList.map((r) => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button size="sm" onClick={applyPreset} disabled={applying}>{applying ? "Applying…" : "Apply"}</Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">Overwrites all permissions for the target role.</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---- KPI order editor (per role) ----
+function KpiOrderEditor({ rows, onSaved }: {
+  rows: { role: string; key: string; enabled: boolean; sort_order: number }[];
+  onSaved: () => void;
+}) {
+  const rolesList: AppRole[] = ["leadership", "finance", "ops_lead", "ops_user", "viewer"];
+  const [role, setRole] = useState<AppRole>("viewer");
+  const [saving, setSaving] = useState(false);
+
+  const kpiDefs = PERMISSIONS.filter((p) => p.kind === "kpi");
+
+  const initial = kpiDefs
+    .map((p) => {
+      const r = rows.find((x) => x.role === role && x.key === p.key);
+      return { key: p.key, label: p.label, sort: r?.sort_order ?? 0, enabled: r?.enabled ?? false };
+    })
+    .sort((a, b) => a.sort - b.sort || kpiDefs.findIndex((d) => d.key === a.key) - kpiDefs.findIndex((d) => d.key === b.key));
+
+  const [list, setList] = useState(initial);
+  // Reset when role changes
+  const roleKey = role + ":" + rows.length;
+  const [snapshot, setSnapshot] = useState(roleKey);
+  if (snapshot !== roleKey) { setSnapshot(roleKey); setList(initial); }
+
+  const move = (idx: number, dir: -1 | 1) => {
+    setList((cur) => {
+      const n = cur.slice();
+      const j = idx + dir;
+      if (j < 0 || j >= n.length) return cur;
+      [n[idx], n[j]] = [n[j], n[idx]];
+      return n;
+    });
+  };
+
+  async function save() {
+    setSaving(true);
+    try {
+      const upserts = list.map((item, idx) => {
+        const def = kpiDefs.find((d) => d.key === item.key)!;
+        return { role, key: item.key, kind: def.kind, enabled: item.enabled, sort_order: idx };
+      });
+      const { error } = await supabase.from("role_permissions").upsert(upserts, { onConflict: "role,key" });
+      if (error) throw error;
+      toast.success(`Saved KPI layout for ${ROLE_LABEL[role]}`);
+      onSaved();
+    } catch (e) { toast.error((e as Error).message); } finally { setSaving(false); }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between gap-4">
+        <div>
+          <CardTitle>KPI card layout per role</CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">Reorder and toggle KPI cards as they appear on the dashboard for the selected role.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
+            <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {rolesList.map((r) => <SelectItem key={r} value={r}>{ROLE_LABEL[r]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button size="sm" onClick={save} disabled={saving}>{saving ? "Saving…" : "Save layout"}</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+          {list.map((item, idx) => (
+            <div key={item.key} className="flex items-center justify-between gap-2 border border-border rounded-md p-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs text-muted-foreground w-6 text-right">{idx + 1}.</span>
+                <Checkbox
+                  checked={item.enabled}
+                  onCheckedChange={(v) => setList((cur) => cur.map((it, i) => i === idx ? { ...it, enabled: Boolean(v) } : it))}
+                />
+                <span className="text-sm truncate">{item.label}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => move(idx, -1)} disabled={idx === 0}>↑</Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => move(idx, 1)} disabled={idx === list.length - 1}>↓</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---- Permission audit log ----
+function PermissionAuditLog() {
+  const { data = [], isLoading } = useQuery({
+    queryKey: ["permission-audit-log"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("permission_audit_log")
+        .select("id, role, perm_key, perm_kind, action, old_enabled, new_enabled, old_sort_order, new_sort_order, changed_by_email, changed_at")
+        .order("changed_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const labelFor = (k: string) => PERMISSIONS.find((p) => p.key === k)?.label ?? k;
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Permission Audit Log</CardTitle></CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>When</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Item</TableHead>
+              <TableHead>Change</TableHead>
+              <TableHead>By</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
+            {!isLoading && data.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No permission changes yet.</TableCell></TableRow>}
+            {data.map((a) => {
+              const parts: string[] = [];
+              if (a.old_enabled !== a.new_enabled) {
+                parts.push(`${a.old_enabled === null ? "—" : a.old_enabled ? "on" : "off"} → ${a.new_enabled === null ? "—" : a.new_enabled ? "on" : "off"}`);
+              }
+              if (a.old_sort_order !== a.new_sort_order) {
+                parts.push(`order ${a.old_sort_order ?? "—"} → ${a.new_sort_order ?? "—"}`);
+              }
+              return (
+                <TableRow key={a.id}>
+                  <TableCell className="whitespace-nowrap text-sm">{format(new Date(a.changed_at), "yyyy-MM-dd HH:mm")}</TableCell>
+                  <TableCell><Badge variant="secondary">{ROLE_LABEL[a.role as AppRole] ?? a.role}</Badge></TableCell>
+                  <TableCell className="text-sm">
+                    <span className="text-muted-foreground mr-1 uppercase text-[10px]">{a.perm_kind}</span>
+                    {labelFor(a.perm_key)}
+                  </TableCell>
+                  <TableCell className="text-sm">
+                    <Badge variant={a.action === "delete" ? "destructive" : "default"} className="mr-2">{a.action}</Badge>
+                    {parts.join(" · ")}
+                  </TableCell>
+                  <TableCell className="text-sm">{a.changed_by_email ?? "system"}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 function UserRow({
   user, isSelf, onSetRoles, onSetActive, onSaveProfile,
 }: {
