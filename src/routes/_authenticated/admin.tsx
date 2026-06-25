@@ -24,6 +24,7 @@ import {
 import { format } from "date-fns";
 import { PERMISSIONS, type PermDef, setPreviewRole, usePreviewRole } from "@/lib/permissions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { upsertAccountManagerFn, setAccountManagerActiveFn } from "@/lib/customers.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -100,6 +101,8 @@ function AdminPage() {
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="perm-audit">Permission Audit</TabsTrigger>
           <TabsTrigger value="audit">Role Audit Log</TabsTrigger>
+          <TabsTrigger value="account-managers">Account Managers</TabsTrigger>
+          <TabsTrigger value="customer-audit">Customer Audit</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -179,6 +182,14 @@ function AdminPage() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="account-managers">
+          <AccountManagersAdmin />
+        </TabsContent>
+
+        <TabsContent value="customer-audit">
+          <CustomerAuditLog />
         </TabsContent>
       </Tabs>
     </AppShell>
