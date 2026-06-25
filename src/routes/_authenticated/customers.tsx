@@ -368,6 +368,20 @@ function CustomersPage() {
         filename={`customers-${asyncExport?.scope ?? "export"}-${new Date().toISOString().slice(0, 10)}.xlsx`}
         meta={{ generatedBy: user?.email ?? "—", filters: exportFilters(asyncExport?.scope ?? "") }}
       />
+      <DeactivateReasonDialog
+        customer={deactivating}
+        onClose={() => setDeactivating(null)}
+        onConfirm={async (reason) => {
+          if (!deactivating) return;
+          try {
+            await setActive({ data: { id: deactivating.id, active: false, reason } });
+            toast.success("Customer deactivated");
+            qc.invalidateQueries({ queryKey: ["customers-summary"] });
+            qc.invalidateQueries({ queryKey: ["customers"] });
+            setDeactivating(null);
+          } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+        }}
+      />
     </AppShell>
   );
 }
