@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Plus } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/customers")({
   component: CustomersPage,
@@ -30,6 +31,7 @@ function CustomersPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<CustomerRow | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const { data: rows = [] } = useQuery({
     queryKey: ["customers-summary"],
@@ -91,6 +93,11 @@ function CustomersPage() {
           })), { generatedBy: user?.email ?? "—", filters: { search } })}>
             <Download className="h-4 w-4 mr-1" />Export
           </Button>
+          )}
+          {canEdit && (
+            <Button size="sm" onClick={() => setAdding(true)}>
+              <Plus className="h-4 w-4 mr-1" />Add Customer
+            </Button>
           )}
         </div>
       </Card>
@@ -160,6 +167,15 @@ function CustomersPage() {
         onClose={() => setEditing(null)}
         onSaved={() => {
           setEditing(null);
+          qc.invalidateQueries({ queryKey: ["customers-summary"] });
+          qc.invalidateQueries({ queryKey: ["customers"] });
+        }}
+      />
+      <AddCustomerDialog
+        open={adding}
+        onClose={() => setAdding(false)}
+        onSaved={() => {
+          setAdding(false);
           qc.invalidateQueries({ queryKey: ["customers-summary"] });
           qc.invalidateQueries({ queryKey: ["customers"] });
         }}
