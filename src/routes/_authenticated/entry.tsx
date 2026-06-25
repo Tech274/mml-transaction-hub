@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { MasterAdrForm } from "@/components/master-adr-form";
 import { useAuth } from "@/lib/auth-context";
+import { usePermissions } from "@/lib/permissions";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const Route = createFileRoute("/_authenticated/entry")({
@@ -10,9 +11,11 @@ export const Route = createFileRoute("/_authenticated/entry")({
 
 function EntryPage() {
   const { canEditTransactions } = useAuth();
+  const { can } = usePermissions();
+  const allowed = canEditTransactions && can("feature_master_adr_entry");
   return (
     <AppShell title="Master ADR Entry">
-      {canEditTransactions ? (
+      {allowed ? (
         <MasterAdrForm />
       ) : (
         <Card><CardContent className="py-12 text-center text-muted-foreground">

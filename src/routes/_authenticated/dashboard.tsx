@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
+import { usePermissions } from "@/lib/permissions";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
 } from "recharts";
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent-foreground))", "#0ea5e9", "#22c55e", "#f59e0b", "#ef4444"];
 
 function DashboardPage() {
+  const { can } = usePermissions();
   const { data } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
@@ -95,22 +97,22 @@ function DashboardPage() {
     <AppShell title="Dashboard">
       <div className="space-y-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KPI label="Total Transactions" value={fmtNumber(total)} />
-          <KPI label="Public Cloud" value={fmtNumber(pub)} />
-          <KPI label="Private Cloud" value={fmtNumber(priv)} />
-          <KPI label="Total Users" value={fmtNumber(users)} />
-          <KPI label="Total Revenue" value={fmtCurrency(revenue)} />
-          <KPI label="Total Input Cost" value={fmtCurrency(inputCostTotal)} />
-          <KPI label="Total Profit" value={fmtCurrency(profit)} />
-          <KPI label={`Margin`} value={`${margin.toFixed(1)}%`} />
-          <KPI label="Avg Selling Cost" value={fmtCurrency(avgCost)} />
-          <KPI label="Current Month Revenue" value={fmtCurrency(curRevenue)} />
-          <KPI label="Current Month Profit" value={fmtCurrency(curProfit)} />
-          <KPI label="Current Month Users" value={fmtNumber(curUsers)} />
+          {can("kpi_total_transactions") && <KPI label="Total Transactions" value={fmtNumber(total)} />}
+          {can("kpi_public_cloud") && <KPI label="Public Cloud" value={fmtNumber(pub)} />}
+          {can("kpi_private_cloud") && <KPI label="Private Cloud" value={fmtNumber(priv)} />}
+          {can("kpi_total_users") && <KPI label="Total Users" value={fmtNumber(users)} />}
+          {can("kpi_total_revenue") && <KPI label="Total Revenue" value={fmtCurrency(revenue)} />}
+          {can("kpi_total_input_cost") && <KPI label="Total Input Cost" value={fmtCurrency(inputCostTotal)} />}
+          {can("kpi_total_profit") && <KPI label="Total Profit" value={fmtCurrency(profit)} />}
+          {can("kpi_margin") && <KPI label={`Margin`} value={`${margin.toFixed(1)}%`} />}
+          {can("kpi_avg_cost") && <KPI label="Avg Selling Cost" value={fmtCurrency(avgCost)} />}
+          {can("kpi_current_month_revenue") && <KPI label="Current Month Revenue" value={fmtCurrency(curRevenue)} />}
+          {can("kpi_current_month_profit") && <KPI label="Current Month Profit" value={fmtCurrency(curProfit)} />}
+          {can("kpi_current_month_users") && <KPI label="Current Month Users" value={fmtNumber(curUsers)} />}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title={`Transactions by Month — ${curYear}`}>
+          {can("chart_tx_by_month") && <ChartCard title={`Transactions by Month — ${curYear}`}>
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={byMonth}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -120,8 +122,8 @@ function DashboardPage() {
                 <Bar dataKey="transactions" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard title={`Revenue by Month — ${curYear}`}>
+          </ChartCard>}
+          {can("chart_revenue_by_month") && <ChartCard title={`Revenue by Month — ${curYear}`}>
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={byMonth}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -134,8 +136,8 @@ function DashboardPage() {
                 <Legend />
               </LineChart>
             </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard title="Public vs Private Cloud">
+          </ChartCard>}
+          {can("chart_pub_priv") && <ChartCard title="Public vs Private Cloud">
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie data={split} dataKey="value" nameKey="name" outerRadius={80} label>
@@ -144,8 +146,8 @@ function DashboardPage() {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard title="Public Cloud Provider Split">
+          </ChartCard>}
+          {can("chart_provider") && <ChartCard title="Public Cloud Provider Split">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={providerSplit}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -155,8 +157,8 @@ function DashboardPage() {
                 <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard title="Top Customers by Revenue">
+          </ChartCard>}
+          {can("chart_top_revenue") && <ChartCard title="Top Customers by Revenue">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={topRev} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -166,8 +168,8 @@ function DashboardPage() {
                 <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard title="Top Customers by Users">
+          </ChartCard>}
+          {can("chart_top_users") && <ChartCard title="Top Customers by Users">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={topUsers} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -177,8 +179,8 @@ function DashboardPage() {
                 <Bar dataKey="users" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard title="Top Customers by Profit">
+          </ChartCard>}
+          {can("chart_top_profit") && <ChartCard title="Top Customers by Profit">
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={topProfit} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -188,8 +190,8 @@ function DashboardPage() {
                 <Bar dataKey="profit" fill="#22c55e" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
-          </ChartCard>
-          <ChartCard title="Line of Business Split">
+          </ChartCard>}
+          {can("chart_lob") && <ChartCard title="Line of Business Split">
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
                 <Pie data={lobSplit} dataKey="value" nameKey="name" outerRadius={80} label>
@@ -198,7 +200,7 @@ function DashboardPage() {
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
-          </ChartCard>
+          </ChartCard>}
         </div>
       </div>
     </AppShell>

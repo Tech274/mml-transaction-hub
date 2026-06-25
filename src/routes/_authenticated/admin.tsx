@@ -22,6 +22,7 @@ import {
   adminCreateUser, adminSetUserRoles, adminSetUserActive, adminUpdateUserProfile,
 } from "@/lib/admin.functions";
 import { format } from "date-fns";
+import { PERMISSIONS, type PermDef } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -95,6 +96,7 @@ function AdminPage() {
       <Tabs defaultValue="users" className="space-y-4">
         <TabsList>
           <TabsTrigger value="users">Users & Roles</TabsTrigger>
+          <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="audit">Role Audit Log</TabsTrigger>
         </TabsList>
 
@@ -129,6 +131,10 @@ function AdminPage() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="permissions">
+          <PermissionsMatrix />
         </TabsContent>
 
         <TabsContent value="audit">
@@ -170,6 +176,130 @@ function AdminPage() {
         </TabsContent>
       </Tabs>
     </AppShell>
+  );
+}
+
+function PermissionsMatrix() {
+  const qc = useQueryClient();
+  const rolesList: AppRole[] = ["leadership", "finance", "ops_lead", "ops_user", "viewer"];
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["role-permissions-admin"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("role_permissions").select("role,key,enabled");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const map = new Map<string, boolean>();
+  for (const r of rows) map.set(`${r.role}|${r.key}`, r.enabled);
+
+  const [draft, setDraft] = useState<Map<string, boolean>>(new Map());
+  const [saving, setSaving] = useState(false);
+
+  const get = (role: AppRole, key: string) => {
+    const dk = `${role}|${key}`;
+    if (draft.has(dk)) return draft.get(dk)!;
+    return map.get(dk) ?? false;
+  };
+  const toggle = (role: AppRole, key: string, val: boolean) => {
+    setDraft((d) => { const n = new Map(d); n.set(`${role}|${key}`, val); return n; });
+  };
+
+  async function save() {
+    if (draft.size === 0) return;
+    setSaving(true);
+    try {
+      const upserts = Array.from(draft.entries()).map(([k, enabled]) => {
+        const [role, key] = k.split("|");
+        const def = PERMISSIONS.find((p) => p.key === key)!;
+        return { role: role as AppRole, key, kind: def.kind, enabled };
+      });
+      const { error } = await supabase.from("role_permissions").upsert(upserts, { onConflict: "role,key" });
+      if (error) throw error;
+      toast.success("Permissions updated");
+      setDraft(new Map());
+      qc.invalidateQueries({ queryKey: ["role-permissions-admin"] });
+      qc.invalidateQueries({ queryKey: ["role-permissions-all"] });
+    } catch (e) { toast.error((e as Error).message); } finally { setSaving(false); }
+  }
+
+  const groups = Array.from(new Set(PERMISSIONS.map((p) => p.group)));
+  const dirty = draft.size > 0;
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>KPI & Feature permissions per role</CardTitle>
+        <div className="flex items-center gap-2">
+          {dirty && <span className="text-xs text-muted-foreground">{draft.size} pending change(s)</span>}
+          <Button size="sm" variant="outline" onClick={() => setDraft(new Map())} disabled={!dirty || saving}>Discard</Button>
+          <Button size="sm" onClick={save} disabled={!dirty || saving}>{saving ? "Saving…" : "Save changes"}</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="text-sm text-muted-foreground py-8 text-center">Loading…</div>
+        ) : (
+          <div className="space-y-6">
+            <p className="text-xs text-muted-foreground">
+              Super Admin always has access to everything. Items disabled for a role are hidden in that role's UI.
+            </p>
+            {groups.map((g) => (
+              <PermGroup
+                key={g}
+                title={g}
+                items={PERMISSIONS.filter((p) => p.group === g)}
+                roles={rolesList}
+                get={get}
+                toggle={toggle}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PermGroup({
+  title, items, roles, get, toggle,
+}: {
+  title: string;
+  items: PermDef[];
+  roles: AppRole[];
+  get: (role: AppRole, key: string) => boolean;
+  toggle: (role: AppRole, key: string, val: boolean) => void;
+}) {
+  return (
+    <div className="border border-border rounded-md overflow-hidden">
+      <div className="bg-muted/50 px-3 py-2 text-sm font-semibold">{title}</div>
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="min-w-[240px]">Item</TableHead>
+              {roles.map((r) => (
+                <TableHead key={r} className="text-center whitespace-nowrap">{ROLE_LABEL[r]}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map((p) => (
+              <TableRow key={p.key}>
+                <TableCell className="text-sm">{p.label}</TableCell>
+                {roles.map((r) => (
+                  <TableCell key={r} className="text-center">
+                    <Checkbox checked={get(r, p.key)} onCheckedChange={(v) => toggle(r, p.key, Boolean(v))} />
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
   );
 }
 
