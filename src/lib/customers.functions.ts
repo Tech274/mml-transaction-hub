@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { normalizeName as normalize, normalizeEmail, normalizePhone } from "./customer-normalize";
 
 const emailSchema = z.string().trim().email().max(255).optional().or(z.literal("")).transform((v) => (v ? v : null));
 // Permissive international phone: digits, spaces, dashes, parentheses, plus. 7-20 chars.
@@ -19,18 +20,7 @@ const customerInput = z.object({
   notes: z.string().trim().max(2000).optional().or(z.literal("")).transform((v) => (v ? v : null)),
 });
 
-function normalize(name: string) {
-  return name.trim().replace(/\s+/g, " ").toLowerCase();
-}
-
-function normalizeEmail(v: string | null | undefined): string | null {
-  const s = (v ?? "").trim().toLowerCase();
-  return s ? s : null;
-}
-function normalizePhone(v: string | null | undefined): string | null {
-  const digits = (v ?? "").replace(/\D/g, "").replace(/^0+/, "");
-  return digits.length >= 7 ? digits : null;
-}
+// helpers imported above
 
 async function assertContactUnique(
   supabase: any,
