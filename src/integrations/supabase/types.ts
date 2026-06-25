@@ -121,7 +121,9 @@ export type Database = {
           id: string
           industry: string | null
           is_active: boolean
+          normalized_email: string | null
           normalized_name: string
+          normalized_phone: string | null
           notes: string | null
           updated_at: string
         }
@@ -135,7 +137,9 @@ export type Database = {
           id?: string
           industry?: string | null
           is_active?: boolean
+          normalized_email?: string | null
           normalized_name: string
+          normalized_phone?: string | null
           notes?: string | null
           updated_at?: string
         }
@@ -149,7 +153,9 @@ export type Database = {
           id?: string
           industry?: string | null
           is_active?: boolean
+          normalized_email?: string | null
           normalized_name?: string
+          normalized_phone?: string | null
           notes?: string | null
           updated_at?: string
         }
