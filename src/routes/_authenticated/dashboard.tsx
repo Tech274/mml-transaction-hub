@@ -212,6 +212,9 @@ function DashboardPage() {
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>}
+          {can("widget_customers_by_am") && (
+            <div className="lg:col-span-2"><CustomersByAccountManager /></div>
+          )}
         </div>
       </div>
     </AppShell>
@@ -245,5 +248,106 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
       <CardHeader><CardTitle className="text-sm">{title}</CardTitle></CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
+  );
+}
+
+function CustomersByAccountManager() {
+  const { data } = useQuery({
+    queryKey: ["dashboard-customers-by-am"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("id, account_manager_name, is_active, created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const rows = data ?? [];
+  const active = rows.filter((r) => r.is_active).length;
+  const inactive = rows.length - active;
+
+  const amMap = new Map<string, { active: number; inactive: number }>();
+  for (const r of rows) {
+    const key = r.account_manager_name?.trim() || "Unassigned";
+    const e = amMap.get(key) ?? { active: 0, inactive: 0 };
+    if (r.is_active) e.active += 1; else e.inactive += 1;
+    amMap.set(key, e);
+  }
+  const topAms = Array.from(amMap.entries())
+    .map(([name, v]) => ({ name, active: v.active, inactive: v.inactive, total: v.active + v.inactive }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6);
+
+  // 6-month trend of new customers
+  const months: { label: string; key: string; count: number }[] = [];
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      label: `${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${String(d.getFullYear()).slice(2)}`,
+      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+      count: 0,
+    });
+  }
+  const byKey = new Map(months.map((m) => [m.key, m]));
+  for (const r of rows) {
+    if (!r.created_at) continue;
+    const d = new Date(r.created_at);
+    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const m = byKey.get(k);
+    if (m) m.count += 1;
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">Customers by Account Manager</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <Stat label="Total" value={fmtNumber(rows.length)} />
+          <Stat label="Active" value={fmtNumber(active)} tone="positive" />
+          <Stat label="Deactivated" value={fmtNumber(inactive)} tone="muted" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Top account managers</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart data={topAms} layout="vertical" stackOffset="sign">
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis type="number" fontSize={11} allowDecimals={false} />
+                <YAxis dataKey="name" type="category" fontSize={11} width={110} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="active" name="Active" stackId="a" fill="hsl(var(--primary))" radius={[0, 0, 0, 0]} />
+                <Bar dataKey="inactive" name="Deactivated" stackId="a" fill="#94a3b8" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">New customers — last 6 months</div>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={months}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis dataKey="label" fontSize={11} />
+                <YAxis fontSize={11} allowDecimals={false} />
+                <Tooltip />
+                <Line type="monotone" dataKey="count" stroke="hsl(var(--primary))" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "positive" | "muted" }) {
+  const color = tone === "positive" ? "text-emerald-600" : tone === "muted" ? "text-muted-foreground" : "";
+  return (
+    <div className="rounded-md border border-border p-3">
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={`text-xl font-semibold mt-1 ${color}`}>{value}</div>
+    </div>
   );
 }

@@ -35,6 +35,7 @@ export const PERMISSIONS: PermDef[] = [
   { key: "chart_top_users", kind: "kpi", label: "Top Customers by Users", group: "Charts" },
   { key: "chart_top_profit", kind: "kpi", label: "Top Customers by Profit", group: "Charts" },
   { key: "chart_lob", kind: "kpi", label: "Line of Business Split", group: "Charts" },
+  { key: "widget_customers_by_am", kind: "kpi", label: "Customers by Account Manager", group: "Charts" },
   // Features
   { key: "feature_excel_export", kind: "feature", label: "Excel export", group: "Features" },
   { key: "feature_customer_edit", kind: "feature", label: "Edit customer details", group: "Features" },

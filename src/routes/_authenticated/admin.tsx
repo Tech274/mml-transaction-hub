@@ -793,6 +793,12 @@ function AccountManagersAdmin() {
 }
 
 function CustomerAuditLog() {
+  const [customer, setCustomer] = useState("");
+  const [actor, setActor] = useState("");
+  const [action, setAction] = useState("__all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["customer-audit"],
     queryFn: async () => {
@@ -800,24 +806,53 @@ function CustomerAuditLog() {
         .from("customer_audit_log")
         .select("id, customer_id, customer_name, action, changes, changed_by, changed_by_email, changed_at")
         .order("changed_at", { ascending: false })
-        .limit(500);
+        .limit(1000);
       if (error) throw error;
       return data ?? [];
     },
   });
 
+  const filtered = rows.filter((a: any) => {
+    if (action !== "__all" && a.action !== action) return false;
+    if (customer && !(a.customer_name ?? "").toLowerCase().includes(customer.toLowerCase())) return false;
+    if (actor && !((a.changed_by_email ?? "") + (a.changed_by ?? "")).toLowerCase().includes(actor.toLowerCase())) return false;
+    if (from) { if (new Date(a.changed_at) < new Date(from)) return false; }
+    if (to) {
+      const end = new Date(to); end.setHours(23, 59, 59, 999);
+      if (new Date(a.changed_at) > end) return false;
+    }
+    return true;
+  });
+
   return (
     <Card>
       <CardHeader><CardTitle>Customer Audit Log</CardTitle></CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+          <Input placeholder="Customer" value={customer} onChange={(e) => setCustomer(e.target.value)} />
+          <Input placeholder="Acting user (email)" value={actor} onChange={(e) => setActor(e.target.value)} />
+          <Select value={action} onValueChange={setAction}>
+            <SelectTrigger><SelectValue placeholder="Action" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all">All actions</SelectItem>
+              <SelectItem value="create">Create</SelectItem>
+              <SelectItem value="update">Update</SelectItem>
+              <SelectItem value="activate">Activate</SelectItem>
+              <SelectItem value="deactivate">Deactivate</SelectItem>
+            </SelectContent>
+          </Select>
+          <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+        </div>
+        <div className="text-xs text-muted-foreground">{filtered.length} of {rows.length} entries</div>
         <Table>
           <TableHeader><TableRow>
             <TableHead>When</TableHead><TableHead>Action</TableHead><TableHead>Customer</TableHead><TableHead>Changes</TableHead><TableHead>By</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {isLoading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
-            {!isLoading && rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No customer changes recorded yet.</TableCell></TableRow>}
-            {rows.map((a: any) => (
+            {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No matching customer audit entries.</TableCell></TableRow>}
+            {filtered.map((a: any) => (
               <TableRow key={a.id}>
                 <TableCell className="whitespace-nowrap text-sm">{format(new Date(a.changed_at), "yyyy-MM-dd HH:mm")}</TableCell>
                 <TableCell><Badge variant={a.action === "deactivate" ? "destructive" : a.action === "create" ? "default" : "secondary"}>{a.action}</Badge></TableCell>

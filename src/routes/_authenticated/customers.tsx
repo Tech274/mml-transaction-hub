@@ -19,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useServerFn } from "@tanstack/react-start";
 import { createCustomerFn, updateCustomerFn, setCustomerActiveFn } from "@/lib/customers.functions";
 
@@ -149,6 +150,23 @@ function CustomersPage() {
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   }
 
+  function doExport(set: CustomerRow[], scope: string) {
+    exportToExcel(`customers-${scope}`, set.map((r) => ({
+      Customer: r.customer_name,
+      "Account Manager": r.account_manager_name ?? "",
+      Industry: r.industry ?? "",
+      "Contact Email": r.contact_email ?? "",
+      "Contact Phone": r.contact_phone ?? "",
+      Status: r.is_active ? "Active" : "Inactive",
+      Transactions: r.count, "Total Users": r.users,
+      "Total Revenue": r.revenue, "Total Input Cost": r.cost,
+      "Total Profit": r.profit, "Margin %": Number(r.margin.toFixed(2)),
+    })), { generatedBy: user?.email ?? "—", filters: {
+      scope, search, accountManager: amFilter, sortBy: sortKey, sortDir,
+      ...(scope === "current-page" ? { page: currentPage, pageSize: PAGE_SIZE } : {}),
+    } });
+  }
+
   return (
     <AppShell title="Customers">
       <Card className="p-4 mb-4">
@@ -168,19 +186,18 @@ function CustomersPage() {
             </Select>
           </div>
           {can("feature_excel_export") && (
-          <Button size="sm" onClick={() => exportToExcel("customers-summary", sorted.map((r) => ({
-            Customer: r.customer_name,
-            "Account Manager": r.account_manager_name ?? "",
-            Industry: r.industry ?? "",
-            "Contact Email": r.contact_email ?? "",
-            "Contact Phone": r.contact_phone ?? "",
-            Status: r.is_active ? "Active" : "Inactive",
-            Transactions: r.count, "Total Users": r.users,
-            "Total Revenue": r.revenue, "Total Input Cost": r.cost,
-            "Total Profit": r.profit, "Margin %": Number(r.margin.toFixed(2)),
-          })), { generatedBy: user?.email ?? "—", filters: { search, accountManager: amFilter } })}>
-            <Download className="h-4 w-4 mr-1" />Export
-          </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm"><Download className="h-4 w-4 mr-1" />Export</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Excel export</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => doExport(sorted, "all-filtered")}>All filtered ({sorted.length})</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => doExport(paginated, "current-page")}>Current page ({paginated.length})</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => doExport(rows, "all")}>All customers ({rows.length})</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           {canEdit && (
             <Button size="sm" onClick={() => setAdding(true)}>
