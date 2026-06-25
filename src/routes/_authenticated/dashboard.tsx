@@ -253,6 +253,34 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 }
 
 function CustomersByAccountManager() {
+  const { can, isPreviewing, previewRole } = usePermissions();
+  const allowed = can("widget_customers_by_am");
+
+  // Hide entirely for non-admins who lack the permission.
+  // When an admin is previewing as a role that lacks it, show an explanatory
+  // fallback so they can see what that role would experience.
+  if (!allowed) {
+    if (!isPreviewing) return null;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Customers by Account Manager</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-md border border-dashed border-border bg-muted/40 p-4 text-sm">
+            <div className="font-medium mb-1">Hidden for this role</div>
+            <div className="text-muted-foreground">
+              The <strong>{previewRole}</strong> role doesn't have the
+              <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">widget_customers_by_am</code>
+              permission, so this widget is hidden on their dashboard.
+              Enable it in <strong>Admin → Permissions</strong> to grant access.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const { data } = useQuery({
     queryKey: ["dashboard-customers-by-am"],
     queryFn: async () => {
@@ -302,7 +330,12 @@ function CustomersByAccountManager() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-sm">Customers by Account Manager</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm">Customers by Account Manager</CardTitle>
+          <Button asChild size="sm" variant="ghost">
+            <Link to="/customers" search={{ status: "active" }}>View all →</Link>
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-3 mb-4">
@@ -313,17 +346,25 @@ function CustomersByAccountManager() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
             <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Top account managers</div>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={topAms} layout="vertical" stackOffset="sign">
-                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                <XAxis type="number" fontSize={11} allowDecimals={false} />
-                <YAxis dataKey="name" type="category" fontSize={11} width={110} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="active" name="Active" stackId="a" fill="hsl(var(--primary))" radius={[0, 0, 0, 0]} />
-                <Bar dataKey="inactive" name="Deactivated" stackId="a" fill="#94a3b8" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <ul className="space-y-1">
+              {topAms.length === 0 && <li className="text-sm text-muted-foreground">No data yet.</li>}
+              {topAms.map((am) => (
+                <li key={am.name}>
+                  <Link
+                    to="/customers"
+                    search={{ am: am.name === "Unassigned" ? "__none" : am.name, status: "active" }}
+                    className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/60 transition"
+                  >
+                    <span className="text-sm font-medium truncate">{am.name}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      <span className="text-emerald-600">{am.active}</span>
+                      <span className="mx-1">·</span>
+                      <span>{am.inactive} inactive</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
           <div>
             <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">New customers — last 6 months</div>
