@@ -350,7 +350,72 @@ function CustomersPage() {
           qc.invalidateQueries({ queryKey: ["customers"] });
         }}
       />
+      <AsyncExportDialog
+        open={!!asyncExport?.open}
+        onClose={() => setAsyncExport(null)}
+        rows={asyncExportRows().map(toExportRow)}
+        filename={`customers-${asyncExport?.scope ?? "export"}-${new Date().toISOString().slice(0, 10)}.xlsx`}
+        meta={{ generatedBy: user?.email ?? "—", filters: exportFilters(asyncExport?.scope ?? "") }}
+      />
     </AppShell>
+  );
+}
+
+function AsyncExportDialog({
+  open, onClose, rows, filename, meta,
+}: {
+  open: boolean; onClose: () => void;
+  rows: Record<string, unknown>[]; filename: string;
+  meta: { generatedBy: string; filters?: Record<string, unknown> };
+}) {
+  const [progress, setProgress] = useState<ExportProgress | null>(null);
+  const [blob, setBlob] = useState<Blob | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) { setProgress(null); setBlob(null); setError(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const b = await buildExcelBlobAsync(rows, meta, (p) => { if (!cancelled) setProgress(p); });
+        if (!cancelled) setBlob(b);
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message ?? "Export failed");
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const pct = progress && progress.total > 0
+    ? Math.round((progress.processed / progress.total) * 100)
+    : (progress?.phase === "writing" ? 95 : progress?.phase === "done" ? 100 : 5);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader><DialogTitle>Preparing Excel export</DialogTitle></DialogHeader>
+        <div className="space-y-3">
+          <div className="text-sm text-muted-foreground">
+            {error ? <span className="text-destructive">{error}</span>
+              : progress?.message ?? "Starting…"}
+          </div>
+          <Progress value={pct} />
+          <div className="text-xs text-muted-foreground">
+            {progress ? `${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()} rows` : ""}
+          </div>
+        </div>
+        <DialogFooter>
+          {!blob && <Button variant="outline" onClick={onClose}>Cancel</Button>}
+          {blob && <>
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button onClick={() => { downloadBlob(blob, filename); onClose(); }}>
+              <Download className="h-4 w-4 mr-1" />Download
+            </Button>
+          </>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
