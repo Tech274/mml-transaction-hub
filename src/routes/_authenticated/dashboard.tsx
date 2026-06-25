@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
-import { usePermissions } from "@/lib/permissions";
+import { usePermissions, setPreviewRole } from "@/lib/permissions";
+import { Button } from "@/components/ui/button";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
 } from "recharts";
@@ -16,7 +17,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 const COLORS = ["hsl(var(--primary))", "hsl(var(--accent-foreground))", "#0ea5e9", "#22c55e", "#f59e0b", "#ef4444"];
 
 function DashboardPage() {
-  const { can } = usePermissions();
+  const { can, orderedKpis, isPreviewing, previewRole } = usePermissions();
   const { data } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
@@ -96,20 +97,30 @@ function DashboardPage() {
   return (
     <AppShell title="Dashboard">
       <div className="space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {can("kpi_total_transactions") && <KPI label="Total Transactions" value={fmtNumber(total)} />}
-          {can("kpi_public_cloud") && <KPI label="Public Cloud" value={fmtNumber(pub)} />}
-          {can("kpi_private_cloud") && <KPI label="Private Cloud" value={fmtNumber(priv)} />}
-          {can("kpi_total_users") && <KPI label="Total Users" value={fmtNumber(users)} />}
-          {can("kpi_total_revenue") && <KPI label="Total Revenue" value={fmtCurrency(revenue)} />}
-          {can("kpi_total_input_cost") && <KPI label="Total Input Cost" value={fmtCurrency(inputCostTotal)} />}
-          {can("kpi_total_profit") && <KPI label="Total Profit" value={fmtCurrency(profit)} />}
-          {can("kpi_margin") && <KPI label={`Margin`} value={`${margin.toFixed(1)}%`} />}
-          {can("kpi_avg_cost") && <KPI label="Avg Selling Cost" value={fmtCurrency(avgCost)} />}
-          {can("kpi_current_month_revenue") && <KPI label="Current Month Revenue" value={fmtCurrency(curRevenue)} />}
-          {can("kpi_current_month_profit") && <KPI label="Current Month Profit" value={fmtCurrency(curProfit)} />}
-          {can("kpi_current_month_users") && <KPI label="Current Month Users" value={fmtNumber(curUsers)} />}
-        </div>
+        {isPreviewing && (
+          <div className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm flex items-center justify-between">
+            <span>Previewing dashboard as <strong>{previewRole}</strong>. Disable to return to your Super Admin view.</span>
+            <Button size="sm" variant="outline" onClick={() => setPreviewRole(null)}>Exit preview</Button>
+          </div>
+        )}
+        <KpiGrid
+          order={orderedKpis}
+          can={can}
+          cards={{
+            kpi_total_transactions: <KPI label="Total Transactions" value={fmtNumber(total)} />,
+            kpi_public_cloud: <KPI label="Public Cloud" value={fmtNumber(pub)} />,
+            kpi_private_cloud: <KPI label="Private Cloud" value={fmtNumber(priv)} />,
+            kpi_total_users: <KPI label="Total Users" value={fmtNumber(users)} />,
+            kpi_total_revenue: <KPI label="Total Revenue" value={fmtCurrency(revenue)} />,
+            kpi_total_input_cost: <KPI label="Total Input Cost" value={fmtCurrency(inputCostTotal)} />,
+            kpi_total_profit: <KPI label="Total Profit" value={fmtCurrency(profit)} />,
+            kpi_margin: <KPI label="Margin" value={`${margin.toFixed(1)}%`} />,
+            kpi_avg_cost: <KPI label="Avg Selling Cost" value={fmtCurrency(avgCost)} />,
+            kpi_current_month_revenue: <KPI label="Current Month Revenue" value={fmtCurrency(curRevenue)} />,
+            kpi_current_month_profit: <KPI label="Current Month Profit" value={fmtCurrency(curProfit)} />,
+            kpi_current_month_users: <KPI label="Current Month Users" value={fmtNumber(curUsers)} />,
+          }}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {can("chart_tx_by_month") && <ChartCard title={`Transactions by Month — ${curYear}`}>
