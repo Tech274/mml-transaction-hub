@@ -75,7 +75,7 @@ function CustomersPage() {
     queryFn: async () => {
       const { data: customers } = await supabase
         .from("customers")
-        .select("id, customer_name, is_active, account_manager_name, contact_email, contact_phone, industry, notes")
+        .select("id, customer_name, is_active, account_manager_name, contact_email, contact_phone, industry, notes, created_at, deactivation_reason")
         .order("customer_name");
       const { data: tx } = await supabase
         .from("transactions")
@@ -119,12 +119,22 @@ function CustomersPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const range = searchParams.range;
+    let cutoff: Date | null = null;
+    if (range) {
+      cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - range);
+      cutoff.setHours(0, 0, 0, 0);
+    }
     return rows.filter((r) => {
       if (statusFilter === "active" && !r.is_active) return false;
       if (statusFilter === "inactive" && r.is_active) return false;
       if (amFilter !== "__all") {
         if (amFilter === "__none") { if (r.account_manager_name) return false; }
         else if ((r.account_manager_name ?? "") !== amFilter) return false;
+      }
+      if (cutoff) {
+        if (!r.created_at || new Date(r.created_at) < cutoff) return false;
       }
       if (!q) return true;
       return (
@@ -134,7 +144,7 @@ function CustomersPage() {
         (r.contact_email ?? "").toLowerCase().includes(q)
       );
     });
-  }, [rows, search, amFilter, statusFilter]);
+  }, [rows, search, amFilter, statusFilter, searchParams.range]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
