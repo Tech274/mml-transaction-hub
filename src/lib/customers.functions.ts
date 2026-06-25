@@ -114,11 +114,22 @@ export const updateCustomerFn = createServerFn({ method: "POST" })
 
 export const setCustomerActiveFn = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; active: boolean }) =>
-    z.object({ id: z.string().uuid(), active: z.boolean() }).parse(d),
+  .inputValidator((d: { id: string; active: boolean; reason?: string | null }) =>
+    z.object({
+      id: z.string().uuid(),
+      active: z.boolean(),
+      reason: z.string().trim().max(500).optional().nullable(),
+    }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("customers").update({ is_active: data.active }).eq("id", data.id);
+    // Require a reason when deactivating
+    if (!data.active && (!data.reason || data.reason.trim().length === 0)) {
+      throw new Error("A deactivation reason is required.");
+    }
+    const patch: Record<string, unknown> = { is_active: data.active };
+    // Store the reason only when deactivating; clear it on reactivation
+    patch.deactivation_reason = data.active ? null : (data.reason ?? null);
+    const { error } = await context.supabase.from("customers").update(patch).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
