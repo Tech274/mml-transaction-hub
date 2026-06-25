@@ -23,6 +23,37 @@ function normalize(name: string) {
   return name.trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function normalizeEmail(v: string | null | undefined): string | null {
+  const s = (v ?? "").trim().toLowerCase();
+  return s ? s : null;
+}
+function normalizePhone(v: string | null | undefined): string | null {
+  const digits = (v ?? "").replace(/\D/g, "").replace(/^0+/, "");
+  return digits.length >= 7 ? digits : null;
+}
+
+async function assertContactUnique(
+  supabase: any,
+  email: string | null,
+  phone: string | null,
+  excludeId?: string,
+) {
+  const ne = normalizeEmail(email);
+  const np = normalizePhone(phone);
+  if (ne) {
+    let q = supabase.from("customers").select("id, customer_name").eq("normalized_email", ne).limit(1);
+    if (excludeId) q = q.neq("id", excludeId);
+    const { data } = await q.maybeSingle();
+    if (data) throw new Error(`Email already used by "${data.customer_name}".`);
+  }
+  if (np) {
+    let q = supabase.from("customers").select("id, customer_name").eq("normalized_phone", np).limit(1);
+    if (excludeId) q = q.neq("id", excludeId);
+    const { data } = await q.maybeSingle();
+    if (data) throw new Error(`Phone number already used by "${data.customer_name}".`);
+  }
+}
+
 async function resolveAccountManagerName(
   supabase: any,
   amId: string | null | undefined,
@@ -48,6 +79,7 @@ export const createCustomerFn = createServerFn({ method: "POST" })
     const { data: dup } = await context.supabase
       .from("customers").select("id, customer_name").eq("normalized_name", normalized).maybeSingle();
     if (dup) throw new Error(`A customer named "${dup.customer_name}" already exists.`);
+    await assertContactUnique(context.supabase, data.contact_email, data.contact_phone);
     const amName = await resolveAccountManagerName(context.supabase, data.account_manager_id, data.account_manager_name);
     const { data: created, error } = await context.supabase.from("customers").insert({
       customer_name: name,
@@ -75,6 +107,7 @@ export const updateCustomerFn = createServerFn({ method: "POST" })
       .from("customers").select("id, customer_name")
       .eq("normalized_name", normalized).neq("id", data.id).maybeSingle();
     if (dup) throw new Error(`Another customer named "${dup.customer_name}" already exists.`);
+    await assertContactUnique(context.supabase, data.contact_email, data.contact_phone, data.id);
     const amName = await resolveAccountManagerName(context.supabase, data.account_manager_id, data.account_manager_name);
     const { error } = await context.supabase.from("customers").update({
       customer_name: name,
