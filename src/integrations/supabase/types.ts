@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_managers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          normalized_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          normalized_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          normalized_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       config_master: {
         Row: {
           category: string
@@ -41,6 +74,39 @@ export type Database = {
           key?: string
           label?: string
           sort_order?: number
+        }
+        Relationships: []
+      }
+      customer_audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          changed_by_email: string | null
+          changes: Json | null
+          customer_id: string
+          customer_name: string | null
+          id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          changes?: Json | null
+          customer_id: string
+          customer_name?: string | null
+          id?: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          changes?: Json | null
+          customer_id?: string
+          customer_name?: string | null
+          id?: string
         }
         Relationships: []
       }
