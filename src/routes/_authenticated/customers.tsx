@@ -639,6 +639,8 @@ type CustomerRow = {
   contact_phone: string | null;
   industry: string | null;
   notes: string | null;
+  created_at?: string | null;
+  deactivation_reason?: string | null;
   count: number;
   users: number;
   revenue: number;
