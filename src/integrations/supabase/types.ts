@@ -89,6 +89,51 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          changed_by_email: string | null
+          id: string
+          new_enabled: boolean | null
+          new_sort_order: number | null
+          old_enabled: boolean | null
+          old_sort_order: number | null
+          perm_key: string
+          perm_kind: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          id?: string
+          new_enabled?: boolean | null
+          new_sort_order?: number | null
+          old_enabled?: boolean | null
+          old_sort_order?: number | null
+          perm_key: string
+          perm_kind: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          id?: string
+          new_enabled?: boolean | null
+          new_sort_order?: number | null
+          old_enabled?: boolean | null
+          old_sort_order?: number | null
+          perm_key?: string
+          perm_kind?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -157,6 +202,7 @@ export type Database = {
           key: string
           kind: string
           role: Database["public"]["Enums"]["app_role"]
+          sort_order: number
           updated_at: string
         }
         Insert: {
@@ -166,6 +212,7 @@ export type Database = {
           key: string
           kind: string
           role: Database["public"]["Enums"]["app_role"]
+          sort_order?: number
           updated_at?: string
         }
         Update: {
@@ -175,6 +222,7 @@ export type Database = {
           key?: string
           kind?: string
           role?: Database["public"]["Enums"]["app_role"]
+          sort_order?: number
           updated_at?: string
         }
         Relationships: []
