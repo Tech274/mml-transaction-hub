@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fmtCurrency, fmtNumber } from "@/lib/format";
 import { exportToExcel } from "@/lib/export-xlsx";
+import { buildExcelBlobAsync, downloadBlob, type ExportProgress } from "@/lib/export-xlsx-async";
+import { Progress } from "@/components/ui/progress";
 import { Download, Search, Pencil, ArrowUpDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
@@ -25,25 +27,43 @@ import { createCustomerFn, updateCustomerFn, setCustomerActiveFn } from "@/lib/c
 
 type SortKey = "customer_name" | "account_manager_name" | "count" | "users" | "revenue" | "profit" | "margin";
 const PAGE_SIZE = 25;
+const ASYNC_EXPORT_THRESHOLD = 200; // rows above this use the async progress flow
+
+type CustomersSearch = { am?: string; status?: "active" | "inactive" | "all"; q?: string };
 
 export const Route = createFileRoute("/_authenticated/customers")({
+  validateSearch: (s: Record<string, unknown>): CustomersSearch => ({
+    am: typeof s.am === "string" ? s.am : undefined,
+    status: s.status === "active" || s.status === "inactive" || s.status === "all" ? s.status : undefined,
+    q: typeof s.q === "string" ? s.q : undefined,
+  }),
   component: CustomersPage,
 });
 
 function CustomersPage() {
   const { user, hasAnyRole } = useAuth();
   const { can } = usePermissions();
+  const searchParams = Route.useSearch();
   const canToggle = hasAnyRole(["admin", "ops_lead"]);
   const canEdit = hasAnyRole(["admin", "ops_lead"]) && can("feature_customer_edit");
   const qc = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [amFilter, setAmFilter] = useState<string>("__all");
+  const [search, setSearch] = useState(searchParams.q ?? "");
+  const [amFilter, setAmFilter] = useState<string>(searchParams.am ?? "__all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">(searchParams.status ?? "all");
   const [editing, setEditing] = useState<CustomerRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("customer_name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [page, setPage] = useState(1);
+  const [asyncExport, setAsyncExport] = useState<{ open: boolean; scope: string } | null>(null);
   const setActive = useServerFn(setCustomerActiveFn);
+
+  // Apply incoming search-param changes (e.g., drill-down link reuse)
+  useEffect(() => {
+    if (searchParams.am !== undefined) setAmFilter(searchParams.am);
+    if (searchParams.status !== undefined) setStatusFilter(searchParams.status);
+    if (searchParams.q !== undefined) setSearch(searchParams.q);
+  }, [searchParams.am, searchParams.status, searchParams.q]);
 
   const { data: rows = [] } = useQuery({
     queryKey: ["customers-summary"],
@@ -95,6 +115,8 @@ function CustomersPage() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
+      if (statusFilter === "active" && !r.is_active) return false;
+      if (statusFilter === "inactive" && r.is_active) return false;
       if (amFilter !== "__all") {
         if (amFilter === "__none") { if (r.account_manager_name) return false; }
         else if ((r.account_manager_name ?? "") !== amFilter) return false;
@@ -107,7 +129,7 @@ function CustomersPage() {
         (r.contact_email ?? "").toLowerCase().includes(q)
       );
     });
-  }, [rows, search, amFilter]);
+  }, [rows, search, amFilter, statusFilter]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -124,7 +146,7 @@ function CustomersPage() {
   const currentPage = Math.min(page, totalPages);
   const paginated = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => { setPage(1); }, [search, amFilter, sortKey, sortDir]);
+  useEffect(() => { setPage(1); }, [search, amFilter, statusFilter, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -151,7 +173,18 @@ function CustomersPage() {
   }
 
   function doExport(set: CustomerRow[], scope: string) {
-    exportToExcel(`customers-${scope}`, set.map((r) => ({
+    if (set.length > ASYNC_EXPORT_THRESHOLD) {
+      setAsyncExport({ open: true, scope });
+      return;
+    }
+    exportToExcel(`customers-${scope}`, set.map(toExportRow), {
+      generatedBy: user?.email ?? "—",
+      filters: exportFilters(scope),
+    });
+  }
+
+  function toExportRow(r: CustomerRow) {
+    return {
       Customer: r.customer_name,
       "Account Manager": r.account_manager_name ?? "",
       Industry: r.industry ?? "",
@@ -161,10 +194,21 @@ function CustomersPage() {
       Transactions: r.count, "Total Users": r.users,
       "Total Revenue": r.revenue, "Total Input Cost": r.cost,
       "Total Profit": r.profit, "Margin %": Number(r.margin.toFixed(2)),
-    })), { generatedBy: user?.email ?? "—", filters: {
-      scope, search, accountManager: amFilter, sortBy: sortKey, sortDir,
+    };
+  }
+
+  function exportFilters(scope: string) {
+    return {
+      scope, search, accountManager: amFilter, status: statusFilter, sortBy: sortKey, sortDir,
       ...(scope === "current-page" ? { page: currentPage, pageSize: PAGE_SIZE } : {}),
-    } });
+    };
+  }
+
+  function asyncExportRows(): CustomerRow[] {
+    if (!asyncExport) return [];
+    if (asyncExport.scope === "all") return rows;
+    if (asyncExport.scope === "current-page") return paginated;
+    return sorted;
   }
 
   return (
@@ -182,6 +226,16 @@ function CustomersPage() {
                 <SelectItem value="__all">All account managers</SelectItem>
                 <SelectItem value="__none">— Unassigned —</SelectItem>
                 {amOptions.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full md:w-40">
+            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="active">Active only</SelectItem>
+                <SelectItem value="inactive">Inactive only</SelectItem>
               </SelectContent>
             </Select>
           </div>
