@@ -212,6 +212,9 @@ function DashboardPage() {
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>}
+          {can("widget_customers_by_am") && (
+            <div className="lg:col-span-2"><CustomersByAccountManager /></div>
+          )}
         </div>
       </div>
     </AppShell>
