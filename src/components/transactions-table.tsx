@@ -121,6 +121,8 @@ export function TransactionsTable({
   const summary = useMemo(() => ({
     users: rows.reduce((s, r) => s + (r.total_users ?? 0), 0),
     revenue: rows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0),
+    cost: rows.reduce((s, r) => s + Number(r.input_cost ?? 0), 0),
+    profit: rows.reduce((s, r) => s + Number(r.selling_cost ?? 0) - Number(r.input_cost ?? 0), 0),
   }), [rows]);
 
   function exportCurrent() {
@@ -139,7 +141,12 @@ export function TransactionsTable({
         "Start Date": r.start_date,
         "End Date": r.end_date,
         "Total Users": r.total_users,
+        "Input Cost": Number(r.input_cost ?? 0),
         "Selling Cost": Number(r.selling_cost),
+        "Profit": Number(r.selling_cost ?? 0) - Number(r.input_cost ?? 0),
+        "Margin %": Number(r.selling_cost) > 0
+          ? Number((((Number(r.selling_cost) - Number(r.input_cost ?? 0)) / Number(r.selling_cost)) * 100).toFixed(2))
+          : 0,
         ...(isFuzzy ? { "Relevance Score": Number((scoreMap?.get(r.id) ?? 0).toFixed(4)) } : {}),
         "Created At": r.created_at,
         "Updated At": r.updated_at,
@@ -210,6 +217,8 @@ export function TransactionsTable({
             <span><strong className="text-foreground">{fmtNumber(total)}</strong> records</span>
             <span>Page users: <strong className="text-foreground">{fmtNumber(summary.users)}</strong></span>
             <span>Page revenue: <strong className="text-foreground">{fmtCurrency(summary.revenue)}</strong></span>
+            <span>Page cost: <strong className="text-foreground">{fmtCurrency(summary.cost)}</strong></span>
+            <span>Page profit: <strong className={summary.profit < 0 ? "text-destructive" : "text-foreground"}>{fmtCurrency(summary.profit)}</strong></span>
           </div>
           <div className="flex items-center gap-2">
             <Select value={sortMode} onValueChange={(v) => { setSortMode(v as SortMode); setPage(0); }}>
@@ -239,17 +248,19 @@ export function TransactionsTable({
                 <TableHead>Start</TableHead>
                 <TableHead>End</TableHead>
                 <TableHead className="text-right">Users</TableHead>
+                <TableHead className="text-right">Input Cost</TableHead>
                 <TableHead className="text-right">Selling Cost</TableHead>
+                <TableHead className="text-right">Profit</TableHead>
                 {isFuzzy && <TableHead className="text-right">Score</TableHead>}
                 <TableHead>Updated</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading && (
-                <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-10">Loading…</TableCell></TableRow>
+                <TableRow><TableCell colSpan={14} className="text-center text-muted-foreground py-10">Loading…</TableCell></TableRow>
               )}
               {!isLoading && rows.length === 0 && (
-                <TableRow><TableCell colSpan={12} className="text-center text-muted-foreground py-10">No transactions match the current filters.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={14} className="text-center text-muted-foreground py-10">No transactions match the current filters.</TableCell></TableRow>
               )}
               {rows.map((r) => (
                 <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setOpenId(r.id)}>
@@ -264,7 +275,11 @@ export function TransactionsTable({
                   <TableCell>{fmtDate(r.start_date)}</TableCell>
                   <TableCell>{fmtDate(r.end_date)}</TableCell>
                   <TableCell className="text-right">{fmtNumber(r.total_users)}</TableCell>
+                  <TableCell className="text-right">{fmtCurrency(r.input_cost ?? 0)}</TableCell>
                   <TableCell className="text-right">{fmtCurrency(r.selling_cost)}</TableCell>
+                  <TableCell className={`text-right ${Number(r.selling_cost) - Number(r.input_cost ?? 0) < 0 ? "text-destructive" : ""}`}>
+                    {fmtCurrency(Number(r.selling_cost) - Number(r.input_cost ?? 0))}
+                  </TableCell>
                   {isFuzzy && (
                     <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
                       {(scoreMap?.get(r.id) ?? 0).toFixed(2)}

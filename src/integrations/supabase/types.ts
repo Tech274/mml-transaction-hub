@@ -46,30 +46,45 @@ export type Database = {
       }
       customers: {
         Row: {
+          account_manager_name: string | null
+          contact_email: string | null
+          contact_phone: string | null
           created_at: string
           created_by: string | null
           customer_name: string
           id: string
+          industry: string | null
           is_active: boolean
           normalized_name: string
+          notes: string | null
           updated_at: string
         }
         Insert: {
+          account_manager_name?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           created_by?: string | null
           customer_name: string
           id?: string
+          industry?: string | null
           is_active?: boolean
           normalized_name: string
+          notes?: string | null
           updated_at?: string
         }
         Update: {
+          account_manager_name?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
           created_at?: string
           created_by?: string | null
           customer_name?: string
           id?: string
+          industry?: string | null
           is_active?: boolean
           normalized_name?: string
+          notes?: string | null
           updated_at?: string
         }
         Relationships: []

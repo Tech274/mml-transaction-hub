@@ -30,8 +30,16 @@ const schema = z.object({
   start_date: z.string().min(1, "Required"),
   end_date: z.string().min(1, "Required"),
   total_users: z.coerce.number().int().positive("Must be greater than zero"),
-  input_cost: z.coerce.number().nonnegative("Must be numeric"),
-  selling_cost: z.coerce.number().nonnegative("Must be numeric"),
+  input_cost: z.coerce
+    .number({ invalid_type_error: "Input cost is required" })
+    .finite("Enter a valid number")
+    .nonnegative("Input cost cannot be negative")
+    .max(1_000_000_000, "Input cost is unrealistically high"),
+  selling_cost: z.coerce
+    .number({ invalid_type_error: "Selling cost is required" })
+    .finite("Enter a valid number")
+    .nonnegative("Selling cost cannot be negative")
+    .max(1_000_000_000, "Selling cost is unrealistically high"),
 }).superRefine((v, ctx) => {
   if (v.end_date < v.start_date) {
     ctx.addIssue({ code: "custom", path: ["end_date"], message: "End date cannot be before start date" });
@@ -40,6 +48,9 @@ const schema = z.object({
     if (!v.cloud_provider || !["AWS", "Azure", "GCP"].includes(v.cloud_provider)) {
       ctx.addIssue({ code: "custom", path: ["cloud_provider"], message: "Required for Public Cloud (AWS, Azure, GCP)" });
     }
+  }
+  if (v.input_cost > v.selling_cost) {
+    ctx.addIssue({ code: "custom", path: ["input_cost"], message: "Input cost should not exceed selling cost (negative margin)" });
   }
 });
 

@@ -20,7 +20,7 @@ function DashboardPage() {
     queryFn: async () => {
       const { data: rows, error } = await supabase
         .from("transactions")
-        .select("month,year,repository_type,cloud_provider,line_of_business,customer_name,total_users,selling_cost,is_deleted")
+        .select("month,year,repository_type,cloud_provider,line_of_business,customer_name,total_users,input_cost,selling_cost,is_deleted")
         .eq("is_deleted", false);
       if (error) throw error;
       return rows ?? [];
@@ -37,17 +37,26 @@ function DashboardPage() {
   const priv = rows.filter((r) => r.repository_type === "private_cloud").length;
   const users = rows.reduce((s, r) => s + (r.total_users ?? 0), 0);
   const revenue = rows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0);
+  const inputCostTotal = rows.reduce((s, r) => s + Number(r.input_cost ?? 0), 0);
+  const profit = revenue - inputCostTotal;
+  const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
   const avgCost = rows.length ? revenue / rows.length : 0;
   const curRows = rows.filter((r) => r.month === curMonth && r.year === curYear);
   const curRevenue = curRows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0);
+  const curInputCost = curRows.reduce((s, r) => s + Number(r.input_cost ?? 0), 0);
+  const curProfit = curRevenue - curInputCost;
   const curUsers = curRows.reduce((s, r) => s + (r.total_users ?? 0), 0);
 
   const byMonth = Array.from({ length: 12 }, (_, i) => {
     const monthRows = rows.filter((r) => r.month === i + 1 && r.year === curYear);
+    const mRev = monthRows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0);
+    const mCost = monthRows.reduce((s, r) => s + Number(r.input_cost ?? 0), 0);
     return {
       month: MONTH_NAMES[i],
       transactions: monthRows.length,
-      revenue: monthRows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0),
+      revenue: mRev,
+      cost: mCost,
+      profit: mRev - mCost,
     };
   });
 
@@ -65,10 +74,11 @@ function DashboardPage() {
   for (const r of rows) lobMap.set(r.line_of_business, (lobMap.get(r.line_of_business) ?? 0) + 1);
   const lobSplit = Array.from(lobMap.entries()).map(([name, value]) => ({ name, value }));
 
-  const custRev = new Map<string, { revenue: number; users: number }>();
+  const custRev = new Map<string, { revenue: number; cost: number; users: number }>();
   for (const r of rows) {
-    const e = custRev.get(r.customer_name) ?? { revenue: 0, users: 0 };
+    const e = custRev.get(r.customer_name) ?? { revenue: 0, cost: 0, users: 0 };
     e.revenue += Number(r.selling_cost ?? 0);
+    e.cost += Number(r.input_cost ?? 0);
     e.users += r.total_users ?? 0;
     custRev.set(r.customer_name, e);
   }
@@ -76,6 +86,10 @@ function DashboardPage() {
     .map(([name, v]) => ({ name, revenue: v.revenue }));
   const topUsers = Array.from(custRev.entries()).sort((a, b) => b[1].users - a[1].users).slice(0, 5)
     .map(([name, v]) => ({ name, users: v.users }));
+  const topProfit = Array.from(custRev.entries())
+    .map(([name, v]) => ({ name, profit: v.revenue - v.cost }))
+    .sort((a, b) => b.profit - a.profit)
+    .slice(0, 5);
 
   return (
     <AppShell title="Dashboard">
@@ -86,8 +100,12 @@ function DashboardPage() {
           <KPI label="Private Cloud" value={fmtNumber(priv)} />
           <KPI label="Total Users" value={fmtNumber(users)} />
           <KPI label="Total Revenue" value={fmtCurrency(revenue)} />
+          <KPI label="Total Input Cost" value={fmtCurrency(inputCostTotal)} />
+          <KPI label="Total Profit" value={fmtCurrency(profit)} />
+          <KPI label={`Margin`} value={`${margin.toFixed(1)}%`} />
           <KPI label="Avg Selling Cost" value={fmtCurrency(avgCost)} />
           <KPI label="Current Month Revenue" value={fmtCurrency(curRevenue)} />
+          <KPI label="Current Month Profit" value={fmtCurrency(curProfit)} />
           <KPI label="Current Month Users" value={fmtNumber(curUsers)} />
         </div>
 
@@ -110,7 +128,10 @@ function DashboardPage() {
                 <XAxis dataKey="month" fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip formatter={(v: number) => fmtCurrency(v)} />
-                <Line type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} />
+                <Line type="monotone" dataKey="revenue" name="Revenue" stroke="hsl(var(--primary))" strokeWidth={2} />
+                <Line type="monotone" dataKey="cost" name="Input Cost" stroke="#ef4444" strokeWidth={2} />
+                <Line type="monotone" dataKey="profit" name="Profit" stroke="#22c55e" strokeWidth={2} />
+                <Legend />
               </LineChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -154,6 +175,17 @@ function DashboardPage() {
                 <YAxis dataKey="name" type="category" fontSize={11} width={120} />
                 <Tooltip />
                 <Bar dataKey="users" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartCard>
+          <ChartCard title="Top Customers by Profit">
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={topProfit} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                <XAxis type="number" fontSize={11} tickFormatter={(v) => fmtCurrency(v).replace("₹", "")} />
+                <YAxis dataKey="name" type="category" fontSize={11} width={120} />
+                <Tooltip formatter={(v: number) => fmtCurrency(v)} />
+                <Bar dataKey="profit" fill="#22c55e" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>

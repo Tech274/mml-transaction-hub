@@ -55,7 +55,9 @@ export function TransactionDetailDrawer({
                 <DL label="Start date" value={fmtDate(tx.start_date)} />
                 <DL label="End date" value={fmtDate(tx.end_date)} />
                 <DL label="Total users" value={fmtNumber(tx.total_users)} />
+                <DL label="Input cost" value={fmtCurrency(tx.input_cost ?? 0)} />
                 <DL label="Selling cost" value={fmtCurrency(tx.selling_cost)} />
+                <DL label="Profit" value={fmtCurrency(Number(tx.selling_cost) - Number(tx.input_cost ?? 0))} />
                 <DL label="Created" value={fmtDateTime(tx.created_at)} />
                 <DL label="Last updated" value={fmtDateTime(tx.updated_at)} />
               </div>
