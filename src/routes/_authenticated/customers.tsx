@@ -61,6 +61,7 @@ function CustomersPage() {
   const [page, setPage] = useState(1);
   const [asyncExport, setAsyncExport] = useState<{ open: boolean; scope: string } | null>(null);
   const setActive = useServerFn(setCustomerActiveFn);
+  const [deactivating, setDeactivating] = useState<CustomerRow | null>(null);
 
   // Apply incoming search-param changes (e.g., drill-down link reuse)
   useEffect(() => {
@@ -168,9 +169,15 @@ function CustomersPage() {
   }
 
   async function toggle(id: string, current: boolean) {
+    if (current) {
+      // Deactivating — open the reason dialog instead of acting immediately
+      const row = rows.find((r) => r.id === id);
+      if (row) setDeactivating(row);
+      return;
+    }
     try {
-      await setActive({ data: { id, active: !current } });
-      toast.success(!current ? "Customer activated" : "Customer deactivated");
+      await setActive({ data: { id, active: true, reason: null } });
+      toast.success("Customer activated");
       qc.invalidateQueries({ queryKey: ["customers-summary"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
