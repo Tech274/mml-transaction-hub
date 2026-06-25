@@ -184,6 +184,93 @@ function CustomersPage() {
   );
 }
 
+function AddCustomerDialog({
+  open, onClose, onSaved,
+}: { open: boolean; onClose: () => void; onSaved: () => void }) {
+  const [form, setForm] = useState({
+    customer_name: "",
+    account_manager_name: "",
+    contact_email: "",
+    contact_phone: "",
+    industry: "",
+    notes: "",
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setForm({ customer_name: "", account_manager_name: "", contact_email: "", contact_phone: "", industry: "", notes: "" });
+    }
+  }, [open]);
+
+  async function save() {
+    const name = form.customer_name.trim();
+    if (!name) return toast.error("Customer name is required");
+    if (form.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contact_email.trim())) {
+      return toast.error("Enter a valid contact email");
+    }
+    const normalized = name.replace(/\s+/g, " ").toLowerCase();
+    setSaving(true);
+    const { data: existing } = await supabase
+      .from("customers").select("id").eq("normalized_name", normalized).maybeSingle();
+    if (existing) {
+      setSaving(false);
+      return toast.error("A customer with this name already exists");
+    }
+    const { error } = await supabase.from("customers").insert({
+      customer_name: name,
+      normalized_name: normalized,
+      account_manager_name: form.account_manager_name.trim() || null,
+      contact_email: form.contact_email.trim() || null,
+      contact_phone: form.contact_phone.trim() || null,
+      industry: form.industry.trim() || null,
+      notes: form.notes.trim() || null,
+    });
+    setSaving(false);
+    if (error) return toast.error(error.message);
+    toast.success("Customer added");
+    onSaved();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader><DialogTitle>Add customer</DialogTitle></DialogHeader>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="md:col-span-2 space-y-1.5">
+            <Label>Customer name *</Label>
+            <Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Account Manager</Label>
+            <Input value={form.account_manager_name} onChange={(e) => setForm({ ...form, account_manager_name: e.target.value })} placeholder="e.g. Priya Sharma" />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Industry</Label>
+            <Input value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Contact email</Label>
+            <Input type="email" value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Contact phone</Label>
+            <Input value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} />
+          </div>
+          <div className="md:col-span-2 space-y-1.5">
+            <Label>Notes</Label>
+            <Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Add"}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 type CustomerRow = {
   id: string;
   customer_name: string;
