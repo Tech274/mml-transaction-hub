@@ -22,7 +22,8 @@ import {
   adminCreateUser, adminSetUserRoles, adminSetUserActive, adminUpdateUserProfile,
 } from "@/lib/admin.functions";
 import { format } from "date-fns";
-import { PERMISSIONS, type PermDef } from "@/lib/permissions";
+import { PERMISSIONS, type PermDef, setPreviewRole, usePreviewRole } from "@/lib/permissions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -97,6 +98,7 @@ function AdminPage() {
         <TabsList>
           <TabsTrigger value="users">Users & Roles</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
+          <TabsTrigger value="perm-audit">Permission Audit</TabsTrigger>
           <TabsTrigger value="audit">Role Audit Log</TabsTrigger>
         </TabsList>
 
@@ -135,6 +137,10 @@ function AdminPage() {
 
         <TabsContent value="permissions">
           <PermissionsMatrix />
+        </TabsContent>
+
+        <TabsContent value="perm-audit">
+          <PermissionAuditLog />
         </TabsContent>
 
         <TabsContent value="audit">
