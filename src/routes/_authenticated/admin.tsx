@@ -214,7 +214,7 @@ function PermissionsMatrix() {
       const upserts = Array.from(draft.entries()).map(([k, enabled]) => {
         const [role, key] = k.split("|");
         const def = PERMISSIONS.find((p) => p.key === key)!;
-        return { role, key, kind: def.kind, enabled };
+        return { role: role as AppRole, key, kind: def.kind, enabled };
       });
       const { error } = await supabase.from("role_permissions").upsert(upserts, { onConflict: "role,key" });
       if (error) throw error;
