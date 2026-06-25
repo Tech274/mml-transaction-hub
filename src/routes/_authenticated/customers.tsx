@@ -24,8 +24,9 @@ export const Route = createFileRoute("/_authenticated/customers")({
 
 function CustomersPage() {
   const { user, hasAnyRole } = useAuth();
+  const { can } = usePermissions();
   const canToggle = hasAnyRole(["admin", "ops_lead"]);
-  const canEdit = hasAnyRole(["admin", "ops_lead"]);
+  const canEdit = hasAnyRole(["admin", "ops_lead"]) && can("feature_customer_edit");
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<CustomerRow | null>(null);
@@ -76,6 +77,7 @@ function CustomersPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Search customers…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
+          {can("feature_excel_export") && (
           <Button size="sm" onClick={() => exportToExcel("customers-summary", filtered.map((r) => ({
             Customer: r.customer_name,
             "Account Manager": r.account_manager_name ?? "",
@@ -89,6 +91,7 @@ function CustomersPage() {
           })), { generatedBy: user?.email ?? "—", filters: { search } })}>
             <Download className="h-4 w-4 mr-1" />Export
           </Button>
+          )}
         </div>
       </Card>
       <Card className="overflow-hidden">
