@@ -13,6 +13,7 @@ import { fmtCurrency, fmtDate, fmtDateTime, fmtNumber, MONTH_NAMES, YEARS } from
 import { exportToExcel } from "@/lib/export-xlsx";
 import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { usePermissions } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { highlight, tokenize } from "@/lib/highlight";
 
@@ -45,6 +46,7 @@ export function TransactionsTable({
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const pageSize = 25;
   const { user } = useAuth();
+  const { can } = usePermissions();
 
   const { data: customers = [] } = useQuery({
     queryKey: ["customers", "all-active"],
@@ -229,7 +231,9 @@ export function TransactionsTable({
               </SelectContent>
             </Select>
             <Button variant="ghost" size="sm" onClick={() => { setFilters(initial); setPage(0); setSortMode("recent"); }}>Reset</Button>
-            <Button size="sm" onClick={exportCurrent}><Download className="h-4 w-4 mr-1" />Export{isFuzzy ? ` (${allRows.length})` : ""}</Button>
+            {can("feature_excel_export") && (
+              <Button size="sm" onClick={exportCurrent}><Download className="h-4 w-4 mr-1" />Export{isFuzzy ? ` (${allRows.length})` : ""}</Button>
+            )}
           </div>
         </div>
       </Card>
