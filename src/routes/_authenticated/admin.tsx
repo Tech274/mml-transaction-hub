@@ -24,6 +24,7 @@ import {
 import { format } from "date-fns";
 import { PERMISSIONS, type PermDef, setPreviewRole, usePreviewRole } from "@/lib/permissions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { upsertAccountManagerFn, setAccountManagerActiveFn } from "@/lib/customers.functions";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -100,6 +101,8 @@ function AdminPage() {
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="perm-audit">Permission Audit</TabsTrigger>
           <TabsTrigger value="audit">Role Audit Log</TabsTrigger>
+          <TabsTrigger value="account-managers">Account Managers</TabsTrigger>
+          <TabsTrigger value="customer-audit">Customer Audit</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -179,6 +182,14 @@ function AdminPage() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="account-managers">
+          <AccountManagersAdmin />
+        </TabsContent>
+
+        <TabsContent value="customer-audit">
+          <CustomerAuditLog />
         </TabsContent>
       </Tabs>
     </AppShell>
@@ -704,5 +715,120 @@ function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; passwor
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function AccountManagersAdmin() {
+  const qc = useQueryClient();
+  const upsert = useServerFn(upsertAccountManagerFn);
+  const setActive = useServerFn(setAccountManagerActiveFn);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["am-admin"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("account_managers")
+        .select("id, name, email, is_active, created_at")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  async function add() {
+    if (!name.trim()) return toast.error("Name is required");
+    setBusy(true);
+    try {
+      await upsert({ data: { name, email: email || null } });
+      toast.success("Account manager saved");
+      setName(""); setEmail("");
+      qc.invalidateQueries({ queryKey: ["am-admin"] });
+      qc.invalidateQueries({ queryKey: ["account-managers"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    finally { setBusy(false); }
+  }
+
+  async function toggle(id: string, current: boolean) {
+    try {
+      await setActive({ data: { id, active: !current } });
+      qc.invalidateQueries({ queryKey: ["am-admin"] });
+      qc.invalidateQueries({ queryKey: ["account-managers"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+  }
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Account Managers</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+          <div className="space-y-1.5"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
+          <div className="space-y-1.5"><Label>Email (optional)</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
+          <Button onClick={add} disabled={busy}>{busy ? "Saving…" : "Add account manager"}</Button>
+        </div>
+        <Table>
+          <TableHeader><TableRow>
+            <TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Actions</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {isLoading && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
+            {!isLoading && rows.length === 0 && <TableRow><TableCell colSpan={4} className="text-center text-muted-foreground py-8">No account managers yet.</TableCell></TableRow>}
+            {rows.map((r: any) => (
+              <TableRow key={r.id}>
+                <TableCell className="font-medium">{r.name}</TableCell>
+                <TableCell className="text-sm">{r.email ?? "—"}</TableCell>
+                <TableCell><Badge variant={r.is_active ? "default" : "secondary"}>{r.is_active ? "Active" : "Inactive"}</Badge></TableCell>
+                <TableCell className="text-right">
+                  <Button size="sm" variant="ghost" onClick={() => toggle(r.id, r.is_active)}>{r.is_active ? "Disable" : "Enable"}</Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function CustomerAuditLog() {
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ["customer-audit"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("customer_audit_log")
+        .select("id, customer_id, customer_name, action, changes, changed_by, changed_by_email, changed_at")
+        .order("changed_at", { ascending: false })
+        .limit(500);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  return (
+    <Card>
+      <CardHeader><CardTitle>Customer Audit Log</CardTitle></CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader><TableRow>
+            <TableHead>When</TableHead><TableHead>Action</TableHead><TableHead>Customer</TableHead><TableHead>Changes</TableHead><TableHead>By</TableHead>
+          </TableRow></TableHeader>
+          <TableBody>
+            {isLoading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
+            {!isLoading && rows.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No customer changes recorded yet.</TableCell></TableRow>}
+            {rows.map((a: any) => (
+              <TableRow key={a.id}>
+                <TableCell className="whitespace-nowrap text-sm">{format(new Date(a.changed_at), "yyyy-MM-dd HH:mm")}</TableCell>
+                <TableCell><Badge variant={a.action === "deactivate" ? "destructive" : a.action === "create" ? "default" : "secondary"}>{a.action}</Badge></TableCell>
+                <TableCell className="text-sm">{a.customer_name ?? a.customer_id}</TableCell>
+                <TableCell className="text-xs font-mono max-w-[420px] truncate" title={JSON.stringify(a.changes)}>{a.changes ? JSON.stringify(a.changes) : "—"}</TableCell>
+                <TableCell className="text-sm">{a.changed_by_email ?? a.changed_by ?? "system"}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }

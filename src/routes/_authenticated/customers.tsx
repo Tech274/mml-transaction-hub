@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fmtCurrency, fmtNumber } from "@/lib/format";
 import { exportToExcel } from "@/lib/export-xlsx";
-import { Download, Search, Pencil } from "lucide-react";
+import { Download, Search, Pencil, ArrowUpDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
 import { toast } from "sonner";
@@ -18,6 +18,12 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useServerFn } from "@tanstack/react-start";
+import { createCustomerFn, updateCustomerFn, setCustomerActiveFn } from "@/lib/customers.functions";
+
+type SortKey = "customer_name" | "account_manager_name" | "count" | "users" | "revenue" | "profit" | "margin";
+const PAGE_SIZE = 25;
 
 export const Route = createFileRoute("/_authenticated/customers")({
   component: CustomersPage,
@@ -30,8 +36,13 @@ function CustomersPage() {
   const canEdit = hasAnyRole(["admin", "ops_lead"]) && can("feature_customer_edit");
   const qc = useQueryClient();
   const [search, setSearch] = useState("");
+  const [amFilter, setAmFilter] = useState<string>("__all");
   const [editing, setEditing] = useState<CustomerRow | null>(null);
   const [adding, setAdding] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("customer_name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [page, setPage] = useState(1);
+  const setActive = useServerFn(setCustomerActiveFn);
 
   const { data: rows = [] } = useQuery({
     queryKey: ["customers-summary"],
@@ -62,13 +73,80 @@ function CustomersPage() {
     },
   });
 
-  const filtered = rows.filter((r) => r.customer_name.toLowerCase().includes(search.toLowerCase()));
+  const { data: accountManagers = [] } = useQuery({
+    queryKey: ["account-managers"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("account_managers")
+        .select("id, name, is_active")
+        .order("name");
+      return data ?? [];
+    },
+  });
+
+  const amOptions = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of rows) if (r.account_manager_name) set.add(r.account_manager_name);
+    for (const a of accountManagers) if (a.is_active) set.add(a.name);
+    return Array.from(set).sort((a, b) => a.localeCompare(b));
+  }, [rows, accountManagers]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (amFilter !== "__all") {
+        if (amFilter === "__none") { if (r.account_manager_name) return false; }
+        else if ((r.account_manager_name ?? "") !== amFilter) return false;
+      }
+      if (!q) return true;
+      return (
+        r.customer_name.toLowerCase().includes(q) ||
+        (r.account_manager_name ?? "").toLowerCase().includes(q) ||
+        (r.industry ?? "").toLowerCase().includes(q) ||
+        (r.contact_email ?? "").toLowerCase().includes(q)
+      );
+    });
+  }, [rows, search, amFilter]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      const av: any = (a as any)[sortKey] ?? (typeof (a as any)[sortKey] === "number" ? 0 : "");
+      const bv: any = (b as any)[sortKey] ?? (typeof (b as any)[sortKey] === "number" ? 0 : "");
+      if (typeof av === "number" && typeof bv === "number") return sortDir === "asc" ? av - bv : bv - av;
+      return sortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    });
+    return arr;
+  }, [filtered, sortKey, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  useEffect(() => { setPage(1); }, [search, amFilter, sortKey, sortDir]);
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir(key === "customer_name" || key === "account_manager_name" ? "asc" : "desc"); }
+  }
+
+  function SortHeader({ k, label, className }: { k: SortKey; label: string; className?: string }) {
+    return (
+      <TableHead className={className}>
+        <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort(k)}>
+          {label}<ArrowUpDown className="h-3 w-3 opacity-60" />
+        </button>
+      </TableHead>
+    );
+  }
 
   async function toggle(id: string, current: boolean) {
-    const { error } = await supabase.from("customers").update({ is_active: !current }).eq("id", id);
-    if (error) return toast.error(error.message);
-    qc.invalidateQueries({ queryKey: ["customers-summary"] });
-    qc.invalidateQueries({ queryKey: ["customers"] });
+    try {
+      await setActive({ data: { id, active: !current } });
+      toast.success(!current ? "Customer activated" : "Customer deactivated");
+      qc.invalidateQueries({ queryKey: ["customers-summary"] });
+      qc.invalidateQueries({ queryKey: ["customers"] });
+    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
   }
 
   return (
@@ -77,10 +155,20 @@ function CustomersPage() {
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search customers…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input placeholder="Search customers, account manager, industry…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+          </div>
+          <div className="w-full md:w-64">
+            <Select value={amFilter} onValueChange={setAmFilter}>
+              <SelectTrigger><SelectValue placeholder="All account managers" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all">All account managers</SelectItem>
+                <SelectItem value="__none">— Unassigned —</SelectItem>
+                {amOptions.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           {can("feature_excel_export") && (
-          <Button size="sm" onClick={() => exportToExcel("customers-summary", filtered.map((r) => ({
+          <Button size="sm" onClick={() => exportToExcel("customers-summary", sorted.map((r) => ({
             Customer: r.customer_name,
             "Account Manager": r.account_manager_name ?? "",
             Industry: r.industry ?? "",
@@ -90,7 +178,7 @@ function CustomersPage() {
             Transactions: r.count, "Total Users": r.users,
             "Total Revenue": r.revenue, "Total Input Cost": r.cost,
             "Total Profit": r.profit, "Margin %": Number(r.margin.toFixed(2)),
-          })), { generatedBy: user?.email ?? "—", filters: { search } })}>
+          })), { generatedBy: user?.email ?? "—", filters: { search, accountManager: amFilter } })}>
             <Download className="h-4 w-4 mr-1" />Export
           </Button>
           )}
@@ -106,21 +194,21 @@ function CustomersPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Customer</TableHead>
-              <TableHead>Account Manager</TableHead>
+              <SortHeader k="customer_name" label="Customer" />
+              <SortHeader k="account_manager_name" label="Account Manager" />
               <TableHead>Contact</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Transactions</TableHead>
-              <TableHead className="text-right">Total Users</TableHead>
-              <TableHead className="text-right">Total Revenue</TableHead>
+              <SortHeader k="count" label="Transactions" className="text-right" />
+              <SortHeader k="users" label="Total Users" className="text-right" />
+              <SortHeader k="revenue" label="Total Revenue" className="text-right" />
               <TableHead className="text-right">Input Cost</TableHead>
-              <TableHead className="text-right">Profit</TableHead>
-              <TableHead className="text-right">Margin</TableHead>
+              <SortHeader k="profit" label="Profit" className="text-right" />
+              <SortHeader k="margin" label="Margin" className="text-right" />
               {canToggle && <TableHead></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((r) => (
+            {paginated.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="font-medium">
                   <div>{r.customer_name}</div>
@@ -155,11 +243,22 @@ function CustomersPage() {
                 )}
               </TableRow>
             ))}
-            {filtered.length === 0 && (
+            {paginated.length === 0 && (
               <TableRow><TableCell colSpan={10} className="text-center py-10 text-muted-foreground">No customers found.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
+        </div>
+        <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
+          <div className="text-muted-foreground">
+            {sorted.length === 0 ? "0 results" :
+              `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, sorted.length)} of ${sorted.length}`}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Previous</Button>
+            <span className="text-muted-foreground">Page {currentPage} of {totalPages}</span>
+            <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Next</Button>
+          </div>
         </div>
       </Card>
       <EditCustomerDialog
@@ -184,11 +283,43 @@ function CustomersPage() {
   );
 }
 
+function AccountManagerPicker({
+  valueId, valueName, onChange,
+}: { valueId: string | null; valueName: string | null; onChange: (v: { id: string | null; name: string | null }) => void }) {
+  const { data: managers = [] } = useQuery({
+    queryKey: ["account-managers"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("account_managers").select("id, name, is_active").order("name");
+      return data ?? [];
+    },
+  });
+  const active = managers.filter((m: any) => m.is_active);
+  const selected = valueId ?? (active.find((m: any) => m.name === valueName)?.id ?? "");
+  return (
+    <Select
+      value={selected || "__none"}
+      onValueChange={(v) => {
+        if (v === "__none") return onChange({ id: null, name: null });
+        const m = active.find((x: any) => x.id === v);
+        onChange({ id: v, name: m?.name ?? null });
+      }}
+    >
+      <SelectTrigger><SelectValue placeholder="Select account manager" /></SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none">— None —</SelectItem>
+        {active.map((m: any) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
+
 function AddCustomerDialog({
   open, onClose, onSaved,
 }: { open: boolean; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
     customer_name: "",
+    account_manager_id: null as string | null,
     account_manager_name: "",
     contact_email: "",
     contact_phone: "",
@@ -196,40 +327,33 @@ function AddCustomerDialog({
     notes: "",
   });
   const [saving, setSaving] = useState(false);
+  const create = useServerFn(createCustomerFn);
 
   useEffect(() => {
     if (open) {
-      setForm({ customer_name: "", account_manager_name: "", contact_email: "", contact_phone: "", industry: "", notes: "" });
+      setForm({ customer_name: "", account_manager_id: null, account_manager_name: "", contact_email: "", contact_phone: "", industry: "", notes: "" });
     }
   }, [open]);
 
   async function save() {
-    const name = form.customer_name.trim();
-    if (!name) return toast.error("Customer name is required");
-    if (form.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contact_email.trim())) {
-      return toast.error("Enter a valid contact email");
-    }
-    const normalized = name.replace(/\s+/g, " ").toLowerCase();
     setSaving(true);
-    const { data: existing } = await supabase
-      .from("customers").select("id").eq("normalized_name", normalized).maybeSingle();
-    if (existing) {
+    try {
+      await create({ data: {
+        customer_name: form.customer_name,
+        account_manager_id: form.account_manager_id,
+        account_manager_name: form.account_manager_name,
+        contact_email: form.contact_email,
+        contact_phone: form.contact_phone,
+        industry: form.industry,
+        notes: form.notes,
+      } });
+      toast.success("Customer added");
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to add customer");
+    } finally {
       setSaving(false);
-      return toast.error("A customer with this name already exists");
     }
-    const { error } = await supabase.from("customers").insert({
-      customer_name: name,
-      normalized_name: normalized,
-      account_manager_name: form.account_manager_name.trim() || null,
-      contact_email: form.contact_email.trim() || null,
-      contact_phone: form.contact_phone.trim() || null,
-      industry: form.industry.trim() || null,
-      notes: form.notes.trim() || null,
-    });
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Customer added");
-    onSaved();
   }
 
   return (
@@ -241,9 +365,13 @@ function AddCustomerDialog({
             <Label>Customer name *</Label>
             <Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
           </div>
-          <div className="space-y-1.5">
+          <div className="md:col-span-2 space-y-1.5">
             <Label>Account Manager</Label>
-            <Input value={form.account_manager_name} onChange={(e) => setForm({ ...form, account_manager_name: e.target.value })} placeholder="e.g. Priya Sharma" />
+            <AccountManagerPicker
+              valueId={form.account_manager_id}
+              valueName={form.account_manager_name || null}
+              onChange={(v) => setForm({ ...form, account_manager_id: v.id, account_manager_name: v.name ?? "" })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Industry</Label>
@@ -293,6 +421,7 @@ function EditCustomerDialog({
 }: { customer: CustomerRow | null; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({
     customer_name: "",
+    account_manager_id: null as string | null,
     account_manager_name: "",
     contact_email: "",
     contact_phone: "",
@@ -300,11 +429,13 @@ function EditCustomerDialog({
     notes: "",
   });
   const [saving, setSaving] = useState(false);
+  const update = useServerFn(updateCustomerFn);
 
   useEffect(() => {
     if (customer) {
       setForm({
         customer_name: customer.customer_name,
+        account_manager_id: null,
         account_manager_name: customer.account_manager_name ?? "",
         contact_email: customer.contact_email ?? "",
         contact_phone: customer.contact_phone ?? "",
@@ -316,24 +447,25 @@ function EditCustomerDialog({
 
   async function save() {
     if (!customer) return;
-    const name = form.customer_name.trim();
-    if (!name) return toast.error("Customer name is required");
-    if (form.contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contact_email.trim())) {
-      return toast.error("Enter a valid contact email");
-    }
     setSaving(true);
-    const { error } = await supabase.from("customers").update({
-      customer_name: name,
-      account_manager_name: form.account_manager_name.trim() || null,
-      contact_email: form.contact_email.trim() || null,
-      contact_phone: form.contact_phone.trim() || null,
-      industry: form.industry.trim() || null,
-      notes: form.notes.trim() || null,
-    }).eq("id", customer.id);
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Customer details saved");
-    onSaved();
+    try {
+      await update({ data: {
+        id: customer.id,
+        customer_name: form.customer_name,
+        account_manager_id: form.account_manager_id,
+        account_manager_name: form.account_manager_name,
+        contact_email: form.contact_email,
+        contact_phone: form.contact_phone,
+        industry: form.industry,
+        notes: form.notes,
+      } });
+      toast.success("Customer details saved");
+      onSaved();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to save customer");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -345,9 +477,13 @@ function EditCustomerDialog({
             <Label>Customer name *</Label>
             <Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
           </div>
-          <div className="space-y-1.5">
+          <div className="md:col-span-2 space-y-1.5">
             <Label>Account Manager</Label>
-            <Input value={form.account_manager_name} onChange={(e) => setForm({ ...form, account_manager_name: e.target.value })} placeholder="e.g. Priya Sharma" />
+            <AccountManagerPicker
+              valueId={form.account_manager_id}
+              valueName={form.account_manager_name || null}
+              onChange={(v) => setForm({ ...form, account_manager_id: v.id, account_manager_name: v.name ?? "" })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Industry</Label>
