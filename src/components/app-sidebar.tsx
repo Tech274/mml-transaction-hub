@@ -9,16 +9,17 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useAuth, type AppRole } from "@/lib/auth-context";
+import { usePermissions } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 
-const nav: { to: string; label: string; icon: typeof LayoutDashboard; roles: AppRole[] | null }[] = [
+const nav: { to: string; label: string; icon: typeof LayoutDashboard; roles: AppRole[] | null; permission?: string }[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: null },
-  { to: "/entry", label: "Master ADR Entry", icon: FilePlus2, roles: ["admin", "ops_lead", "ops_user"] },
+  { to: "/entry", label: "Master ADR Entry", icon: FilePlus2, roles: ["admin", "ops_lead", "ops_user"], permission: "feature_master_adr_entry" },
   { to: "/transactions", label: "All Transactions", icon: ListTree, roles: null },
   { to: "/public-cloud", label: "Public Cloud", icon: Cloud, roles: null },
   { to: "/private-cloud", label: "Private Cloud", icon: Server, roles: null },
   { to: "/customers", label: "Customers", icon: Users, roles: null },
-  { to: "/reports", label: "Reports", icon: BarChart3, roles: null },
+  { to: "/reports", label: "Reports", icon: BarChart3, roles: null, permission: "feature_reports_access" },
   { to: "/admin", label: "Admin Settings", icon: Settings, roles: ["admin"] },
 ];
 
@@ -27,6 +28,7 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { hasAnyRole, user, roles, signOut } = useAuth();
+  const { can } = usePermissions();
 
   return (
     <Sidebar collapsible="icon">
@@ -49,7 +51,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {nav
-                .filter((i) => !i.roles || hasAnyRole(i.roles))
+                .filter((i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)))
                 .map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
