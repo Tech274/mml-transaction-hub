@@ -396,12 +396,14 @@ function AsyncExportDialog({
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [runId, setRunId] = useState(0);
 
   useEffect(() => {
     if (!open) { setProgress(null); setBlob(null); setError(null); return; }
     let cancelled = false;
     (async () => {
       try {
+        setError(null); setBlob(null); setProgress(null);
         const b = await buildExcelBlobAsync(rows, meta, (p) => { if (!cancelled) setProgress(p); });
         if (!cancelled) setBlob(b);
       } catch (e: any) {
@@ -410,7 +412,7 @@ function AsyncExportDialog({
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, runId]);
 
   const pct = progress && progress.total > 0
     ? Math.round((progress.processed / progress.total) * 100)
@@ -422,8 +424,19 @@ function AsyncExportDialog({
         <DialogHeader><DialogTitle>Preparing Excel export</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="text-sm text-muted-foreground">
-            {error ? <span className="text-destructive">{error}</span>
-              : progress?.message ?? "Starting…"}
+            {error ? (
+              <div className="space-y-1">
+                <div className="text-destructive font-medium">Export failed</div>
+                <div className="text-xs text-destructive/80 break-words">{error}</div>
+              </div>
+            ) : (
+              <>
+                {progress?.message ?? "Starting…"}
+                {progress?.attempt && progress.attempt > 1 && (
+                  <span className="ml-1 text-xs text-amber-600">(attempt {progress.attempt})</span>
+                )}
+              </>
+            )}
           </div>
           <Progress value={pct} />
           <div className="text-xs text-muted-foreground">
@@ -431,13 +444,60 @@ function AsyncExportDialog({
           </div>
         </div>
         <DialogFooter>
-          {!blob && <Button variant="outline" onClick={onClose}>Cancel</Button>}
+          {!blob && !error && <Button variant="outline" onClick={onClose}>Cancel</Button>}
+          {error && <>
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button onClick={() => setRunId((n) => n + 1)}>Retry</Button>
+          </>}
           {blob && <>
             <Button variant="outline" onClick={onClose}>Close</Button>
             <Button onClick={() => { downloadBlob(blob, filename); onClose(); }}>
               <Download className="h-4 w-4 mr-1" />Download
             </Button>
           </>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeactivateReasonDialog({
+  customer, onClose, onConfirm,
+}: { customer: CustomerRow | null; onClose: () => void; onConfirm: (reason: string) => Promise<void> }) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (customer) { setReason(""); setBusy(false); } }, [customer]);
+
+  async function confirm() {
+    const r = reason.trim();
+    if (!r) { toast.error("Please enter a reason."); return; }
+    setBusy(true);
+    try { await onConfirm(r); } finally { setBusy(false); }
+  }
+
+  return (
+    <Dialog open={!!customer} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Deactivate {customer?.customer_name}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label>Deactivation reason *</Label>
+          <Textarea
+            rows={3}
+            placeholder="e.g. contract ended, duplicate record, customer churned…"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            The reason is recorded in the customer audit log.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="destructive" onClick={confirm} disabled={busy || !reason.trim()}>
+            {busy ? "Deactivating…" : "Deactivate"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
