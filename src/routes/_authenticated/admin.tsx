@@ -188,11 +188,12 @@ function AdminPage() {
 function PermissionsMatrix() {
   const qc = useQueryClient();
   const rolesList: AppRole[] = ["leadership", "finance", "ops_lead", "ops_user", "viewer"];
+  const previewRole = usePreviewRole();
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["role-permissions-admin"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("role_permissions").select("role,key,enabled");
+      const { data, error } = await supabase.from("role_permissions").select("role,key,enabled,sort_order");
       if (error) throw error;
       return data ?? [];
     },
@@ -235,6 +236,15 @@ function PermissionsMatrix() {
   const dirty = draft.size > 0;
 
   return (
+    <div className="space-y-4">
+      <PreviewAndPresetsBar previewRole={previewRole} onApplied={() => {
+        qc.invalidateQueries({ queryKey: ["role-permissions-admin"] });
+        qc.invalidateQueries({ queryKey: ["role-permissions-all"] });
+      }} />
+      <KpiOrderEditor rows={rows} onSaved={() => {
+        qc.invalidateQueries({ queryKey: ["role-permissions-admin"] });
+        qc.invalidateQueries({ queryKey: ["role-permissions-all"] });
+      }} />
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>KPI & Feature permissions per role</CardTitle>
@@ -266,6 +276,7 @@ function PermissionsMatrix() {
         )}
       </CardContent>
     </Card>
+    </div>
   );
 }
 
