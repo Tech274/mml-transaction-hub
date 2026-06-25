@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
@@ -194,18 +194,18 @@ function EditCustomerDialog({
   });
   const [saving, setSaving] = useState(false);
 
-  // hydrate when opening
-  useState(() => {});
-  if (customer && form.customer_name !== customer.customer_name && !saving) {
-    setForm({
-      customer_name: customer.customer_name,
-      account_manager_name: customer.account_manager_name ?? "",
-      contact_email: customer.contact_email ?? "",
-      contact_phone: customer.contact_phone ?? "",
-      industry: customer.industry ?? "",
-      notes: customer.notes ?? "",
-    });
-  }
+  useEffect(() => {
+    if (customer) {
+      setForm({
+        customer_name: customer.customer_name,
+        account_manager_name: customer.account_manager_name ?? "",
+        contact_email: customer.contact_email ?? "",
+        contact_phone: customer.contact_phone ?? "",
+        industry: customer.industry ?? "",
+        notes: customer.notes ?? "",
+      });
+    }
+  }, [customer]);
 
   async function save() {
     if (!customer) return;
