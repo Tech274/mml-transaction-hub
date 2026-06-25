@@ -30,6 +30,7 @@ const schema = z.object({
   start_date: z.string().min(1, "Required"),
   end_date: z.string().min(1, "Required"),
   total_users: z.coerce.number().int().positive("Must be greater than zero"),
+  input_cost: z.coerce.number().nonnegative("Must be numeric"),
   selling_cost: z.coerce.number().nonnegative("Must be numeric"),
 }).superRefine((v, ctx) => {
   if (v.end_date < v.start_date) {
@@ -70,6 +71,7 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
       start_date: "",
       end_date: "",
       total_users: 1,
+      input_cost: 0,
       selling_cost: 0,
     },
   });
@@ -110,6 +112,7 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
         start_date: values.start_date,
         end_date: values.end_date,
         total_users: values.total_users,
+        input_cost: values.input_cost,
         selling_cost: values.selling_cost,
         created_by: user!.id,
       });
@@ -122,6 +125,7 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
         start_date: "",
         end_date: "",
         total_users: 1,
+        input_cost: 0,
         selling_cost: 0,
       });
       qc.invalidateQueries({ queryKey: ["transactions"] });
@@ -207,6 +211,9 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
           </Field>
           <Field label="Total Users *" error={form.formState.errors.total_users?.message}>
             <Input type="number" min={1} {...form.register("total_users")} />
+          </Field>
+          <Field label="Input Cost *" error={form.formState.errors.input_cost?.message}>
+            <Input type="number" min={0} step="0.01" {...form.register("input_cost")} />
           </Field>
           <Field label="Selling Cost *" error={form.formState.errors.selling_cost?.message}>
             <Input type="number" min={0} step="0.01" {...form.register("selling_cost")} />
