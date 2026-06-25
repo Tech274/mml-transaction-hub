@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
@@ -212,9 +213,9 @@ function DashboardPage() {
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("widget_customers_by_am") && (
-            <div className="lg:col-span-2"><CustomersByAccountManager /></div>
-          )}
+          <div className="lg:col-span-2">
+            <CustomersByAccountManager />
+          </div>
         </div>
       </div>
     </AppShell>
