@@ -229,6 +229,16 @@ function KPI({ label, value }: { label: string; value: string }) {
   );
 }
 
+function KpiGrid({ order, can, cards }: { order: string[]; can: (k: string) => boolean; cards: Record<string, React.ReactNode> }) {
+  const visible = order.filter((k) => can(k) && cards[k]);
+  if (visible.length === 0) return null;
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {visible.map((k) => <div key={k}>{cards[k]}</div>)}
+    </div>
+  );
+}
+
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card>
