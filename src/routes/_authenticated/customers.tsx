@@ -461,7 +461,9 @@ function AsyncExportDialog({
         <DialogHeader><DialogTitle>Preparing Excel export</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="text-sm text-muted-foreground">
-            {error ? (
+            {cancelled ? (
+              <div className="text-amber-600 font-medium">Export cancelled.</div>
+            ) : error ? (
               <div className="space-y-1">
                 <div className="text-destructive font-medium">Export failed</div>
                 <div className="text-xs text-destructive/80 break-words">{error}</div>
