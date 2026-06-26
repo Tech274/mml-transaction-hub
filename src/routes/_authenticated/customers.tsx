@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { fmtCurrency, fmtNumber } from "@/lib/format";
 import { exportToExcel } from "@/lib/export-xlsx";
 import { buildExcelBlobAsync, downloadBlob, type ExportProgress } from "@/lib/export-xlsx-async";
-import { startJob, updateJob, finishJob } from "@/lib/export-jobs";
+import { startJob, updateJob, finishJob, registerRetryHandler } from "@/lib/export-jobs";
 import { Progress } from "@/components/ui/progress";
 import { Download, Search, Pencil, ArrowUpDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
