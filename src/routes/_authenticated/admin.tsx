@@ -447,16 +447,57 @@ function fmtDuration(ms: number): string {
 function ExportJobsPanel() {
   const jobs = useExportJobs();
   const [status, setStatus] = useState<"all" | ExportJob["status"]>("all");
-  const filtered = jobs.filter((j) => status === "all" || j.status === status);
+  const [jobType, setJobType] = useState<string>("__all");
+  const [requestedBy, setRequestedBy] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [viewing, setViewing] = useState<ExportJob | null>(null);
+  const PAGE_SIZE = 25;
+
+  // Derive job-type options from observed scopes (e.g. customers-all, customer-audit)
+  const jobTypes = Array.from(new Set(jobs.map((j) => baseType(j.scope)))).sort();
+
+  const filtered = jobs.filter((j) => {
+    if (status !== "all" && j.status !== status) return false;
+    if (jobType !== "__all" && baseType(j.scope) !== jobType) return false;
+    if (requestedBy && !((j.user ?? "").toLowerCase().includes(requestedBy.toLowerCase()))) return false;
+    if (from && j.startedAt < new Date(from).getTime()) return false;
+    if (to) { const end = new Date(to); end.setHours(23, 59, 59, 999); if (j.startedAt > end.getTime()) return false; }
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = Math.min(page, totalPages);
+  const paginated = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+
+  function reset() { setStatus("all"); setJobType("__all"); setRequestedBy(""); setFrom(""); setTo(""); setPage(1); }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle>Async Export Jobs</CardTitle>
-          <div className="flex items-center gap-2">
-            <Select value={status} onValueChange={(v) => setStatus(v as any)}>
-              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle>Async Export Jobs</CardTitle>
+            <Button size="sm" variant="outline" onClick={() => { if (confirm("Clear all job history on this browser?")) clearJobs(); }}>
+              Clear history
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Async Excel exports run in the browser. This log records jobs started on this device.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+            <Select value={jobType} onValueChange={(v) => { setJobType(v); setPage(1); }}>
+              <SelectTrigger><SelectValue placeholder="Job type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all">All job types</SelectItem>
+                {jobTypes.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={(v) => { setStatus(v as any); setPage(1); }}>
+              <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All statuses</SelectItem>
                 <SelectItem value="running">Running</SelectItem>
@@ -465,57 +506,130 @@ function ExportJobsPanel() {
                 <SelectItem value="cancelled">Cancelled</SelectItem>
               </SelectContent>
             </Select>
-            <Button size="sm" variant="outline" onClick={() => { if (confirm("Clear all job history on this browser?")) clearJobs(); }}>
-              Clear
-            </Button>
+            <Input placeholder="Requested by" value={requestedBy} onChange={(e) => { setRequestedBy(e.target.value); setPage(1); }} />
+            <Input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
+            <Input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-xs text-muted-foreground mb-3">
-          Async Excel exports run in the browser. This log shows export jobs started on this device and is stored locally per browser.
-        </p>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Started</TableHead>
-              <TableHead>Scope</TableHead>
-              <TableHead>File</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Progress</TableHead>
-              <TableHead className="text-right">Attempts</TableHead>
-              <TableHead className="text-right">Duration</TableHead>
-              <TableHead>Last Error</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No export jobs yet.</TableCell></TableRow>
-            )}
-            {filtered.map((j) => {
-              const dur = (j.endedAt ?? Date.now()) - j.startedAt;
-              const pct = j.total > 0 ? Math.round((j.processed / j.total) * 100) : 0;
-              const variant =
-                j.status === "done" ? "default" :
-                j.status === "error" ? "destructive" :
-                j.status === "cancelled" ? "secondary" : "outline";
-              return (
-                <TableRow key={j.id}>
-                  <TableCell className="whitespace-nowrap text-sm">{format(new Date(j.startedAt), "yyyy-MM-dd HH:mm:ss")}</TableCell>
-                  <TableCell className="text-sm">{j.scope}</TableCell>
-                  <TableCell className="text-xs font-mono max-w-[260px] truncate" title={j.filename}>{j.filename}</TableCell>
-                  <TableCell><Badge variant={variant as any}>{j.status}</Badge></TableCell>
-                  <TableCell className="text-right tabular-nums">{j.processed.toLocaleString()} / {j.total.toLocaleString()} ({pct}%)</TableCell>
-                  <TableCell className="text-right tabular-nums">{j.attempts}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtDuration(dur)}</TableCell>
-                  <TableCell className="text-xs text-destructive max-w-[280px] truncate" title={j.error ?? ""}>{j.error ?? "—"}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div>{filtered.length} of {jobs.length} jobs</div>
+            <Button size="sm" variant="ghost" onClick={reset}>Reset filters</Button>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Started</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>File</TableHead>
+                <TableHead>Requested by</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Progress</TableHead>
+                <TableHead className="text-right">Attempts</TableHead>
+                <TableHead className="text-right">Duration</TableHead>
+                <TableHead>Last error</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {paginated.length === 0 && (
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">No export jobs match the filters.</TableCell></TableRow>
+              )}
+              {paginated.map((j) => {
+                const dur = (j.endedAt ?? Date.now()) - j.startedAt;
+                const pct = j.total > 0 ? Math.round((j.processed / j.total) * 100) : 0;
+                const variant =
+                  j.status === "done" ? "default" :
+                  j.status === "error" ? "destructive" :
+                  j.status === "cancelled" ? "secondary" : "outline";
+                return (
+                  <TableRow key={j.id}>
+                    <TableCell className="whitespace-nowrap text-sm">{format(new Date(j.startedAt), "yyyy-MM-dd HH:mm:ss")}</TableCell>
+                    <TableCell className="text-sm">{baseType(j.scope)}</TableCell>
+                    <TableCell className="text-xs font-mono max-w-[240px] truncate" title={j.filename}>{j.filename}</TableCell>
+                    <TableCell className="text-sm">{j.user ?? "—"}</TableCell>
+                    <TableCell><Badge variant={variant as any}>{j.status}</Badge></TableCell>
+                    <TableCell className="text-right tabular-nums">{j.processed.toLocaleString()} / {j.total.toLocaleString()} ({pct}%)</TableCell>
+                    <TableCell className="text-right tabular-nums">{j.attempts}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtDuration(dur)}</TableCell>
+                    <TableCell className="text-xs">
+                      {j.error ? (
+                        <Button size="sm" variant="ghost" className="h-auto p-1 text-destructive" onClick={() => setViewing(j)}>
+                          View error
+                        </Button>
+                      ) : "—"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+          <div className="flex items-center justify-between text-sm">
+            <div className="text-muted-foreground">
+              {filtered.length === 0 ? "0 results" :
+                `${(current - 1) * PAGE_SIZE + 1}–${Math.min(current * PAGE_SIZE, filtered.length)} of ${filtered.length}`}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" disabled={current <= 1} onClick={() => setPage(current - 1)}>Previous</Button>
+              <span className="text-muted-foreground">Page {current} of {totalPages}</span>
+              <Button size="sm" variant="outline" disabled={current >= totalPages} onClick={() => setPage(current + 1)}>Next</Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      <ExportJobErrorDrawer job={viewing} onClose={() => setViewing(null)} />
+    </>
+  );
+}
+
+function baseType(scope: string): string {
+  // e.g. "customers-all-filtered" -> "customers"
+  const dash = scope.indexOf("-");
+  return dash > 0 ? scope.slice(0, dash) : scope;
+}
+
+function ExportJobErrorDrawer({ job, onClose }: { job: ExportJob | null; onClose: () => void }) {
+  return (
+    <Dialog open={!!job} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Export job error</DialogTitle>
+          <DialogDescription>
+            {job ? `${job.filename} — started ${format(new Date(job.startedAt), "yyyy-MM-dd HH:mm:ss")}` : ""}
+          </DialogDescription>
+        </DialogHeader>
+        {job && (
+          <div className="space-y-3 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Job type" value={baseType(job.scope)} />
+              <Field label="Scope" value={job.scope} />
+              <Field label="Status" value={job.status} />
+              <Field label="Attempts" value={String(job.attempts)} />
+              <Field label="Requested by" value={job.user ?? "—"} />
+              <Field label="Duration" value={fmtDuration((job.endedAt ?? Date.now()) - job.startedAt)} />
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Error name</div>
+              <div className="font-mono text-xs">{job.errorName ?? "—"}</div>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Message</div>
+              <pre className="rounded border bg-muted/30 p-2 text-xs whitespace-pre-wrap break-words">{job.error ?? "—"}</pre>
+            </div>
+            <div>
+              <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Stack trace</div>
+              <pre className="rounded border bg-muted/30 p-2 text-[11px] leading-snug overflow-auto max-h-72 whitespace-pre">{job.errorStack ?? "No stack trace available."}</pre>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-sm">{value}</div>
+    </div>
   );
 }
 
