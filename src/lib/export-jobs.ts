@@ -68,8 +68,22 @@ export function updateJob(id: string, patch: Partial<ExportJob>) {
   write(next);
 }
 
-export function finishJob(id: string, status: "done" | "error" | "cancelled", error?: string) {
-  updateJob(id, { status, error, endedAt: Date.now() });
+export function finishJob(
+  id: string,
+  status: "done" | "error" | "cancelled",
+  error?: { message?: string; name?: string; stack?: string } | string,
+) {
+  if (typeof error === "string" || !error) {
+    updateJob(id, { status, error: typeof error === "string" ? error : undefined, endedAt: Date.now() });
+  } else {
+    updateJob(id, {
+      status,
+      error: error.message,
+      errorName: error.name,
+      errorStack: error.stack,
+      endedAt: Date.now(),
+    });
+  }
 }
 
 export function clearJobs() { write([]); }
