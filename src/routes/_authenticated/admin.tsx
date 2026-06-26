@@ -28,7 +28,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { upsertAccountManagerFn, setAccountManagerActiveFn } from "@/lib/customers.functions";
 import { exportToExcel } from "@/lib/export-xlsx";
 import { ArrowUpDown, Download } from "lucide-react";
-import { useExportJobs, clearJobs, type ExportJob } from "@/lib/export-jobs";
+import {
+  useExportJobs, clearJobs, type ExportJob,
+  getRetentionDays, setRetentionDays, getLastCleanedAt, runCleanup,
+} from "@/lib/export-jobs";
+import { useEffect } from "react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -455,6 +459,16 @@ function ExportJobsPanel() {
   const [viewing, setViewing] = useState<ExportJob | null>(null);
   const PAGE_SIZE = 25;
 
+  const [retention, setRetention] = useState<number>(getRetentionDays());
+  const [lastCleaned, setLastCleaned] = useState<number | null>(getLastCleanedAt());
+
+  // Auto-run cleanup once per page-mount so retention is always enforced.
+  useEffect(() => {
+    runCleanup();
+    setLastCleaned(getLastCleanedAt());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Derive job-type options from observed scopes (e.g. customers-all, customer-audit)
   const jobTypes = Array.from(new Set(jobs.map((j) => baseType(j.scope)))).sort();
 
@@ -488,6 +502,49 @@ function ExportJobsPanel() {
           <p className="text-xs text-muted-foreground">
             Async Excel exports run in the browser. This log records jobs started on this device.
           </p>
+          <div
+            className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3"
+            data-testid="export-jobs-retention"
+          >
+            <div className="space-y-1">
+              <Label htmlFor="retention-days" className="text-xs">Delete jobs older than (days)</Label>
+              <Input
+                id="retention-days"
+                type="number"
+                min={1}
+                className="w-32"
+                value={retention}
+                onChange={(e) => setRetention(Math.max(1, Number(e.target.value) || 1))}
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setRetentionDays(retention);
+                toast.success(`Retention set to ${retention} day(s)`);
+              }}
+            >
+              Save retention
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                const removed = runCleanup(retention);
+                setLastCleaned(getLastCleanedAt());
+                toast.success(removed > 0 ? `Removed ${removed} old job(s)` : "No jobs needed cleanup");
+              }}
+            >
+              Run cleanup now
+            </Button>
+            <div
+              className="text-xs text-muted-foreground ml-auto"
+              data-testid="last-cleaned-at"
+            >
+              Last cleaned at:{" "}
+              {lastCleaned ? format(new Date(lastCleaned), "yyyy-MM-dd HH:mm:ss") : "never"}
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
             <Select value={jobType} onValueChange={(v) => { setJobType(v); setPage(1); }}>
               <SelectTrigger><SelectValue placeholder="Job type" /></SelectTrigger>
