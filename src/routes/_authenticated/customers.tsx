@@ -447,7 +447,7 @@ function AsyncExportDialog({
         } else {
           const msg = e?.message ?? "Export failed";
           setError(msg);
-          finishJob(jobId, "error", msg);
+          finishJob(jobId, "error", { message: msg, name: e?.name, stack: e?.stack });
         }
       }
     })();
