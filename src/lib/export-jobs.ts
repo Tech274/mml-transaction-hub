@@ -9,6 +9,8 @@ export type ExportJob = {
   attempts: number;
   status: "running" | "done" | "error" | "cancelled";
   error?: string;
+  errorStack?: string;
+  errorName?: string;
   startedAt: number;
   endedAt?: number;
   user?: string;
