@@ -378,6 +378,8 @@ function CustomersPage() {
         rows={asyncExportRows().map(toExportRow)}
         filename={`customers-${asyncExport?.scope ?? "export"}-${new Date().toISOString().slice(0, 10)}.xlsx`}
         meta={{ generatedBy: user?.email ?? "—", filters: exportFilters(asyncExport?.scope ?? "") }}
+        scope={`customers-${asyncExport?.scope ?? "export"}`}
+        generatedBy={user?.email ?? "—"}
       />
       <DeactivateReasonDialog
         customer={deactivating}
