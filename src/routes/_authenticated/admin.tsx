@@ -840,6 +840,9 @@ function CustomerAuditLog() {
       Action: a.action,
       Customer: a.customer_name ?? a.customer_id,
       "Acting User": a.changed_by_email ?? a.changed_by ?? "system",
+      "Deactivation Reason": a.action === "deactivate"
+        ? (a.changes?.deactivation_reason ?? "")
+        : "",
       Changes: a.changes ? JSON.stringify(a.changes) : "",
     }));
     exportToExcel("customer-audit-log", data, {
