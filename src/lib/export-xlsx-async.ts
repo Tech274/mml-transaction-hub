@@ -1,10 +1,11 @@
 import * as XLSX from "xlsx";
 
 export type ExportProgress = {
-  phase: "preparing" | "building" | "writing" | "done";
+  phase: "preparing" | "building" | "writing" | "done" | "retrying";
   processed: number;
   total: number;
   message: string;
+  attempt?: number;
 };
 
 /**
@@ -18,8 +19,50 @@ export async function buildExcelBlobAsync<T extends Record<string, unknown>>(
   onProgress?: (p: ExportProgress) => void,
   chunkSize = 500,
 ): Promise<Blob> {
+  return buildWithRetry(rows, meta, onProgress, chunkSize, 0);
+}
+
+/**
+ * Queue-style runner with automatic retry. The Excel build is CPU work, so a
+ * "background queue" here means a single in-flight job that yields between
+ * chunks and retries the whole job up to `maxAttempts` times on failure.
+ */
+export async function buildWithRetry<T extends Record<string, unknown>>(
+  rows: T[],
+  meta: { generatedBy: string; filters?: Record<string, unknown> },
+  onProgress?: (p: ExportProgress) => void,
+  chunkSize = 500,
+  maxAttempts = 2,
+): Promise<Blob> {
+  let attempt = 0;
+  let lastErr: unknown;
+  while (attempt <= maxAttempts) {
+    try {
+      if (attempt > 0) {
+        onProgress?.({
+          phase: "retrying", processed: 0, total: rows.length, attempt: attempt + 1,
+          message: `Retrying (attempt ${attempt + 1} of ${maxAttempts + 1})…`,
+        });
+        await new Promise((r) => setTimeout(r, 250 * attempt));
+      }
+      return await buildOnce(rows, meta, onProgress, chunkSize, attempt + 1);
+    } catch (e) {
+      lastErr = e;
+      attempt += 1;
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+async function buildOnce<T extends Record<string, unknown>>(
+  rows: T[],
+  meta: { generatedBy: string; filters?: Record<string, unknown> },
+  onProgress: ((p: ExportProgress) => void) | undefined,
+  chunkSize: number,
+  attempt: number,
+): Promise<Blob> {
   const total = rows.length;
-  onProgress?.({ phase: "preparing", processed: 0, total, message: "Preparing workbook…" });
+  onProgress?.({ phase: "preparing", processed: 0, total, attempt, message: "Preparing workbook…" });
   await tick();
 
   const wb = XLSX.utils.book_new();
@@ -51,6 +94,7 @@ export async function buildExcelBlobAsync<T extends Record<string, unknown>>(
       phase: "building",
       processed,
       total,
+      attempt,
       message: `Processed ${processed.toLocaleString()} of ${total.toLocaleString()} rows…`,
     });
     await tick();
@@ -58,13 +102,13 @@ export async function buildExcelBlobAsync<T extends Record<string, unknown>>(
 
   XLSX.utils.book_append_sheet(wb, dataSheet, "Data");
 
-  onProgress?.({ phase: "writing", processed, total, message: "Writing workbook file…" });
+  onProgress?.({ phase: "writing", processed, total, attempt, message: "Writing workbook file…" });
   await tick();
   const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
   const blob = new Blob([arrayBuffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
-  onProgress?.({ phase: "done", processed, total, message: "Ready to download." });
+  onProgress?.({ phase: "done", processed, total, attempt, message: "Ready to download." });
   return blob;
 }
 

@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
 import { usePermissions, setPreviewRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, LineChart, Line, CartesianGrid,
 } from "recharts";
@@ -255,6 +257,7 @@ function ChartCard({ title, children }: { title: string; children: React.ReactNo
 function CustomersByAccountManager() {
   const { can, isPreviewing, previewRole } = usePermissions();
   const allowed = can("widget_customers_by_am");
+  const [rangeMonths, setRangeMonths] = useState<3 | 6 | 12>(6);
 
   // Hide entirely for non-admins who lack the permission.
   // When an admin is previewing as a role that lacks it, show an explanatory
@@ -292,11 +295,18 @@ function CustomersByAccountManager() {
     },
   });
   const rows = data ?? [];
-  const active = rows.filter((r) => r.is_active).length;
-  const inactive = rows.length - active;
+
+  // Range cutoff for "new customers" within the selected window
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - rangeMonths);
+  cutoff.setHours(0, 0, 0, 0);
+
+  const inRange = rows.filter((r) => r.created_at && new Date(r.created_at) >= cutoff);
+  const active = inRange.filter((r) => r.is_active).length;
+  const inactive = inRange.length - active;
 
   const amMap = new Map<string, { active: number; inactive: number }>();
-  for (const r of rows) {
+  for (const r of inRange) {
     const key = r.account_manager_name?.trim() || "Unassigned";
     const e = amMap.get(key) ?? { active: 0, inactive: 0 };
     if (r.is_active) e.active += 1; else e.inactive += 1;
@@ -307,10 +317,10 @@ function CustomersByAccountManager() {
     .sort((a, b) => b.total - a.total)
     .slice(0, 6);
 
-  // 6-month trend of new customers
+  // Trend of new customers across the selected range
   const months: { label: string; key: string; count: number }[] = [];
   const now = new Date();
-  for (let i = 5; i >= 0; i--) {
+  for (let i = rangeMonths - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push({
       label: `${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${String(d.getFullYear()).slice(2)}`,
@@ -319,7 +329,7 @@ function CustomersByAccountManager() {
     });
   }
   const byKey = new Map(months.map((m) => [m.key, m]));
-  for (const r of rows) {
+  for (const r of inRange) {
     if (!r.created_at) continue;
     const d = new Date(r.created_at);
     const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -332,14 +342,24 @@ function CustomersByAccountManager() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm">Customers by Account Manager</CardTitle>
-          <Button asChild size="sm" variant="ghost">
-            <Link to="/customers" search={{ status: "active" }}>View all →</Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Select value={String(rangeMonths)} onValueChange={(v) => setRangeMonths(Number(v) as 3 | 6 | 12)}>
+              <SelectTrigger className="h-8 w-[130px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3">Last 3 months</SelectItem>
+                <SelectItem value="6">Last 6 months</SelectItem>
+                <SelectItem value="12">Last 12 months</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button asChild size="sm" variant="ghost">
+              <Link to="/customers" search={{ status: "active", range: rangeMonths }}>View all →</Link>
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-3 mb-4">
-          <Stat label="Total" value={fmtNumber(rows.length)} />
+          <Stat label={`New (last ${rangeMonths}m)`} value={fmtNumber(inRange.length)} />
           <Stat label="Active" value={fmtNumber(active)} tone="positive" />
           <Stat label="Deactivated" value={fmtNumber(inactive)} tone="muted" />
         </div>
@@ -352,7 +372,7 @@ function CustomersByAccountManager() {
                 <li key={am.name}>
                   <Link
                     to="/customers"
-                    search={{ am: am.name === "Unassigned" ? "__none" : am.name, status: "active" }}
+                    search={{ am: am.name === "Unassigned" ? "__none" : am.name, status: "active", range: rangeMonths }}
                     className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/60 transition"
                   >
                     <span className="text-sm font-medium truncate">{am.name}</span>
@@ -367,7 +387,7 @@ function CustomersByAccountManager() {
             </ul>
           </div>
           <div>
-            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">New customers — last 6 months</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">New customers — last {rangeMonths} months</div>
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={months}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />

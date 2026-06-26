@@ -25,6 +25,8 @@ import { format } from "date-fns";
 import { PERMISSIONS, type PermDef, setPreviewRole, usePreviewRole } from "@/lib/permissions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { upsertAccountManagerFn, setAccountManagerActiveFn } from "@/lib/customers.functions";
+import { exportToExcel } from "@/lib/export-xlsx";
+import { ArrowUpDown, Download } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -793,11 +795,13 @@ function AccountManagersAdmin() {
 }
 
 function CustomerAuditLog() {
+  const { user: me } = useAuth();
   const [customer, setCustomer] = useState("");
   const [actor, setActor] = useState("");
   const [action, setAction] = useState("__all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["customer-audit"],
@@ -824,6 +828,26 @@ function CustomerAuditLog() {
     return true;
   });
 
+  const sorted = [...filtered].sort((a: any, b: any) => {
+    const av = new Date(a.changed_at).getTime();
+    const bv = new Date(b.changed_at).getTime();
+    return sortDir === "asc" ? av - bv : bv - av;
+  });
+
+  function exportAudit() {
+    const data = sorted.map((a: any) => ({
+      When: format(new Date(a.changed_at), "yyyy-MM-dd HH:mm:ss"),
+      Action: a.action,
+      Customer: a.customer_name ?? a.customer_id,
+      "Acting User": a.changed_by_email ?? a.changed_by ?? "system",
+      Changes: a.changes ? JSON.stringify(a.changes) : "",
+    }));
+    exportToExcel("customer-audit-log", data, {
+      generatedBy: me?.email ?? "—",
+      filters: { customer, actor, action, from, to, sortBy: "changed_at", sortDir },
+    });
+  }
+
   return (
     <Card>
       <CardHeader><CardTitle>Customer Audit Log</CardTitle></CardHeader>
@@ -844,15 +868,25 @@ function CustomerAuditLog() {
           <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
           <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         </div>
-        <div className="text-xs text-muted-foreground">{filtered.length} of {rows.length} entries</div>
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-muted-foreground">{sorted.length} of {rows.length} entries</div>
+          <Button size="sm" variant="outline" onClick={exportAudit} disabled={sorted.length === 0}>
+            <Download className="h-4 w-4 mr-1" />Export to Excel
+          </Button>
+        </div>
         <Table>
           <TableHeader><TableRow>
-            <TableHead>When</TableHead><TableHead>Action</TableHead><TableHead>Customer</TableHead><TableHead>Changes</TableHead><TableHead>By</TableHead>
+            <TableHead>
+              <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => setSortDir((d) => d === "asc" ? "desc" : "asc")}>
+                When <ArrowUpDown className="h-3 w-3 opacity-60" />
+              </button>
+            </TableHead>
+            <TableHead>Action</TableHead><TableHead>Customer</TableHead><TableHead>Changes</TableHead><TableHead>By</TableHead>
           </TableRow></TableHeader>
           <TableBody>
             {isLoading && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>}
-            {!isLoading && filtered.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No matching customer audit entries.</TableCell></TableRow>}
-            {filtered.map((a: any) => (
+            {!isLoading && sorted.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">No matching customer audit entries.</TableCell></TableRow>}
+            {sorted.map((a: any) => (
               <TableRow key={a.id}>
                 <TableCell className="whitespace-nowrap text-sm">{format(new Date(a.changed_at), "yyyy-MM-dd HH:mm")}</TableCell>
                 <TableCell><Badge variant={a.action === "deactivate" ? "destructive" : a.action === "create" ? "default" : "secondary"}>{a.action}</Badge></TableCell>

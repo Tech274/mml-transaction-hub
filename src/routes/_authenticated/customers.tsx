@@ -29,14 +29,18 @@ type SortKey = "customer_name" | "account_manager_name" | "count" | "users" | "r
 const PAGE_SIZE = 25;
 const ASYNC_EXPORT_THRESHOLD = 200; // rows above this use the async progress flow
 
-type CustomersSearch = { am?: string; status?: "active" | "inactive" | "all"; q?: string };
+type CustomersSearch = { am?: string; status?: "active" | "inactive" | "all"; q?: string; range?: 3 | 6 | 12 };
 
 export const Route = createFileRoute("/_authenticated/customers")({
-  validateSearch: (s: Record<string, unknown>): CustomersSearch => ({
-    am: typeof s.am === "string" ? s.am : undefined,
-    status: s.status === "active" || s.status === "inactive" || s.status === "all" ? s.status : undefined,
-    q: typeof s.q === "string" ? s.q : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): CustomersSearch => {
+    const rangeNum = Number(s.range);
+    return {
+      am: typeof s.am === "string" ? s.am : undefined,
+      status: s.status === "active" || s.status === "inactive" || s.status === "all" ? s.status : undefined,
+      q: typeof s.q === "string" ? s.q : undefined,
+      range: rangeNum === 3 || rangeNum === 6 || rangeNum === 12 ? (rangeNum as 3 | 6 | 12) : undefined,
+    };
+  },
   component: CustomersPage,
 });
 
@@ -57,6 +61,7 @@ function CustomersPage() {
   const [page, setPage] = useState(1);
   const [asyncExport, setAsyncExport] = useState<{ open: boolean; scope: string } | null>(null);
   const setActive = useServerFn(setCustomerActiveFn);
+  const [deactivating, setDeactivating] = useState<CustomerRow | null>(null);
 
   // Apply incoming search-param changes (e.g., drill-down link reuse)
   useEffect(() => {
@@ -70,7 +75,7 @@ function CustomersPage() {
     queryFn: async () => {
       const { data: customers } = await supabase
         .from("customers")
-        .select("id, customer_name, is_active, account_manager_name, contact_email, contact_phone, industry, notes")
+        .select("id, customer_name, is_active, account_manager_name, contact_email, contact_phone, industry, notes, created_at, deactivation_reason")
         .order("customer_name");
       const { data: tx } = await supabase
         .from("transactions")
@@ -114,12 +119,22 @@ function CustomersPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const range = searchParams.range;
+    let cutoff: Date | null = null;
+    if (range) {
+      cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - range);
+      cutoff.setHours(0, 0, 0, 0);
+    }
     return rows.filter((r) => {
       if (statusFilter === "active" && !r.is_active) return false;
       if (statusFilter === "inactive" && r.is_active) return false;
       if (amFilter !== "__all") {
         if (amFilter === "__none") { if (r.account_manager_name) return false; }
         else if ((r.account_manager_name ?? "") !== amFilter) return false;
+      }
+      if (cutoff) {
+        if (!r.created_at || new Date(r.created_at) < cutoff) return false;
       }
       if (!q) return true;
       return (
@@ -129,7 +144,7 @@ function CustomersPage() {
         (r.contact_email ?? "").toLowerCase().includes(q)
       );
     });
-  }, [rows, search, amFilter, statusFilter]);
+  }, [rows, search, amFilter, statusFilter, searchParams.range]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
@@ -164,9 +179,15 @@ function CustomersPage() {
   }
 
   async function toggle(id: string, current: boolean) {
+    if (current) {
+      // Deactivating — open the reason dialog instead of acting immediately
+      const row = rows.find((r) => r.id === id);
+      if (row) setDeactivating(row);
+      return;
+    }
     try {
-      await setActive({ data: { id, active: !current } });
-      toast.success(!current ? "Customer activated" : "Customer deactivated");
+      await setActive({ data: { id, active: true, reason: null } });
+      toast.success("Customer activated");
       qc.invalidateQueries({ queryKey: ["customers-summary"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
     } catch (e: any) { toast.error(e?.message ?? "Failed"); }
@@ -357,6 +378,20 @@ function CustomersPage() {
         filename={`customers-${asyncExport?.scope ?? "export"}-${new Date().toISOString().slice(0, 10)}.xlsx`}
         meta={{ generatedBy: user?.email ?? "—", filters: exportFilters(asyncExport?.scope ?? "") }}
       />
+      <DeactivateReasonDialog
+        customer={deactivating}
+        onClose={() => setDeactivating(null)}
+        onConfirm={async (reason) => {
+          if (!deactivating) return;
+          try {
+            await setActive({ data: { id: deactivating.id, active: false, reason } });
+            toast.success("Customer deactivated");
+            qc.invalidateQueries({ queryKey: ["customers-summary"] });
+            qc.invalidateQueries({ queryKey: ["customers"] });
+            setDeactivating(null);
+          } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+        }}
+      />
     </AppShell>
   );
 }
@@ -371,12 +406,14 @@ function AsyncExportDialog({
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [runId, setRunId] = useState(0);
 
   useEffect(() => {
     if (!open) { setProgress(null); setBlob(null); setError(null); return; }
     let cancelled = false;
     (async () => {
       try {
+        setError(null); setBlob(null); setProgress(null);
         const b = await buildExcelBlobAsync(rows, meta, (p) => { if (!cancelled) setProgress(p); });
         if (!cancelled) setBlob(b);
       } catch (e: any) {
@@ -385,7 +422,7 @@ function AsyncExportDialog({
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, runId]);
 
   const pct = progress && progress.total > 0
     ? Math.round((progress.processed / progress.total) * 100)
@@ -397,8 +434,19 @@ function AsyncExportDialog({
         <DialogHeader><DialogTitle>Preparing Excel export</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="text-sm text-muted-foreground">
-            {error ? <span className="text-destructive">{error}</span>
-              : progress?.message ?? "Starting…"}
+            {error ? (
+              <div className="space-y-1">
+                <div className="text-destructive font-medium">Export failed</div>
+                <div className="text-xs text-destructive/80 break-words">{error}</div>
+              </div>
+            ) : (
+              <>
+                {progress?.message ?? "Starting…"}
+                {progress?.attempt && progress.attempt > 1 && (
+                  <span className="ml-1 text-xs text-amber-600">(attempt {progress.attempt})</span>
+                )}
+              </>
+            )}
           </div>
           <Progress value={pct} />
           <div className="text-xs text-muted-foreground">
@@ -406,13 +454,60 @@ function AsyncExportDialog({
           </div>
         </div>
         <DialogFooter>
-          {!blob && <Button variant="outline" onClick={onClose}>Cancel</Button>}
+          {!blob && !error && <Button variant="outline" onClick={onClose}>Cancel</Button>}
+          {error && <>
+            <Button variant="outline" onClick={onClose}>Close</Button>
+            <Button onClick={() => setRunId((n) => n + 1)}>Retry</Button>
+          </>}
           {blob && <>
             <Button variant="outline" onClick={onClose}>Close</Button>
             <Button onClick={() => { downloadBlob(blob, filename); onClose(); }}>
               <Download className="h-4 w-4 mr-1" />Download
             </Button>
           </>}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeactivateReasonDialog({
+  customer, onClose, onConfirm,
+}: { customer: CustomerRow | null; onClose: () => void; onConfirm: (reason: string) => Promise<void> }) {
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { if (customer) { setReason(""); setBusy(false); } }, [customer]);
+
+  async function confirm() {
+    const r = reason.trim();
+    if (!r) { toast.error("Please enter a reason."); return; }
+    setBusy(true);
+    try { await onConfirm(r); } finally { setBusy(false); }
+  }
+
+  return (
+    <Dialog open={!!customer} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Deactivate {customer?.customer_name}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-2">
+          <Label>Deactivation reason *</Label>
+          <Textarea
+            rows={3}
+            placeholder="e.g. contract ended, duplicate record, customer churned…"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            The reason is recorded in the customer audit log.
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="destructive" onClick={confirm} disabled={busy || !reason.trim()}>
+            {busy ? "Deactivating…" : "Deactivate"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -544,6 +639,8 @@ type CustomerRow = {
   contact_phone: string | null;
   industry: string | null;
   notes: string | null;
+  created_at?: string | null;
+  deactivation_reason?: string | null;
   count: number;
   users: number;
   revenue: number;
