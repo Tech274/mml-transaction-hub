@@ -27,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { upsertAccountManagerFn, setAccountManagerActiveFn } from "@/lib/customers.functions";
 import { exportToExcel } from "@/lib/export-xlsx";
 import { ArrowUpDown, Download } from "lucide-react";
+import { useExportJobs, clearJobs, type ExportJob } from "@/lib/export-jobs";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -105,6 +106,7 @@ function AdminPage() {
           <TabsTrigger value="audit">Role Audit Log</TabsTrigger>
           <TabsTrigger value="account-managers">Account Managers</TabsTrigger>
           <TabsTrigger value="customer-audit">Customer Audit</TabsTrigger>
+          <TabsTrigger value="export-jobs">Export Jobs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -192,6 +194,10 @@ function AdminPage() {
 
         <TabsContent value="customer-audit">
           <CustomerAuditLog />
+        </TabsContent>
+
+        <TabsContent value="export-jobs">
+          <ExportJobsPanel />
         </TabsContent>
       </Tabs>
     </AppShell>
