@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { fmtCurrency, fmtNumber } from "@/lib/format";
 import { exportToExcel } from "@/lib/export-xlsx";
 import { buildExcelBlobAsync, downloadBlob, type ExportProgress } from "@/lib/export-xlsx-async";
+import { startJob, updateJob, finishJob } from "@/lib/export-jobs";
 import { Progress } from "@/components/ui/progress";
 import { Download, Search, Pencil, ArrowUpDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -397,30 +398,54 @@ function CustomersPage() {
 }
 
 function AsyncExportDialog({
-  open, onClose, rows, filename, meta,
+  open, onClose, rows, filename, meta, scope, generatedBy,
 }: {
   open: boolean; onClose: () => void;
   rows: Record<string, unknown>[]; filename: string;
   meta: { generatedBy: string; filters?: Record<string, unknown> };
+  scope: string;
+  generatedBy: string;
 }) {
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [runId, setRunId] = useState(0);
+  const [controller, setController] = useState<AbortController | null>(null);
+  const [cancelled, setCancelled] = useState(false);
 
   useEffect(() => {
     if (!open) { setProgress(null); setBlob(null); setError(null); return; }
-    let cancelled = false;
+    let stopped = false;
+    const ac = new AbortController();
+    setController(ac);
+    setCancelled(false);
+    const jobId = startJob({
+      filename, scope, total: rows.length, user: generatedBy,
+    });
+    let attempts = 1;
     (async () => {
       try {
         setError(null); setBlob(null); setProgress(null);
-        const b = await buildExcelBlobAsync(rows, meta, (p) => { if (!cancelled) setProgress(p); });
-        if (!cancelled) setBlob(b);
+        const b = await buildExcelBlobAsync(rows, meta, (p) => {
+          if (stopped) return;
+          setProgress(p);
+          if (p.attempt && p.attempt > attempts) attempts = p.attempt;
+          updateJob(jobId, { processed: p.processed, total: p.total, attempts });
+        }, 500, ac.signal);
+        if (!stopped) { setBlob(b); finishJob(jobId, "done"); }
       } catch (e: any) {
-        if (!cancelled) setError(e?.message ?? "Export failed");
+        if (stopped) return;
+        if (e?.name === "ExportCancelledError" || ac.signal.aborted) {
+          setCancelled(true);
+          finishJob(jobId, "cancelled");
+        } else {
+          const msg = e?.message ?? "Export failed";
+          setError(msg);
+          finishJob(jobId, "error", msg);
+        }
       }
     })();
-    return () => { cancelled = true; };
+    return () => { stopped = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, runId]);
 
@@ -454,7 +479,17 @@ function AsyncExportDialog({
           </div>
         </div>
         <DialogFooter>
-          {!blob && !error && <Button variant="outline" onClick={onClose}>Cancel</Button>}
+          {!blob && !error && !cancelled && (
+            <Button variant="outline" onClick={() => { controller?.abort(); }}>
+              Cancel export
+            </Button>
+          )}
+          {cancelled && (
+            <>
+              <Button variant="outline" onClick={onClose}>Close</Button>
+              <Button onClick={() => { setCancelled(false); setRunId((n) => n + 1); }}>Restart</Button>
+            </>
+          )}
           {error && <>
             <Button variant="outline" onClick={onClose}>Close</Button>
             <Button onClick={() => setRunId((n) => n + 1)}>Retry</Button>
