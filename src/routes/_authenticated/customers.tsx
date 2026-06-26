@@ -196,6 +196,10 @@ function CustomersPage() {
 
   function doExport(set: CustomerRow[], scope: string) {
     if (set.length > ASYNC_EXPORT_THRESHOLD) {
+      if (!can("feature_export_jobs_trigger")) {
+        toast.error("You don't have permission to run large async exports.");
+        return;
+      }
       setAsyncExport({ open: true, scope });
       return;
     }
