@@ -41,6 +41,8 @@ export const PERMISSIONS: PermDef[] = [
   { key: "feature_customer_edit", kind: "feature", label: "Edit customer details", group: "Features" },
   { key: "feature_master_adr_entry", kind: "feature", label: "Master ADR entry", group: "Features" },
   { key: "feature_reports_access", kind: "feature", label: "Reports page access", group: "Features" },
+  { key: "feature_export_jobs_view", kind: "feature", label: "View async export jobs", group: "Features" },
+  { key: "feature_export_jobs_trigger", kind: "feature", label: "Trigger async export jobs (large exports)", group: "Features" },
 ];
 
 export const PERM_KEYS = PERMISSIONS.map((p) => p.key);
