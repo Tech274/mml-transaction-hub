@@ -461,6 +461,8 @@ function ExportJobsPanel() {
 
   const [retention, setRetention] = useState<number>(getRetentionDays());
   const [lastCleaned, setLastCleaned] = useState<number | null>(getLastCleanedAt());
+  const retentionError = validateRetentionDays(retention);
+  const nextCleanup = getNextCleanupAt(retention);
 
   // Auto-run cleanup once per page-mount so retention is always enforced.
   useEffect(() => {
@@ -514,12 +516,19 @@ function ExportJobsPanel() {
                 min={1}
                 className="w-32"
                 value={retention}
-                onChange={(e) => setRetention(Math.max(1, Number(e.target.value) || 1))}
+                aria-invalid={retentionError ? true : undefined}
+                onChange={(e) => setRetention(Number(e.target.value))}
               />
+              {retentionError && (
+                <div className="text-[11px] text-destructive" data-testid="retention-error">
+                  {retentionError}
+                </div>
+              )}
             </div>
             <Button
               size="sm"
               variant="outline"
+              disabled={!!retentionError}
               onClick={() => {
                 setRetentionDays(retention);
                 toast.success(`Retention set to ${retention} day(s)`);
@@ -529,6 +538,7 @@ function ExportJobsPanel() {
             </Button>
             <Button
               size="sm"
+              disabled={!!retentionError}
               onClick={() => {
                 const removed = runCleanup(retention);
                 setLastCleaned(getLastCleanedAt());
@@ -537,12 +547,17 @@ function ExportJobsPanel() {
             >
               Run cleanup now
             </Button>
-            <div
-              className="text-xs text-muted-foreground ml-auto"
-              data-testid="last-cleaned-at"
-            >
-              Last cleaned at:{" "}
-              {lastCleaned ? format(new Date(lastCleaned), "yyyy-MM-dd HH:mm:ss") : "never"}
+            <div className="ml-auto text-right text-xs text-muted-foreground space-y-0.5">
+              <div data-testid="last-cleaned-at">
+                Last cleaned at:{" "}
+                {lastCleaned ? format(new Date(lastCleaned), "yyyy-MM-dd HH:mm:ss") : "never"}
+              </div>
+              <div data-testid="next-cleanup-at">
+                Next cleanup at:{" "}
+                {nextCleanup
+                  ? `${format(new Date(nextCleanup), "yyyy-MM-dd HH:mm:ss")} (when this panel is next opened)`
+                  : "on next page load"}
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
