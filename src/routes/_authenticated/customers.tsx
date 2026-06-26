@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { fmtCurrency, fmtNumber } from "@/lib/format";
 import { exportToExcel } from "@/lib/export-xlsx";
 import { buildExcelBlobAsync, downloadBlob, type ExportProgress } from "@/lib/export-xlsx-async";
-import { startJob, updateJob, finishJob } from "@/lib/export-jobs";
+import { startJob, updateJob, finishJob, registerRetryHandler } from "@/lib/export-jobs";
 import { Progress } from "@/components/ui/progress";
 import { Download, Search, Pencil, ArrowUpDown } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -236,6 +236,18 @@ function CustomersPage() {
     if (asyncExport.scope === "current-page") return paginated;
     return sorted;
   }
+
+  // Register retry handlers so the Admin "View error" drawer can re-trigger
+  // a failed export using the same scope + current page filters/sort.
+  useEffect(() => {
+    const scopes = ["all", "current-page", "filtered"] as const;
+    const unregs = scopes.map((s) =>
+      registerRetryHandler(`customers-${s}`, () => {
+        setAsyncExport({ open: true, scope: s });
+      }),
+    );
+    return () => { for (const u of unregs) u(); };
+  }, []);
 
   return (
     <AppShell title="Customers">

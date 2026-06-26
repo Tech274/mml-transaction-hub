@@ -31,6 +31,7 @@ import { ArrowUpDown, Download } from "lucide-react";
 import {
   useExportJobs, clearJobs, type ExportJob,
   getRetentionDays, setRetentionDays, getLastCleanedAt, runCleanup,
+  getNextCleanupAt, validateRetentionDays, retryJob, hasRetryHandler,
 } from "@/lib/export-jobs";
 
 export const Route = createFileRoute("/_authenticated/admin")({
@@ -460,6 +461,8 @@ function ExportJobsPanel() {
 
   const [retention, setRetention] = useState<number>(getRetentionDays());
   const [lastCleaned, setLastCleaned] = useState<number | null>(getLastCleanedAt());
+  const retentionError = validateRetentionDays(retention);
+  const nextCleanup = getNextCleanupAt(retention);
 
   // Auto-run cleanup once per page-mount so retention is always enforced.
   useEffect(() => {
@@ -513,12 +516,19 @@ function ExportJobsPanel() {
                 min={1}
                 className="w-32"
                 value={retention}
-                onChange={(e) => setRetention(Math.max(1, Number(e.target.value) || 1))}
+                aria-invalid={retentionError ? true : undefined}
+                onChange={(e) => setRetention(Number(e.target.value))}
               />
+              {retentionError && (
+                <div className="text-[11px] text-destructive" data-testid="retention-error">
+                  {retentionError}
+                </div>
+              )}
             </div>
             <Button
               size="sm"
               variant="outline"
+              disabled={!!retentionError}
               onClick={() => {
                 setRetentionDays(retention);
                 toast.success(`Retention set to ${retention} day(s)`);
@@ -528,6 +538,7 @@ function ExportJobsPanel() {
             </Button>
             <Button
               size="sm"
+              disabled={!!retentionError}
               onClick={() => {
                 const removed = runCleanup(retention);
                 setLastCleaned(getLastCleanedAt());
@@ -536,12 +547,17 @@ function ExportJobsPanel() {
             >
               Run cleanup now
             </Button>
-            <div
-              className="text-xs text-muted-foreground ml-auto"
-              data-testid="last-cleaned-at"
-            >
-              Last cleaned at:{" "}
-              {lastCleaned ? format(new Date(lastCleaned), "yyyy-MM-dd HH:mm:ss") : "never"}
+            <div className="ml-auto text-right text-xs text-muted-foreground space-y-0.5">
+              <div data-testid="last-cleaned-at">
+                Last cleaned at:{" "}
+                {lastCleaned ? format(new Date(lastCleaned), "yyyy-MM-dd HH:mm:ss") : "never"}
+              </div>
+              <div data-testid="next-cleanup-at">
+                Next cleanup at:{" "}
+                {nextCleanup
+                  ? `${format(new Date(nextCleanup), "yyyy-MM-dd HH:mm:ss")} (when this panel is next opened)`
+                  : "on next page load"}
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
@@ -642,6 +658,17 @@ function baseType(scope: string): string {
 }
 
 function ExportJobErrorDrawer({ job, onClose }: { job: ExportJob | null; onClose: () => void }) {
+  const canRetry = job ? hasRetryHandler(job.scope) : false;
+  function onRetry() {
+    if (!job) return;
+    const ok = retryJob({ id: job.id, scope: job.scope });
+    if (ok) {
+      toast.success("Retrying export…");
+      onClose();
+    } else {
+      toast.error("Open the page that started this export to retry it.");
+    }
+  }
   return (
     <Dialog open={!!job} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-2xl">
@@ -675,6 +702,17 @@ function ExportJobErrorDrawer({ job, onClose }: { job: ExportJob | null; onClose
             </div>
           </div>
         )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button
+            onClick={onRetry}
+            disabled={!job}
+            title={canRetry ? "Re-run this export with the same parameters" : "Open the source page to retry"}
+            data-testid="retry-export-job"
+          >
+            Retry
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

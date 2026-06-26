@@ -21,6 +21,7 @@ const MAX = 100;
 const RETENTION_KEY = "lovable.exportJobs.retention.v1";
 const LAST_CLEANED_KEY = "lovable.exportJobs.lastCleanedAt.v1";
 const DEFAULT_RETENTION_DAYS = 30;
+const MAX_RETENTION_DAYS = 3650;
 
 let cache: ExportJob[] | null = null;
 const listeners = new Set<() => void>();
@@ -116,6 +117,26 @@ export function getLastCleanedAt(): number | null {
   } catch { return null; }
 }
 
+/** Returns when the next automatic cleanup will logically run.
+ * Cleanup is triggered when the admin Export Jobs panel mounts; this value
+ * is the earliest point at which mounting the panel would actually delete
+ * a job under the current retention setting (lastCleaned + retentionDays).
+ * If cleanup has never run, returns null. */
+export function getNextCleanupAt(days?: number): number | null {
+  const last = getLastCleanedAt();
+  if (last == null) return null;
+  const d = days ?? getRetentionDays();
+  return last + d * 24 * 60 * 60 * 1000;
+}
+
+export function validateRetentionDays(n: number): string | null {
+  if (!Number.isFinite(n)) return "Enter a number";
+  if (!Number.isInteger(n)) return "Must be a whole number of days";
+  if (n < 1) return "Must be at least 1 day";
+  if (n > MAX_RETENTION_DAYS) return `Must be ${MAX_RETENTION_DAYS} days or fewer`;
+  return null;
+}
+
 /** Delete jobs older than retention. Returns number of jobs removed. */
 export function runCleanup(days?: number): number {
   const d = days ?? getRetentionDays();
@@ -128,6 +149,42 @@ export function runCleanup(days?: number): number {
   }
   if (removed > 0) write(next); else for (const l of listeners) l();
   return removed;
+}
+
+// ---- Retry registry --------------------------------------------------------
+// Pages that own an export (e.g. /customers) register a handler keyed by the
+// job scope. The admin "View error" drawer can then re-trigger the job using
+// the same request parameters by invoking the handler. Handlers live in
+// module memory only — if the owning page is unmounted, retry is unavailable
+// and the caller should prompt the user to navigate to that page.
+
+export type RetryHandler = () => void | Promise<void>;
+const retryHandlers = new Map<string, RetryHandler>();
+
+export function registerRetryHandler(scope: string, fn: RetryHandler): () => void {
+  retryHandlers.set(scope, fn);
+  for (const l of listeners) l();
+  return () => {
+    if (retryHandlers.get(scope) === fn) {
+      retryHandlers.delete(scope);
+      for (const l of listeners) l();
+    }
+  };
+}
+
+export function hasRetryHandler(scope: string): boolean {
+  return retryHandlers.has(scope);
+}
+
+/** Returns true if a handler ran; false if no handler is registered. */
+export function retryJob(job: Pick<ExportJob, "id" | "scope">): boolean {
+  const fn = retryHandlers.get(job.scope);
+  if (!fn) return false;
+  // Mark the failed job as cancelled/retried so it stops showing as "error"
+  // in the list; the handler creates a new running job entry.
+  updateJob(job.id, { status: "cancelled", endedAt: Date.now() });
+  Promise.resolve(fn()).catch(() => {});
+  return true;
 }
 
 export function useExportJobs(): ExportJob[] {
