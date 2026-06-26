@@ -429,6 +429,90 @@ function PreviewAndPresetsBar({ previewRole, onApplied }: { previewRole: AppRole
   );
 }
 
+function fmtDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const s = ms / 1000;
+  if (s < 60) return `${s.toFixed(1)}s`;
+  const m = Math.floor(s / 60);
+  const r = Math.round(s - m * 60);
+  return `${m}m ${r}s`;
+}
+
+function ExportJobsPanel() {
+  const jobs = useExportJobs();
+  const [status, setStatus] = useState<"all" | ExportJob["status"]>("all");
+  const filtered = jobs.filter((j) => status === "all" || j.status === status);
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle>Async Export Jobs</CardTitle>
+          <div className="flex items-center gap-2">
+            <Select value={status} onValueChange={(v) => setStatus(v as any)}>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="running">Running</SelectItem>
+                <SelectItem value="done">Done</SelectItem>
+                <SelectItem value="error">Error</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button size="sm" variant="outline" onClick={() => { if (confirm("Clear all job history on this browser?")) clearJobs(); }}>
+              Clear
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xs text-muted-foreground mb-3">
+          Async Excel exports run in the browser. This log shows export jobs started on this device and is stored locally per browser.
+        </p>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Started</TableHead>
+              <TableHead>Scope</TableHead>
+              <TableHead>File</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Progress</TableHead>
+              <TableHead className="text-right">Attempts</TableHead>
+              <TableHead className="text-right">Duration</TableHead>
+              <TableHead>Last Error</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.length === 0 && (
+              <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">No export jobs yet.</TableCell></TableRow>
+            )}
+            {filtered.map((j) => {
+              const dur = (j.endedAt ?? Date.now()) - j.startedAt;
+              const pct = j.total > 0 ? Math.round((j.processed / j.total) * 100) : 0;
+              const variant =
+                j.status === "done" ? "default" :
+                j.status === "error" ? "destructive" :
+                j.status === "cancelled" ? "secondary" : "outline";
+              return (
+                <TableRow key={j.id}>
+                  <TableCell className="whitespace-nowrap text-sm">{format(new Date(j.startedAt), "yyyy-MM-dd HH:mm:ss")}</TableCell>
+                  <TableCell className="text-sm">{j.scope}</TableCell>
+                  <TableCell className="text-xs font-mono max-w-[260px] truncate" title={j.filename}>{j.filename}</TableCell>
+                  <TableCell><Badge variant={variant as any}>{j.status}</Badge></TableCell>
+                  <TableCell className="text-right tabular-nums">{j.processed.toLocaleString()} / {j.total.toLocaleString()} ({pct}%)</TableCell>
+                  <TableCell className="text-right tabular-nums">{j.attempts}</TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtDuration(dur)}</TableCell>
+                  <TableCell className="text-xs text-destructive max-w-[280px] truncate" title={j.error ?? ""}>{j.error ?? "—"}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ---- KPI order editor (per role) ----
 function KpiOrderEditor({ rows, onSaved }: {
   rows: { role: string; key: string; enabled: boolean; sort_order: number }[];
