@@ -237,6 +237,18 @@ function CustomersPage() {
     return sorted;
   }
 
+  // Register retry handlers so the Admin "View error" drawer can re-trigger
+  // a failed export using the same scope + current page filters/sort.
+  useEffect(() => {
+    const scopes = ["all", "current-page", "filtered"] as const;
+    const unregs = scopes.map((s) =>
+      registerRetryHandler(`customers-${s}`, () => {
+        setAsyncExport({ open: true, scope: s });
+      }),
+    );
+    return () => { for (const u of unregs) u(); };
+  }, []);
+
   return (
     <AppShell title="Customers">
       <Card className="p-4 mb-4">
