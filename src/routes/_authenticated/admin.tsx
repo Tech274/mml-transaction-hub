@@ -658,6 +658,17 @@ function baseType(scope: string): string {
 }
 
 function ExportJobErrorDrawer({ job, onClose }: { job: ExportJob | null; onClose: () => void }) {
+  const canRetry = job ? hasRetryHandler(job.scope) : false;
+  function onRetry() {
+    if (!job) return;
+    const ok = retryJob({ id: job.id, scope: job.scope });
+    if (ok) {
+      toast.success("Retrying export…");
+      onClose();
+    } else {
+      toast.error("Open the page that started this export to retry it.");
+    }
+  }
   return (
     <Dialog open={!!job} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-2xl">
@@ -691,6 +702,17 @@ function ExportJobErrorDrawer({ job, onClose }: { job: ExportJob | null; onClose
             </div>
           </div>
         )}
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>Close</Button>
+          <Button
+            onClick={onRetry}
+            disabled={!job}
+            title={canRetry ? "Re-run this export with the same parameters" : "Open the source page to retry"}
+            data-testid="retry-export-job"
+          >
+            Retry
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
