@@ -23,6 +23,7 @@ import {
 } from "@/lib/admin.functions";
 import { format } from "date-fns";
 import { PERMISSIONS, type PermDef, setPreviewRole, usePreviewRole } from "@/lib/permissions";
+import { usePermissions } from "@/lib/permissions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { upsertAccountManagerFn, setAccountManagerActiveFn } from "@/lib/customers.functions";
 import { exportToExcel } from "@/lib/export-xlsx";
@@ -53,6 +54,7 @@ const ROLE_LABEL: Record<AppRole, string> = {
 function AdminPage() {
   const { user: me } = useAuth();
   const qc = useQueryClient();
+  const { can } = usePermissions();
   const createUserFn = useServerFn(adminCreateUser);
   const setRolesFn = useServerFn(adminSetUserRoles);
   const setActiveFn = useServerFn(adminSetUserActive);
@@ -106,7 +108,9 @@ function AdminPage() {
           <TabsTrigger value="audit">Role Audit Log</TabsTrigger>
           <TabsTrigger value="account-managers">Account Managers</TabsTrigger>
           <TabsTrigger value="customer-audit">Customer Audit</TabsTrigger>
-          <TabsTrigger value="export-jobs">Export Jobs</TabsTrigger>
+          {can("feature_export_jobs_view") && (
+            <TabsTrigger value="export-jobs">Export Jobs</TabsTrigger>
+          )}
         </TabsList>
 
         <TabsContent value="users">
@@ -196,9 +200,11 @@ function AdminPage() {
           <CustomerAuditLog />
         </TabsContent>
 
-        <TabsContent value="export-jobs">
-          <ExportJobsPanel />
-        </TabsContent>
+        {can("feature_export_jobs_view") && (
+          <TabsContent value="export-jobs">
+            <ExportJobsPanel />
+          </TabsContent>
+        )}
       </Tabs>
     </AppShell>
   );
