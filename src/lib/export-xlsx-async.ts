@@ -1,12 +1,20 @@
 import * as XLSX from "xlsx";
 
 export type ExportProgress = {
-  phase: "preparing" | "building" | "writing" | "done" | "retrying";
+  phase: "preparing" | "building" | "writing" | "done" | "retrying" | "cancelled";
   processed: number;
   total: number;
   message: string;
   attempt?: number;
 };
+
+export class ExportCancelledError extends Error {
+  constructor() { super("Export cancelled"); this.name = "ExportCancelledError"; }
+}
+
+function checkAborted(signal?: AbortSignal) {
+  if (signal?.aborted) throw new ExportCancelledError();
+}
 
 /**
  * Build an XLSX workbook in chunks, yielding to the event loop between chunks
@@ -18,8 +26,9 @@ export async function buildExcelBlobAsync<T extends Record<string, unknown>>(
   meta: { generatedBy: string; filters?: Record<string, unknown> },
   onProgress?: (p: ExportProgress) => void,
   chunkSize = 500,
+  signal?: AbortSignal,
 ): Promise<Blob> {
-  return buildWithRetry(rows, meta, onProgress, chunkSize, 0);
+  return buildWithRetry(rows, meta, onProgress, chunkSize, 2, signal);
 }
 
 /**
@@ -33,20 +42,27 @@ export async function buildWithRetry<T extends Record<string, unknown>>(
   onProgress?: (p: ExportProgress) => void,
   chunkSize = 500,
   maxAttempts = 2,
+  signal?: AbortSignal,
 ): Promise<Blob> {
   let attempt = 0;
   let lastErr: unknown;
   while (attempt <= maxAttempts) {
     try {
+      checkAborted(signal);
       if (attempt > 0) {
         onProgress?.({
           phase: "retrying", processed: 0, total: rows.length, attempt: attempt + 1,
           message: `Retrying (attempt ${attempt + 1} of ${maxAttempts + 1})…`,
         });
         await new Promise((r) => setTimeout(r, 250 * attempt));
+        checkAborted(signal);
       }
-      return await buildOnce(rows, meta, onProgress, chunkSize, attempt + 1);
+      return await buildOnce(rows, meta, onProgress, chunkSize, attempt + 1, signal);
     } catch (e) {
+      if (e instanceof ExportCancelledError) {
+        onProgress?.({ phase: "cancelled", processed: 0, total: rows.length, attempt: attempt + 1, message: "Cancelled" });
+        throw e;
+      }
       lastErr = e;
       attempt += 1;
     }
@@ -60,8 +76,10 @@ async function buildOnce<T extends Record<string, unknown>>(
   onProgress: ((p: ExportProgress) => void) | undefined,
   chunkSize: number,
   attempt: number,
+  signal?: AbortSignal,
 ): Promise<Blob> {
   const total = rows.length;
+  checkAborted(signal);
   onProgress?.({ phase: "preparing", processed: 0, total, attempt, message: "Preparing workbook…" });
   await tick();
 
@@ -86,6 +104,7 @@ async function buildOnce<T extends Record<string, unknown>>(
 
   let processed = 0;
   for (let i = 0; i < total; i += chunkSize) {
+    checkAborted(signal);
     const slice = rows.slice(i, i + chunkSize);
     const aoa = slice.map((r) => Object.values(r) as (string | number | boolean | null)[]);
     XLSX.utils.sheet_add_aoa(dataSheet, aoa, { origin: -1 });
@@ -102,6 +121,7 @@ async function buildOnce<T extends Record<string, unknown>>(
 
   XLSX.utils.book_append_sheet(wb, dataSheet, "Data");
 
+  checkAborted(signal);
   onProgress?.({ phase: "writing", processed, total, attempt, message: "Writing workbook file…" });
   await tick();
   const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });

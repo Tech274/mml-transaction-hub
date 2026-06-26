@@ -118,17 +118,23 @@ export const setCustomerActiveFn = createServerFn({ method: "POST" })
     z.object({
       id: z.string().uuid(),
       active: z.boolean(),
-      reason: z.string().trim().max(500).optional().nullable(),
+      reason: z.string().trim().min(1, "Reason is required").max(500, "Reason must be 500 characters or fewer")
+        .optional().nullable(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    // Require a reason when deactivating
-    if (!data.active && (!data.reason || data.reason.trim().length === 0)) {
-      throw new Error("A deactivation reason is required.");
+    // Require a non-empty, bounded reason when deactivating — enforced
+    // before any update that would trigger the audit log trigger.
+    let reason: string | null = null;
+    if (!data.active) {
+      const r = (data.reason ?? "").trim();
+      if (r.length === 0) throw new Error("A deactivation reason is required.");
+      if (r.length > 500) throw new Error("Deactivation reason must be 500 characters or fewer.");
+      reason = r;
     }
     const { error } = await context.supabase.from("customers").update({
       is_active: data.active,
-      deactivation_reason: data.active ? null : (data.reason ?? null),
+      deactivation_reason: reason,
     }).eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
