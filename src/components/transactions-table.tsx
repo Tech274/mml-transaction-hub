@@ -222,6 +222,15 @@ export function TransactionsTable({
               </SelectContent>
             </Select>
           )}
+          {repoFilter !== "public_cloud" && (
+            <Select value={filters.systemConfig} onValueChange={(v) => { setFilters({ ...filters, systemConfig: v }); setPage(0); }}>
+              <SelectTrigger><SelectValue placeholder="System Config" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All system configs</SelectItem>
+                {SYSTEM_CONFIG_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <div className="flex gap-2">
             <Input type="date" value={filters.startFrom} onChange={(e) => { setFilters({ ...filters, startFrom: e.target.value }); setPage(0); }} />
             <Input type="date" value={filters.startTo} onChange={(e) => { setFilters({ ...filters, startTo: e.target.value }); setPage(0); }} />
