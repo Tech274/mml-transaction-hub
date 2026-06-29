@@ -51,7 +51,7 @@ const schema = z.object({
     }
   }
   if (v.lab_type === "private_cloud") {
-    if (!v.system_config || !SYSTEM_CONFIG_OPTIONS.includes(v.system_config)) {
+    if (!v.system_config || !(SYSTEM_CONFIG_OPTIONS as readonly string[]).includes(v.system_config)) {
       ctx.addIssue({ code: "custom", path: ["system_config"], message: "Required for Private Cloud" });
     }
   }
