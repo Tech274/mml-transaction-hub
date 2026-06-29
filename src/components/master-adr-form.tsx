@@ -26,6 +26,7 @@ const schema = z.object({
   lab_name: z.string().trim().min(1, "Required").max(200),
   lab_type: z.enum(["public_cloud", "private_cloud"]),
   cloud_provider: z.string().optional(),
+  system_config: z.string().optional(),
   line_of_business: z.string().min(1, "Required"),
   start_date: z.string().min(1, "Required"),
   end_date: z.string().min(1, "Required"),
@@ -49,12 +50,26 @@ const schema = z.object({
       ctx.addIssue({ code: "custom", path: ["cloud_provider"], message: "Required for Public Cloud (AWS, Azure, GCP)" });
     }
   }
+  if (v.lab_type === "private_cloud") {
+    if (!v.system_config || !SYSTEM_CONFIG_OPTIONS.includes(v.system_config)) {
+      ctx.addIssue({ code: "custom", path: ["system_config"], message: "Required for Private Cloud" });
+    }
+  }
   if (v.input_cost > v.selling_cost) {
     ctx.addIssue({ code: "custom", path: ["input_cost"], message: "Input cost should not exceed selling cost (negative margin)" });
   }
 });
 
 type FormValues = z.infer<typeof schema>;
+
+const SYSTEM_CONFIG_OPTIONS = [
+  "8GB 2vCPUs",
+  "8GB 4vCPUs",
+  "12GB 4vCPUs",
+  "16GB 4vCPUs",
+  "24GB 6vCPUs",
+  "32GB 8vCPUs",
+] as const;
 
 export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
   const { user } = useAuth();
@@ -78,6 +93,7 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
       lab_name: "",
       lab_type: "public_cloud",
       cloud_provider: "",
+      system_config: "",
       line_of_business: "",
       start_date: "",
       end_date: "",
@@ -91,6 +107,7 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
   useEffect(() => {
     if (labType === "private_cloud") form.setValue("cloud_provider", "MakeMyLabs Private Cloud");
     else if (form.getValues("cloud_provider") === "MakeMyLabs Private Cloud") form.setValue("cloud_provider", "");
+    if (labType !== "private_cloud") form.setValue("system_config", "");
   }, [labType, form]);
 
   useEffect(() => {
@@ -119,6 +136,7 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
         lab_type: values.lab_type,
         repository_type: values.lab_type, // trigger normalizes
         cloud_provider: values.lab_type === "private_cloud" ? "MakeMyLabs Private Cloud" : (values.cloud_provider ?? ""),
+        system_config: values.lab_type === "private_cloud" ? (values.system_config ?? null) : null,
         line_of_business: values.line_of_business,
         start_date: values.start_date,
         end_date: values.end_date,
@@ -214,6 +232,21 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
               </SelectContent>
             </Select>
           </Field>
+          {labType === "private_cloud" && (
+            <Field label="System Config *" error={form.formState.errors.system_config?.message}>
+              <Select
+                value={form.watch("system_config") ?? ""}
+                onValueChange={(v) => form.setValue("system_config", v, { shouldValidate: true })}
+              >
+                <SelectTrigger><SelectValue placeholder="Select configuration" /></SelectTrigger>
+                <SelectContent>
+                  {SYSTEM_CONFIG_OPTIONS.map((opt) => (
+                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          )}
           <Field label="Start Date *" error={form.formState.errors.start_date?.message}>
             <Input type="date" {...form.register("start_date")} />
           </Field>
