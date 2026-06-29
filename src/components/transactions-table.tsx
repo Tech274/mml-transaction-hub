@@ -28,6 +28,7 @@ interface Filters {
   lob: string;
   startFrom: string;
   startTo: string;
+  systemConfig: string;
 }
 
 type SortMode = "recent" | "relevance";
@@ -35,7 +36,17 @@ type SortMode = "recent" | "relevance";
 const initial: Filters = {
   search: "", month: "all", year: "all", customer: "all",
   provider: "all", lob: "all", startFrom: "", startTo: "",
+  systemConfig: "all",
 };
+
+const SYSTEM_CONFIG_OPTIONS = [
+  "8GB 2vCPUs",
+  "8GB 4vCPUs",
+  "12GB 4vCPUs",
+  "16GB 4vCPUs",
+  "24GB 6vCPUs",
+  "32GB 8vCPUs",
+] as const;
 
 export function TransactionsTable({
   repoFilter = "all", showProviderFilter = true,
@@ -88,6 +99,7 @@ export function TransactionsTable({
       if (filters.lob !== "all") q = q.eq("line_of_business", filters.lob);
       if (filters.startFrom) q = q.gte("start_date", filters.startFrom);
       if (filters.startTo) q = q.lte("start_date", filters.startTo);
+      if (filters.systemConfig !== "all") q = q.eq("system_config", filters.systemConfig);
       if (fuzzy) {
         q = q.in("id", Array.from(scoreMap!.keys()));
         // Sort client-side; fetch all matching (already capped at 500).
@@ -139,6 +151,7 @@ export function TransactionsTable({
         "Lab Name": r.lab_name,
         "Repository": r.repository_type,
         "Cloud Provider": r.cloud_provider,
+        ...(repoFilter !== "public_cloud" ? { "System Config": r.system_config ?? "" } : {}),
         "Line of Business": r.line_of_business,
         "Start Date": r.start_date,
         "End Date": r.end_date,
@@ -206,6 +219,15 @@ export function TransactionsTable({
                 {["AWS", "Azure", "GCP", "MakeMyLabs Private Cloud"].map((p) => (
                   <SelectItem key={p} value={p}>{p}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          )}
+          {repoFilter !== "public_cloud" && (
+            <Select value={filters.systemConfig} onValueChange={(v) => { setFilters({ ...filters, systemConfig: v }); setPage(0); }}>
+              <SelectTrigger><SelectValue placeholder="System Config" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All system configs</SelectItem>
+                {SYSTEM_CONFIG_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
           )}
