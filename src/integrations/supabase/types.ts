@@ -362,6 +362,7 @@ export type Database = {
           repository_type: string
           selling_cost: number
           start_date: string
+          system_config: string | null
           total_users: number
           updated_at: string
           updated_by: string | null
@@ -385,6 +386,7 @@ export type Database = {
           repository_type: string
           selling_cost: number
           start_date: string
+          system_config?: string | null
           total_users: number
           updated_at?: string
           updated_by?: string | null
@@ -408,6 +410,7 @@ export type Database = {
           repository_type?: string
           selling_cost?: number
           start_date?: string
+          system_config?: string | null
           total_users?: number
           updated_at?: string
           updated_by?: string | null
