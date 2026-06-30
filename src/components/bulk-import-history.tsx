@@ -298,6 +298,31 @@ function RunDetails({ run, onDownload }: { run: Run; onDownload: () => void }) {
             <FileWarning className="h-4 w-4 mr-1" />Download error CSV
           </Button>
         )}
+        <div className="flex flex-wrap gap-2">
+          {run.original_csv_path && (
+            <Button size="sm" variant="outline" onClick={async () => {
+              const { data, error } = await supabase.storage.from("bulk-imports").createSignedUrl(run.original_csv_path!, 60);
+              if (error || !data?.signedUrl) { toast.error(error?.message ?? "Could not create download link"); return; }
+              const a = document.createElement("a");
+              a.href = data.signedUrl; a.download = run.filename || "original.csv"; a.target = "_blank"; a.rel = "noopener"; a.click();
+            }}>
+              <FileText className="h-4 w-4 mr-1" />Download original CSV
+            </Button>
+          )}
+          {run.error_artifact_path && (
+            <Button size="sm" variant="outline" onClick={async () => {
+              const { data, error } = await supabase.storage.from("bulk-imports").createSignedUrl(run.error_artifact_path!, 60);
+              if (error || !data?.signedUrl) { toast.error(error?.message ?? "Could not create download link"); return; }
+              const a = document.createElement("a");
+              a.href = data.signedUrl; a.download = `${run.filename.replace(/\.csv$/i,"")}-errors.json`; a.target = "_blank"; a.rel = "noopener"; a.click();
+            }}>
+              <Download className="h-4 w-4 mr-1" />Error JSON artifact
+            </Button>
+          )}
+          {run.parent_run_id && (
+            <Badge variant="secondary" className="gap-1"><GitBranch className="h-3 w-3" />Retry of {run.parent_run_id.slice(0, 8)}</Badge>
+          )}
+        </div>
         <div className="border rounded-md overflow-x-auto">
           <Table>
             <TableHeader>
