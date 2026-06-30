@@ -29,6 +29,9 @@ interface Run {
   completed_at: string | null;
   column_mapping?: Record<string, number> | null;
   update_fields?: string[] | null;
+  retry_count?: number | null;
+  max_retries?: number | null;
+  parent_run_id?: string | null;
 }
 
 interface RowAudit {
@@ -144,6 +147,7 @@ export function BulkImportHistory() {
                 <TableHead>Kind</TableHead>
                 <TableHead>Strategy</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Retry</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Valid</TableHead>
                 <TableHead className="text-right">Invalid</TableHead>
@@ -156,7 +160,7 @@ export function BulkImportHistory() {
             </TableHeader>
             <TableBody>
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={14} className="text-center text-muted-foreground py-6">No matching imports</TableCell></TableRow>
+                <TableRow><TableCell colSpan={15} className="text-center text-muted-foreground py-6">No matching imports</TableCell></TableRow>
               )}
               {filtered.map((r) => (
                 <TableRow key={r.id}>
@@ -169,6 +173,9 @@ export function BulkImportHistory() {
                     <Badge variant={r.status === "completed" ? "outline" : r.status === "failed" ? "destructive" : "secondary"}>
                       {r.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    {(r.retry_count ?? 0)}/{r.max_retries ?? 3}
                   </TableCell>
                   <TableCell className="text-right">{r.total_rows}</TableCell>
                   <TableCell className="text-right">{r.valid_rows}</TableCell>
