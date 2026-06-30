@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning } from "lucide-react";
+import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -147,6 +149,24 @@ export function BulkImport() {
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [dupStrategy, setDupStrategy] = useState<DupStrategy>("skip");
+  // Pre-import mapping step
+  const [mapping, setMapping] = useState<{
+    detected: string[];
+    matched: string[];
+    missing: string[];
+    extra: string[];
+    body: string[][];
+    colIdx: Record<string, number>;
+  } | null>(null);
+  // Fields the user opts to update when duplicate strategy = update
+  const UPDATABLE_FIELDS = [
+    "month", "year", "customer_name", "lab_name", "line_of_business",
+    "start_date", "end_date", "total_users", "input_cost", "selling_cost",
+    "cloud_provider", "system_config",
+  ] as const;
+  const [updateFields, setUpdateFields] = useState<Set<string>>(
+    new Set(UPDATABLE_FIELDS),
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const findOrCreate = useServerFn(findOrCreateCustomer);
   const checkUnique = useServerFn(checkPotentialIdUnique);
@@ -162,7 +182,7 @@ export function BulkImport() {
   }
 
   function reset() {
-    setRows([]); setFileName(""); setProgress(null);
+    setRows([]); setFileName(""); setProgress(null); setMapping(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -176,14 +196,22 @@ export function BulkImport() {
     if (matrix.length === 0) { toast.error("Empty CSV"); return; }
     const [header, ...body] = matrix;
     const hdr = header.map((h) => h.trim().toLowerCase());
-    const missing = headers.filter((h) => !hdr.includes(h));
-    if (missing.length) {
-      toast.error(`Missing columns: ${missing.join(", ")}`);
-      return;
-    }
-    // Header-based mapping: build name->index map so column order in CSV is irrelevant.
     const colIdx: Record<string, number> = {};
     hdr.forEach((h, i) => { if (!(h in colIdx)) colIdx[h] = i; });
+    const matched = headers.filter((h) => h in colIdx);
+    const missing = headers.filter((h) => !(h in colIdx));
+    const extra = hdr.filter((h) => !(headers as readonly string[]).includes(h));
+    setMapping({ detected: hdr, matched, missing, extra, body, colIdx });
+    setRows([]);
+  }
+
+  function confirmMappingAndValidate() {
+    if (!mapping) return;
+    if (mapping.missing.length) {
+      toast.error(`Cannot proceed: missing columns ${mapping.missing.join(", ")}`);
+      return;
+    }
+    const { body, colIdx } = mapping;
     const seen = new Set<string>();
     const parsed: ParsedRow[] = body.map((cols, idx) => {
       const raw: Record<string, string> = {};
@@ -204,6 +232,15 @@ export function BulkImport() {
     setRows(parsed);
     const ok = parsed.filter((r) => r.errors.length === 0).length;
     toast.success(`Parsed ${parsed.length} rows · ${ok} valid · ${parsed.length - ok} with errors`);
+  }
+
+  function retryInvalidOnly() {
+    const invalid = rows.filter((r) => r.errors.length > 0);
+    if (!invalid.length) { toast.message("No invalid rows to retry"); return; }
+    // Re-validate just those rows; user is expected to have fixed them via re-upload
+    // of a corrected CSV (mapping step), so this is mostly for clearing successes.
+    setRows(invalid);
+    toast.success(`Kept ${invalid.length} invalid row${invalid.length === 1 ? "" : "s"}. Fix them and upload a corrected CSV, or re-run.`);
   }
 
   function downloadErrorReport() {
@@ -259,6 +296,9 @@ export function BulkImport() {
 
     try {
       for (let i = 0; i < valid.length; i++) {
+        // Yield to the UI thread every row so the progress bar stays responsive
+        // and the page does not appear frozen on large imports.
+        if (i % 5 === 0) await new Promise((r) => setTimeout(r, 0));
         const r = valid[i];
         const idx = updated.findIndex((x) => x.line === r.line);
         const p = r.parsed as Record<string, unknown>;
@@ -268,7 +308,7 @@ export function BulkImport() {
         try {
           const uq = await checkUnique({ data: { potentialId: String(p.potential_id) } });
           const cust = await findOrCreate({ data: { customerName: String(p.customer_name) } });
-          const payload = {
+          const fullPayload = {
             potential_id: String(p.potential_id),
             month: Number(p.month),
             year: Number(p.year),
@@ -286,27 +326,32 @@ export function BulkImport() {
             input_cost: Number(p.input_cost),
             selling_cost: Number(p.selling_cost),
             created_by: user.id,
-          };
+          } as Record<string, unknown>;
           if (!uq.unique) {
             if (dupStrategy === "skip") {
-              updated[idx] = { ...r, errors: [`skipped: potential_id ${payload.potential_id} already exists`] };
+              updated[idx] = { ...r, errors: [`skipped: potential_id ${String(fullPayload.potential_id)} already exists`] };
               rowStatus = "skipped"; skipped++;
             } else if (dupStrategy === "update") {
+              // Only overwrite the fields the user opted into; preserve the rest.
+              const partial: Record<string, unknown> = {};
+              for (const f of updateFields) if (f in fullPayload) partial[f] = fullPayload[f];
+              if (kind === "private_cloud") partial.system_config = fullPayload.system_config;
               const { data: existing, error: updErr } = await supabase
                 .from("transactions")
-                .update(payload)
-                .eq("potential_id", payload.potential_id)
+                .update(partial)
+                .eq("potential_id", String(fullPayload.potential_id))
                 .select("id").maybeSingle();
               if (updErr) { rowStatus = "error"; rowError = updErr.message; updated[idx] = { ...r, errors: [updErr.message] }; }
               else { rowStatus = "updated"; updatedCount++; txId = existing?.id ?? null; }
             } else { // link
+              // Link = read-only association, no fields overwritten on the existing record.
               const { data: existing } = await supabase
-                .from("transactions").select("id").eq("potential_id", payload.potential_id).maybeSingle();
+                .from("transactions").select("id").eq("potential_id", String(fullPayload.potential_id)).maybeSingle();
               rowStatus = "linked"; linked++; txId = existing?.id ?? null;
-              updated[idx] = { ...r, errors: [`linked to existing transaction ${payload.potential_id}`] };
+              updated[idx] = { ...r, errors: [`linked to existing transaction ${String(fullPayload.potential_id)} (no fields changed)`] };
             }
           } else {
-            const { data: ins, error } = await supabase.from("transactions").insert(payload).select("id").single();
+            const { data: ins, error } = await supabase.from("transactions").insert(fullPayload).select("id").single();
             if (error) { rowStatus = "error"; rowError = error.message; updated[idx] = { ...r, errors: [error.message] }; }
             else { imported++; txId = ins?.id ?? null; }
           }
