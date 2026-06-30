@@ -350,8 +350,9 @@ export function BulkImport() {
   function downloadErrorReport() {
     const errs = rows.filter((r) => r.errors.length > 0);
     if (!errs.length) { toast.error("No invalid rows"); return; }
-    // Break out per-field error columns so admins see exactly which field failed and why.
-    const cols = ["line", "potential_id", ...headers, "failed_fields", "validation_messages"];
+    // Per-field error columns + suggested corrected values for faster fixing.
+    const suggCols = headers.map((h) => `suggested_${h}`);
+    const cols = ["line", "potential_id", ...headers, "failed_fields", "validation_messages", ...suggCols];
     const body = errs.map((r) => {
       const fields = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim()))).join(", ");
       return [
@@ -360,9 +361,72 @@ export function BulkImport() {
         ...headers.map((h) => r.raw[h] ?? ""),
         fields,
         r.errors.join(" | "),
+        ...headers.map((h) => fields.split(", ").includes(h) ? suggestCorrection(h, r.raw[h] ?? "", kind) : ""),
       ];
     });
     downloadFile(`${kind}-invalid-rows-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(cols, body));
+  }
+
+  function downloadErrorJson() {
+    const errs = rows.filter((r) => r.errors.length > 0);
+    if (!errs.length) { toast.error("No invalid rows"); return; }
+    const payload = errs.map((r) => {
+      const failed_fields = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim())));
+      const suggested: Record<string, string> = {};
+      for (const f of failed_fields) {
+        const s = suggestCorrection(f, r.raw[f] ?? "", kind);
+        if (s) suggested[f] = s;
+      }
+      return {
+        line: r.line,
+        potential_id: r.raw.potential_id ?? null,
+        raw: r.raw,
+        failed_fields,
+        validation_messages: r.errors,
+        suggested_values: suggested,
+      };
+    });
+    downloadFile(
+      `${kind}-invalid-rows-${new Date().toISOString().slice(0, 10)}.json`,
+      JSON.stringify(payload, null, 2),
+      "application/json",
+    );
+  }
+
+  // --- Presets ---
+  async function saveAsPreset() {
+    if (!mapping) { toast.error("Upload a CSV first"); return; }
+    if (!presetName.trim()) { toast.error("Enter a preset name"); return; }
+    if (!user) return;
+    const { error } = await supabase.from("bulk_import_presets").insert({
+      name: presetName.trim(),
+      kind,
+      column_mapping: mapping.colIdx,
+      duplicate_strategy: dupStrategy,
+      update_fields: dupStrategy === "update" ? Array.from(updateFields) : null,
+      is_shared: true,
+      created_by: user.id,
+      created_by_email: user.email ?? null,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Preset "${presetName.trim()}" saved`);
+    setPresetName("");
+    qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
+  }
+
+  function applyPreset(id: string) {
+    setSelectedPresetId(id);
+    const p = presets.find((x) => x.id === id);
+    if (!p) return;
+    setDupStrategy(p.duplicate_strategy);
+    if (p.update_fields) setUpdateFields(new Set(p.update_fields));
+    if (mapping) {
+      const colIdx = p.column_mapping;
+      const matched = headers.filter((h) => h in colIdx);
+      const missing = headers.filter((h) => !(h in colIdx));
+      setMapping({ ...mapping, colIdx, matched, missing });
+    }
+    toast.success(`Loaded preset "${p.name}"`);
   }
 
   async function importValid() {
