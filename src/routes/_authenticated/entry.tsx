@@ -13,21 +13,24 @@ export const Route = createFileRoute("/_authenticated/entry")({
 });
 
 function EntryPage() {
-  const { canEditTransactions } = useAuth();
+  const { canEditTransactions, hasAnyRole } = useAuth();
   const { can } = usePermissions();
   const allowed = canEditTransactions && can("feature_master_adr_entry");
+  // Bulk import + history are limited to Ops/Manager/Admin.
+  const canBulk = hasAnyRole(["admin", "ops_lead", "ops_user"]);
+  const canHistory = hasAnyRole(["admin", "ops_lead", "leadership"]);
   return (
     <AppShell title="Master ADR Entry">
       {allowed ? (
         <Tabs defaultValue="single" className="space-y-4">
           <TabsList>
             <TabsTrigger value="single">Single Entry</TabsTrigger>
-            <TabsTrigger value="bulk">Bulk Import</TabsTrigger>
-          <TabsTrigger value="history">Import History</TabsTrigger>
+            {canBulk && <TabsTrigger value="bulk">Bulk Import</TabsTrigger>}
+            {canHistory && <TabsTrigger value="history">Import History</TabsTrigger>}
           </TabsList>
           <TabsContent value="single"><MasterAdrForm /></TabsContent>
-        <TabsContent value="bulk"><BulkImport /></TabsContent>
-        <TabsContent value="history"><BulkImportHistory /></TabsContent>
+          {canBulk && <TabsContent value="bulk"><BulkImport /></TabsContent>}
+          {canHistory && <TabsContent value="history"><BulkImportHistory /></TabsContent>}
         </Tabs>
       ) : (
         <Card><CardContent className="py-12 text-center text-muted-foreground">
