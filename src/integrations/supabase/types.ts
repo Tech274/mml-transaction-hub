@@ -47,6 +47,113 @@ export type Database = {
         }
         Relationships: []
       }
+      bulk_import_row_audit: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          filename: string
+          id: string
+          line_number: number
+          potential_id: string | null
+          row_data: Json | null
+          run_id: string
+          status: string
+          transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          filename: string
+          id?: string
+          line_number: number
+          potential_id?: string | null
+          row_data?: Json | null
+          run_id: string
+          status: string
+          transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          filename?: string
+          id?: string
+          line_number?: number
+          potential_id?: string | null
+          row_data?: Json | null
+          run_id?: string
+          status?: string
+          transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_row_audit_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_import_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_import_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          duplicate_strategy: string
+          filename: string
+          id: string
+          imported_rows: number
+          invalid_rows: number
+          kind: string
+          linked_rows: number
+          skipped_rows: number
+          status: string
+          total_rows: number
+          updated_rows: number
+          user_email: string | null
+          user_id: string
+          valid_rows: number
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          duplicate_strategy?: string
+          filename: string
+          id?: string
+          imported_rows?: number
+          invalid_rows?: number
+          kind: string
+          linked_rows?: number
+          skipped_rows?: number
+          status?: string
+          total_rows?: number
+          updated_rows?: number
+          user_email?: string | null
+          user_id: string
+          valid_rows?: number
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          duplicate_strategy?: string
+          filename?: string
+          id?: string
+          imported_rows?: number
+          invalid_rows?: number
+          kind?: string
+          linked_rows?: number
+          skipped_rows?: number
+          status?: string
+          total_rows?: number
+          updated_rows?: number
+          user_email?: string | null
+          user_id?: string
+          valid_rows?: number
+        }
+        Relationships: []
+      }
       config_master: {
         Row: {
           category: string
