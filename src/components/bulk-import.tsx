@@ -338,7 +338,7 @@ export function BulkImport() {
               if (kind === "private_cloud") partial.system_config = fullPayload.system_config;
               const { data: existing, error: updErr } = await supabase
                 .from("transactions")
-                .update(partial)
+                .update(partial as never)
                 .eq("potential_id", String(fullPayload.potential_id))
                 .select("id").maybeSingle();
               if (updErr) { rowStatus = "error"; rowError = updErr.message; updated[idx] = { ...r, errors: [updErr.message] }; }
@@ -351,7 +351,7 @@ export function BulkImport() {
               updated[idx] = { ...r, errors: [`linked to existing transaction ${String(fullPayload.potential_id)} (no fields changed)`] };
             }
           } else {
-            const { data: ins, error } = await supabase.from("transactions").insert(fullPayload).select("id").single();
+            const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
             if (error) { rowStatus = "error"; rowError = error.message; updated[idx] = { ...r, errors: [error.message] }; }
             else { imported++; txId = ins?.id ?? null; }
           }
