@@ -954,6 +954,162 @@ export function BulkImport() {
             </Table>
           </div>
         )}
+
+        {/* Preview suggested corrections — before/after per failed row */}
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Preview suggested corrections</DialogTitle>
+              <DialogDescription>
+                Review the proposed before/after values for each failed row. Apply to retry, or download artifacts.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-14">Line</TableHead>
+                    <TableHead>Potential ID</TableHead>
+                    <TableHead>Field</TableHead>
+                    <TableHead>Before</TableHead>
+                    <TableHead>After (suggested)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {suggestionDiffs().flatMap((d) =>
+                    d.changes.length === 0
+                      ? [(
+                          <TableRow key={`${d.line}-none`}>
+                            <TableCell className="text-muted-foreground">{d.line}</TableCell>
+                            <TableCell className="text-xs">{d.potential_id || "—"}</TableCell>
+                            <TableCell colSpan={3} className="text-xs text-muted-foreground">
+                              No automatic suggestion available for: {d.failed.join(", ") || "—"}
+                            </TableCell>
+                          </TableRow>
+                        )]
+                      : d.changes.map((c, i) => (
+                          <TableRow key={`${d.line}-${c.field}`}>
+                            {i === 0 ? (
+                              <>
+                                <TableCell className="text-muted-foreground align-top" rowSpan={d.changes.length}>{d.line}</TableCell>
+                                <TableCell className="text-xs align-top" rowSpan={d.changes.length}>{d.potential_id || "—"}</TableCell>
+                              </>
+                            ) : null}
+                            <TableCell className="text-xs font-medium">{c.field}</TableCell>
+                            <TableCell className="text-xs text-destructive line-through max-w-[180px] truncate" title={c.before}>{c.before || "(empty)"}</TableCell>
+                            <TableCell className="text-xs text-green-700 max-w-[180px] truncate" title={c.after}>{c.after}</TableCell>
+                          </TableRow>
+                        )),
+                  )}
+                  {suggestionDiffs().length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No invalid rows.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={downloadCorrectedCsv}>
+                <Download className="h-4 w-4 mr-1" />Download corrected CSV
+              </Button>
+              <Button variant="outline" onClick={downloadErrorJson}>
+                <FileWarning className="h-4 w-4 mr-1" />Download JSON artifact
+              </Button>
+              <Button onClick={applySuggestedAndRetry} disabled={submitting || lastRunInFlight || retryBlocked}>
+                <Sparkles className="h-4 w-4 mr-1" />Apply &amp; retry
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Preset management — create/edit/rename/delete + sharing toggle */}
+        <Dialog open={presetMgrOpen} onOpenChange={(o) => { setPresetMgrOpen(o); if (!o) setEditingPreset(null); }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Manage presets — {kind === "public_cloud" ? "Public" : "Private"} Cloud</DialogTitle>
+              <DialogDescription>
+                Saved header mappings and duplicate-handling choices. Shared presets are visible to all Ops/Manager/Admin users.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[55vh] overflow-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Strategy</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Sharing</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {presets.length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No presets yet</TableCell></TableRow>
+                  )}
+                  {presets.map((p) => {
+                    const pAny = p as Preset & { created_by?: string; created_by_email?: string | null; is_shared?: boolean };
+                    const mine = pAny.created_by === user?.id;
+                    const isEditing = editingPreset?.id === p.id;
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell>
+                          {isEditing ? (
+                            <Input
+                              value={editingPreset!.name}
+                              onChange={(e) => setEditingPreset({ ...editingPreset!, name: e.target.value })}
+                              className="h-8"
+                            />
+                          ) : (
+                            <span className="font-medium">{p.name}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">{p.duplicate_strategy}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{pAny.created_by_email ?? "—"}</TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <label className="flex items-center gap-2 text-xs cursor-pointer">
+                              <Checkbox
+                                checked={editingPreset!.is_shared}
+                                onCheckedChange={(c) => setEditingPreset({ ...editingPreset!, is_shared: !!c })}
+                              />
+                              Shared
+                            </label>
+                          ) : (
+                            <Badge variant={pAny.is_shared ? "outline" : "secondary"} className="text-xs">
+                              {pAny.is_shared ? "Shared" : "Private"}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            {isEditing ? (
+                              <>
+                                <Button size="sm" onClick={() => renamePreset(p.id, editingPreset!.name, editingPreset!.is_shared)} disabled={!editingPreset!.name.trim()}>Save</Button>
+                                <Button size="sm" variant="ghost" onClick={() => setEditingPreset(null)}>Cancel</Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button size="sm" variant="ghost" onClick={() => applyPreset(p.id)} title="Load into form">Load</Button>
+                                <Button size="sm" variant="ghost" disabled={!mine} onClick={() => setEditingPreset({ id: p.id, name: p.name, is_shared: !!pAny.is_shared })} title={mine ? "Rename / sharing" : "Only the creator can edit"}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" disabled={!mine} onClick={() => deletePreset(p.id)} title={mine ? "Delete" : "Only the creator can delete"}>
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPresetMgrOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
