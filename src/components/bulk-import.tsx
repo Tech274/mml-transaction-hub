@@ -599,6 +599,40 @@ export function BulkImport() {
           </div>
         </div>
 
+        {/* Retry-cap banner */}
+        {retryBlocked && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 text-destructive text-sm p-2">
+            <Ban className="h-4 w-4" />
+            Retry limit reached on your last {kind === "public_cloud" ? "Public" : "Private"} Cloud run
+            ({retryStats?.retry_count}/{retryStats?.max_retries ?? MAX_RETRIES}). Start a fresh import to continue.
+          </div>
+        )}
+
+        {/* Preset bar */}
+        <div className="flex flex-wrap items-end gap-2 rounded-md border p-2 bg-muted/30">
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs flex items-center gap-1"><Bookmark className="h-3 w-3" />Use a saved preset</Label>
+            <Select value={selectedPresetId} onValueChange={applyPreset}>
+              <SelectTrigger className="w-[240px] h-9"><SelectValue placeholder={presets.length ? "Choose preset…" : "No presets yet"} /></SelectTrigger>
+              <SelectContent>
+                {presets.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs">Save current mapping + duplicate choices as…</Label>
+            <div className="flex gap-1">
+              <Input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Preset name" className="h-9 w-[200px]" />
+              <Button size="sm" variant="outline" onClick={saveAsPreset} disabled={!mapping || !presetName.trim()}>
+                <Save className="h-4 w-4 mr-1" />Save preset
+              </Button>
+            </div>
+          </div>
+          <div className="text-[11px] text-muted-foreground ml-auto self-end">
+            Presets are shared with all Ops/Manager/Admin users in this workspace.
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <Label className="text-xs">CSV file</Label>
@@ -620,9 +654,15 @@ export function BulkImport() {
             <div className="flex flex-wrap items-center gap-2 ml-auto">
               <Badge variant="outline" className="gap-1"><CheckCircle2 className="h-3 w-3 text-green-600" />{validCount} valid</Badge>
               <Badge variant="outline" className="gap-1"><AlertTriangle className="h-3 w-3 text-amber-600" />{errorCount} errors</Badge>
+              {isRetryRun && <Badge variant="secondary" className="gap-1"><RotateCw className="h-3 w-3" />Retry run</Badge>}
               {errorCount > 0 && (
                 <Button size="sm" variant="outline" onClick={downloadErrorReport}>
                   <FileWarning className="h-4 w-4 mr-1" />Download error report
+                </Button>
+              )}
+              {errorCount > 0 && (
+                <Button size="sm" variant="outline" onClick={downloadErrorJson} title="JSON with raw input, failed_fields, validation_messages and suggested values">
+                  <FileWarning className="h-4 w-4 mr-1" />Download JSON
                 </Button>
               )}
               {errorCount > 0 && (
@@ -630,8 +670,12 @@ export function BulkImport() {
                   size="sm"
                   variant="outline"
                   onClick={retryInvalidOnly}
-                  disabled={submitting || lastRunInFlight}
-                  title={lastRunInFlight ? "Wait for the previous import to finish" : "Keep only invalid rows; current mapping & duplicate strategy will be reused"}
+                  disabled={submitting || lastRunInFlight || retryBlocked}
+                  title={retryBlocked
+                    ? `Retry limit reached (${retryStats?.max_retries ?? MAX_RETRIES})`
+                    : lastRunInFlight
+                      ? "Wait for the previous import to finish"
+                      : "Keep only invalid rows; current mapping & duplicate strategy will be reused"}
                 >
                   <RotateCw className="h-4 w-4 mr-1" />Retry invalid rows
                 </Button>
@@ -650,8 +694,15 @@ export function BulkImport() {
         {submitting && progress && (
           <div className="space-y-1">
             <Progress value={(progress.done / Math.max(progress.total, 1)) * 100} />
-            <div className="text-xs text-muted-foreground">
-              Processing in the background · {progress.done} of {progress.total} rows · UI stays responsive.
+            <div className="text-xs flex flex-wrap items-center gap-2">
+              {progress.isRetry && (
+                <Badge variant="secondary" className="gap-1"><RotateCw className="h-3 w-3" />Retry in progress</Badge>
+              )}
+              <span className="text-muted-foreground">
+                Attempted <strong className="text-foreground">{progress.done}</strong> / {progress.total} ·
+                <span className="text-green-700"> {progress.succeeded} succeeded</span> ·
+                <span className="text-destructive"> {progress.failed} failed</span>
+              </span>
             </div>
           </div>
         )}
