@@ -29,6 +29,9 @@ interface Run {
   completed_at: string | null;
   column_mapping?: Record<string, number> | null;
   update_fields?: string[] | null;
+  retry_count?: number | null;
+  max_retries?: number | null;
+  parent_run_id?: string | null;
 }
 
 interface RowAudit {
@@ -144,6 +147,7 @@ export function BulkImportHistory() {
                 <TableHead>Kind</TableHead>
                 <TableHead>Strategy</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="text-right">Retry</TableHead>
                 <TableHead className="text-right">Total</TableHead>
                 <TableHead className="text-right">Valid</TableHead>
                 <TableHead className="text-right">Invalid</TableHead>
@@ -156,7 +160,7 @@ export function BulkImportHistory() {
             </TableHeader>
             <TableBody>
               {filtered.length === 0 && (
-                <TableRow><TableCell colSpan={14} className="text-center text-muted-foreground py-6">No matching imports</TableCell></TableRow>
+                <TableRow><TableCell colSpan={15} className="text-center text-muted-foreground py-6">No matching imports</TableCell></TableRow>
               )}
               {filtered.map((r) => (
                 <TableRow key={r.id}>
@@ -169,6 +173,9 @@ export function BulkImportHistory() {
                     <Badge variant={r.status === "completed" ? "outline" : r.status === "failed" ? "destructive" : "secondary"}>
                       {r.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell className="text-right text-xs">
+                    {(r.retry_count ?? 0)}/{r.max_retries ?? 3}
                   </TableCell>
                   <TableCell className="text-right">{r.total_rows}</TableCell>
                   <TableCell className="text-right">{r.valid_rows}</TableCell>
@@ -216,18 +223,45 @@ function RunDetails({ run, onDownload }: { run: Run; onDownload: () => void }) {
       return (data ?? []) as RowAudit[];
     },
   });
+
+  // Aggregate per-status counts for this run+user from the audit log.
+  const summary = useMemo(() => {
+    const counts: Record<string, number> = { valid: 0, error: 0, imported: 0, updated: 0, linked: 0, skipped: 0 };
+    for (const r of rows) counts[r.status] = (counts[r.status] ?? 0) + 1;
+    counts.valid = (counts.imported ?? 0) + (counts.updated ?? 0) + (counts.linked ?? 0);
+    counts.invalid = counts.error ?? 0;
+    return counts;
+  }, [rows]);
+
   return (
     <>
       <SheetHeader>
         <SheetTitle>Import · {run.filename}</SheetTitle>
       </SheetHeader>
       <div className="mt-4 space-y-3 text-sm">
+        {/* Summary panel: aggregates per status for this run + user */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          {[
+            { k: "valid", label: "Valid", cls: "text-green-700" },
+            { k: "invalid", label: "Invalid", cls: "text-destructive" },
+            { k: "imported", label: "Imported", cls: "text-foreground" },
+            { k: "updated", label: "Updated", cls: "text-foreground" },
+            { k: "linked", label: "Linked", cls: "text-foreground" },
+            { k: "skipped", label: "Skipped", cls: "text-muted-foreground" },
+          ].map((s) => (
+            <div key={s.k} className="rounded-md border p-2 text-center">
+              <div className={`text-lg font-semibold ${s.cls}`}>{summary[s.k] ?? 0}</div>
+              <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{s.label}</div>
+            </div>
+          ))}
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <div><span className="text-muted-foreground">By:</span> {run.user_email ?? "—"}</div>
           <div><span className="text-muted-foreground">At:</span> {new Date(run.created_at).toLocaleString()}</div>
           <div><span className="text-muted-foreground">Kind:</span> {run.kind}</div>
           <div><span className="text-muted-foreground">Strategy:</span> {run.duplicate_strategy}</div>
           <div><span className="text-muted-foreground">Status:</span> {run.status}</div>
+          <div><span className="text-muted-foreground">Retry:</span> {(run.retry_count ?? 0)}/{run.max_retries ?? 3}{run.parent_run_id ? " (child run)" : ""}</div>
           <div><span className="text-muted-foreground">Imported / Updated / Linked / Skipped:</span> {run.imported_rows} / {run.updated_rows} / {run.linked_rows} / {run.skipped_rows}</div>
         </div>
         {(run.column_mapping || run.update_fields) && (

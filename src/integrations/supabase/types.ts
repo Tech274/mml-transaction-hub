@@ -47,6 +47,48 @@ export type Database = {
         }
         Relationships: []
       }
+      bulk_import_presets: {
+        Row: {
+          column_mapping: Json
+          created_at: string
+          created_by: string | null
+          created_by_email: string | null
+          duplicate_strategy: string
+          id: string
+          is_shared: boolean
+          kind: string
+          name: string
+          update_fields: Json | null
+          updated_at: string
+        }
+        Insert: {
+          column_mapping: Json
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          duplicate_strategy: string
+          id?: string
+          is_shared?: boolean
+          kind: string
+          name: string
+          update_fields?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          column_mapping?: Json
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          duplicate_strategy?: string
+          id?: string
+          is_shared?: boolean
+          kind?: string
+          name?: string
+          update_fields?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       bulk_import_row_audit: {
         Row: {
           created_at: string
@@ -109,6 +151,9 @@ export type Database = {
           invalid_rows: number
           kind: string
           linked_rows: number
+          max_retries: number
+          parent_run_id: string | null
+          retry_count: number
           skipped_rows: number
           status: string
           total_rows: number
@@ -129,6 +174,9 @@ export type Database = {
           invalid_rows?: number
           kind: string
           linked_rows?: number
+          max_retries?: number
+          parent_run_id?: string | null
+          retry_count?: number
           skipped_rows?: number
           status?: string
           total_rows?: number
@@ -149,6 +197,9 @@ export type Database = {
           invalid_rows?: number
           kind?: string
           linked_rows?: number
+          max_retries?: number
+          parent_run_id?: string | null
+          retry_count?: number
           skipped_rows?: number
           status?: string
           total_rows?: number
@@ -158,7 +209,15 @@ export type Database = {
           user_id?: string
           valid_rows?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_runs_parent_run_id_fkey"
+            columns: ["parent_run_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_import_runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       config_master: {
         Row: {

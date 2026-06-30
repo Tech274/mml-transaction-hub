@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert } from "lucide-react";
+import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert, Save, Bookmark, Ban } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +19,15 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 type CloudKind = "public_cloud" | "private_cloud";
 type DupStrategy = "skip" | "update" | "link";
+
+interface Preset {
+  id: string;
+  name: string;
+  kind: CloudKind;
+  column_mapping: Record<string, number>;
+  duplicate_strategy: DupStrategy;
+  update_fields: string[] | null;
+}
 
 const PUBLIC_PROVIDERS = ["AWS", "Azure", "GCP"] as const;
 const SYSTEM_CONFIG_OPTIONS = [
@@ -140,6 +149,39 @@ interface ParsedRow {
   raw: Record<string, string>;
   parsed?: Record<string, unknown>;
   errors: string[];
+  failedFields?: string[];
+}
+
+// Heuristic correction suggestions per field; aimed at common fixable mistakes.
+function suggestCorrection(field: string, raw: string, kind: CloudKind): string {
+  const v = (raw ?? "").trim();
+  if (!v) return "";
+  if (field === "month") {
+    const n = parseInt(v, 10);
+    if (!isNaN(n)) return String(Math.min(12, Math.max(1, n)));
+  }
+  if (field === "year") {
+    const n = parseInt(v, 10);
+    if (!isNaN(n)) return String(Math.min(2100, Math.max(2000, n)));
+  }
+  if (field === "total_users" || field === "input_cost" || field === "selling_cost") {
+    const cleaned = v.replace(/[^0-9.\-]/g, "");
+    if (cleaned) return cleaned;
+  }
+  if (field === "start_date" || field === "end_date") {
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  if (field === "cloud_provider") {
+    const m = ["AWS", "Azure", "GCP"].find((p) => p.toLowerCase() === v.toLowerCase());
+    if (m) return m;
+  }
+  if (field === "system_config" && kind === "private_cloud") {
+    const norm = v.replace(/\s+/g, "").toLowerCase();
+    const m = SYSTEM_CONFIG_OPTIONS.find((o) => o.replace(/\s+/g, "").toLowerCase() === norm);
+    if (m) return m;
+  }
+  return "";
 }
 
 export function BulkImport() {
@@ -147,8 +189,14 @@ export function BulkImport() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<
+    { done: number; total: number; succeeded: number; failed: number; isRetry: boolean } | null
+  >(null);
+  const [isRetryRun, setIsRetryRun] = useState(false);
+  const [parentRunId, setParentRunId] = useState<string | null>(null);
   const [dupStrategy, setDupStrategy] = useState<DupStrategy>("skip");
+  const [presetName, setPresetName] = useState("");
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("");
   // Pre-import mapping step
   const [mapping, setMapping] = useState<{
     detected: string[];
@@ -191,6 +239,39 @@ export function BulkImport() {
   });
   const lastRunInFlight = lastRun?.status === "pending";
 
+  // Retry cap: count prior retries for this user (latest "completed" chain).
+  const MAX_RETRIES = 3;
+  const { data: retryStats } = useQuery({
+    queryKey: ["bulk_import_runs", "retry-stats", user?.id, kind],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("bulk_import_runs")
+        .select("id,retry_count,max_retries,parent_run_id,filename,status")
+        .eq("user_id", user!.id)
+        .eq("kind", kind)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+  const retryBlocked = !!retryStats && (retryStats.retry_count ?? 0) >= (retryStats.max_retries ?? MAX_RETRIES);
+
+  // Presets (shared with all users)
+  const { data: presets = [] } = useQuery({
+    queryKey: ["bulk_import_presets", kind],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bulk_import_presets")
+        .select("id,name,kind,column_mapping,duplicate_strategy,update_fields")
+        .eq("kind", kind)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Preset[];
+    },
+  });
+
   const headers = kind === "public_cloud" ? PUBLIC_HEADERS : PRIVATE_HEADERS;
   const sample = kind === "public_cloud" ? PUBLIC_SAMPLE : PRIVATE_SAMPLE;
   const schema = useMemo(() => buildRowSchema(kind), [kind]);
@@ -201,6 +282,7 @@ export function BulkImport() {
 
   function reset() {
     setRows([]); setFileName(""); setProgress(null); setMapping(null);
+    setIsRetryRun(false); setParentRunId(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -253,19 +335,24 @@ export function BulkImport() {
   }
 
   function retryInvalidOnly() {
+    if (retryBlocked) {
+      toast.error(`Retry limit reached (${retryStats?.max_retries ?? MAX_RETRIES}). Start a fresh import.`);
+      return;
+    }
     const invalid = rows.filter((r) => r.errors.length > 0);
     if (!invalid.length) { toast.message("No invalid rows to retry"); return; }
-    // Re-validate just those rows; user is expected to have fixed them via re-upload
-    // of a corrected CSV (mapping step), so this is mostly for clearing successes.
     setRows(invalid);
+    setIsRetryRun(true);
+    setParentRunId(retryStats?.id ?? null);
     toast.success(`Kept ${invalid.length} invalid row${invalid.length === 1 ? "" : "s"}. Fix them and upload a corrected CSV, or re-run.`);
   }
 
   function downloadErrorReport() {
     const errs = rows.filter((r) => r.errors.length > 0);
     if (!errs.length) { toast.error("No invalid rows"); return; }
-    // Break out per-field error columns so admins see exactly which field failed and why.
-    const cols = ["line", "potential_id", ...headers, "failed_fields", "validation_messages"];
+    // Per-field error columns + suggested corrected values for faster fixing.
+    const suggCols = headers.map((h) => `suggested_${h}`);
+    const cols = ["line", "potential_id", ...headers, "failed_fields", "validation_messages", ...suggCols];
     const body = errs.map((r) => {
       const fields = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim()))).join(", ");
       return [
@@ -274,9 +361,72 @@ export function BulkImport() {
         ...headers.map((h) => r.raw[h] ?? ""),
         fields,
         r.errors.join(" | "),
+        ...headers.map((h) => fields.split(", ").includes(h) ? suggestCorrection(h, r.raw[h] ?? "", kind) : ""),
       ];
     });
     downloadFile(`${kind}-invalid-rows-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(cols, body));
+  }
+
+  function downloadErrorJson() {
+    const errs = rows.filter((r) => r.errors.length > 0);
+    if (!errs.length) { toast.error("No invalid rows"); return; }
+    const payload = errs.map((r) => {
+      const failed_fields = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim())));
+      const suggested: Record<string, string> = {};
+      for (const f of failed_fields) {
+        const s = suggestCorrection(f, r.raw[f] ?? "", kind);
+        if (s) suggested[f] = s;
+      }
+      return {
+        line: r.line,
+        potential_id: r.raw.potential_id ?? null,
+        raw: r.raw,
+        failed_fields,
+        validation_messages: r.errors,
+        suggested_values: suggested,
+      };
+    });
+    downloadFile(
+      `${kind}-invalid-rows-${new Date().toISOString().slice(0, 10)}.json`,
+      JSON.stringify(payload, null, 2),
+      "application/json",
+    );
+  }
+
+  // --- Presets ---
+  async function saveAsPreset() {
+    if (!mapping) { toast.error("Upload a CSV first"); return; }
+    if (!presetName.trim()) { toast.error("Enter a preset name"); return; }
+    if (!user) return;
+    const { error } = await supabase.from("bulk_import_presets").insert({
+      name: presetName.trim(),
+      kind,
+      column_mapping: mapping.colIdx,
+      duplicate_strategy: dupStrategy,
+      update_fields: dupStrategy === "update" ? Array.from(updateFields) : null,
+      is_shared: true,
+      created_by: user.id,
+      created_by_email: user.email ?? null,
+    });
+    if (error) { toast.error(error.message); return; }
+    toast.success(`Preset "${presetName.trim()}" saved`);
+    setPresetName("");
+    qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
+  }
+
+  function applyPreset(id: string) {
+    setSelectedPresetId(id);
+    const p = presets.find((x) => x.id === id);
+    if (!p) return;
+    setDupStrategy(p.duplicate_strategy);
+    if (p.update_fields) setUpdateFields(new Set(p.update_fields));
+    if (mapping) {
+      const colIdx = p.column_mapping;
+      const matched = headers.filter((h) => h in colIdx);
+      const missing = headers.filter((h) => !(h in colIdx));
+      setMapping({ ...mapping, colIdx, matched, missing });
+    }
+    toast.success(`Loaded preset "${p.name}"`);
   }
 
   async function importValid() {
@@ -284,7 +434,7 @@ export function BulkImport() {
     if (!valid.length) { toast.error("No valid rows to import"); return; }
     if (!user) { toast.error("Not authenticated"); return; }
     setSubmitting(true);
-    setProgress({ done: 0, total: valid.length });
+    setProgress({ done: 0, total: valid.length, succeeded: 0, failed: 0, isRetry: isRetryRun });
     const updated = [...rows];
     let imported = 0, skipped = 0, updatedCount = 0, linked = 0;
 
@@ -303,6 +453,9 @@ export function BulkImport() {
         status: "pending",
         column_mapping: mapping?.colIdx ?? null,
         update_fields: dupStrategy === "update" ? Array.from(updateFields) : null,
+        parent_run_id: isRetryRun ? parentRunId : null,
+        retry_count: isRetryRun ? ((retryStats?.retry_count ?? 0) + 1) : 0,
+        max_retries: MAX_RETRIES,
       })
       .select("id").single();
     if (runErr || !run) {
@@ -394,7 +547,13 @@ export function BulkImport() {
           line_number: r.line, potential_id: String(p.potential_id),
           transaction_id: txId, status: rowStatus, error_message: rowError, row_data: r.raw,
         });
-        setProgress({ done: i + 1, total: valid.length });
+        setProgress((prev) => ({
+          done: i + 1,
+          total: valid.length,
+          succeeded: (prev?.succeeded ?? 0) + (rowStatus !== "error" ? 1 : 0),
+          failed: (prev?.failed ?? 0) + (rowStatus === "error" ? 1 : 0),
+          isRetry: prev?.isRetry ?? isRetryRun,
+        }));
       }
       await supabase.from("bulk_import_runs").update({
         imported_rows: imported, skipped_rows: skipped, updated_rows: updatedCount, linked_rows: linked,
@@ -405,6 +564,7 @@ export function BulkImport() {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["bulk_import_runs"] });
+      qc.invalidateQueries({ queryKey: ["bulk_import_runs", "retry-stats", user?.id, kind] });
     } catch (e) {
       await supabase.from("bulk_import_runs").update({
         status: "failed", completed_at: new Date().toISOString(),
@@ -439,6 +599,40 @@ export function BulkImport() {
           </div>
         </div>
 
+        {/* Retry-cap banner */}
+        {retryBlocked && (
+          <div className="flex items-center gap-2 rounded-md border border-destructive/40 bg-destructive/5 text-destructive text-sm p-2">
+            <Ban className="h-4 w-4" />
+            Retry limit reached on your last {kind === "public_cloud" ? "Public" : "Private"} Cloud run
+            ({retryStats?.retry_count}/{retryStats?.max_retries ?? MAX_RETRIES}). Start a fresh import to continue.
+          </div>
+        )}
+
+        {/* Preset bar */}
+        <div className="flex flex-wrap items-end gap-2 rounded-md border p-2 bg-muted/30">
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs flex items-center gap-1"><Bookmark className="h-3 w-3" />Use a saved preset</Label>
+            <Select value={selectedPresetId} onValueChange={applyPreset}>
+              <SelectTrigger className="w-[240px] h-9"><SelectValue placeholder={presets.length ? "Choose preset…" : "No presets yet"} /></SelectTrigger>
+              <SelectContent>
+                {presets.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs">Save current mapping + duplicate choices as…</Label>
+            <div className="flex gap-1">
+              <Input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Preset name" className="h-9 w-[200px]" />
+              <Button size="sm" variant="outline" onClick={saveAsPreset} disabled={!mapping || !presetName.trim()}>
+                <Save className="h-4 w-4 mr-1" />Save preset
+              </Button>
+            </div>
+          </div>
+          <div className="text-[11px] text-muted-foreground ml-auto self-end">
+            Presets are shared with all Ops/Manager/Admin users in this workspace.
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
             <Label className="text-xs">CSV file</Label>
@@ -460,9 +654,15 @@ export function BulkImport() {
             <div className="flex flex-wrap items-center gap-2 ml-auto">
               <Badge variant="outline" className="gap-1"><CheckCircle2 className="h-3 w-3 text-green-600" />{validCount} valid</Badge>
               <Badge variant="outline" className="gap-1"><AlertTriangle className="h-3 w-3 text-amber-600" />{errorCount} errors</Badge>
+              {isRetryRun && <Badge variant="secondary" className="gap-1"><RotateCw className="h-3 w-3" />Retry run</Badge>}
               {errorCount > 0 && (
                 <Button size="sm" variant="outline" onClick={downloadErrorReport}>
                   <FileWarning className="h-4 w-4 mr-1" />Download error report
+                </Button>
+              )}
+              {errorCount > 0 && (
+                <Button size="sm" variant="outline" onClick={downloadErrorJson} title="JSON with raw input, failed_fields, validation_messages and suggested values">
+                  <FileWarning className="h-4 w-4 mr-1" />Download JSON
                 </Button>
               )}
               {errorCount > 0 && (
@@ -470,8 +670,12 @@ export function BulkImport() {
                   size="sm"
                   variant="outline"
                   onClick={retryInvalidOnly}
-                  disabled={submitting || lastRunInFlight}
-                  title={lastRunInFlight ? "Wait for the previous import to finish" : "Keep only invalid rows; current mapping & duplicate strategy will be reused"}
+                  disabled={submitting || lastRunInFlight || retryBlocked}
+                  title={retryBlocked
+                    ? `Retry limit reached (${retryStats?.max_retries ?? MAX_RETRIES})`
+                    : lastRunInFlight
+                      ? "Wait for the previous import to finish"
+                      : "Keep only invalid rows; current mapping & duplicate strategy will be reused"}
                 >
                   <RotateCw className="h-4 w-4 mr-1" />Retry invalid rows
                 </Button>
@@ -490,8 +694,15 @@ export function BulkImport() {
         {submitting && progress && (
           <div className="space-y-1">
             <Progress value={(progress.done / Math.max(progress.total, 1)) * 100} />
-            <div className="text-xs text-muted-foreground">
-              Processing in the background · {progress.done} of {progress.total} rows · UI stays responsive.
+            <div className="text-xs flex flex-wrap items-center gap-2">
+              {progress.isRetry && (
+                <Badge variant="secondary" className="gap-1"><RotateCw className="h-3 w-3" />Retry in progress</Badge>
+              )}
+              <span className="text-muted-foreground">
+                Attempted <strong className="text-foreground">{progress.done}</strong> / {progress.total} ·
+                <span className="text-green-700"> {progress.succeeded} succeeded</span> ·
+                <span className="text-destructive"> {progress.failed} failed</span>
+              </span>
             </div>
           </div>
         )}
