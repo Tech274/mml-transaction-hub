@@ -239,6 +239,39 @@ export function BulkImport() {
   });
   const lastRunInFlight = lastRun?.status === "pending";
 
+  // Retry cap: count prior retries for this user (latest "completed" chain).
+  const MAX_RETRIES = 3;
+  const { data: retryStats } = useQuery({
+    queryKey: ["bulk_import_runs", "retry-stats", user?.id, kind],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("bulk_import_runs")
+        .select("id,retry_count,max_retries,parent_run_id,filename,status")
+        .eq("user_id", user!.id)
+        .eq("kind", kind)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+  });
+  const retryBlocked = !!retryStats && (retryStats.retry_count ?? 0) >= (retryStats.max_retries ?? MAX_RETRIES);
+
+  // Presets (shared with all users)
+  const { data: presets = [] } = useQuery({
+    queryKey: ["bulk_import_presets", kind],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("bulk_import_presets")
+        .select("id,name,kind,column_mapping,duplicate_strategy,update_fields")
+        .eq("kind", kind)
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as Preset[];
+    },
+  });
+
   const headers = kind === "public_cloud" ? PUBLIC_HEADERS : PRIVATE_HEADERS;
   const sample = kind === "public_cloud" ? PUBLIC_SAMPLE : PRIVATE_SAMPLE;
   const schema = useMemo(() => buildRowSchema(kind), [kind]);
@@ -249,6 +282,7 @@ export function BulkImport() {
 
   function reset() {
     setRows([]); setFileName(""); setProgress(null); setMapping(null);
+    setIsRetryRun(false); setParentRunId(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -301,11 +335,15 @@ export function BulkImport() {
   }
 
   function retryInvalidOnly() {
+    if (retryBlocked) {
+      toast.error(`Retry limit reached (${retryStats?.max_retries ?? MAX_RETRIES}). Start a fresh import.`);
+      return;
+    }
     const invalid = rows.filter((r) => r.errors.length > 0);
     if (!invalid.length) { toast.message("No invalid rows to retry"); return; }
-    // Re-validate just those rows; user is expected to have fixed them via re-upload
-    // of a corrected CSV (mapping step), so this is mostly for clearing successes.
     setRows(invalid);
+    setIsRetryRun(true);
+    setParentRunId(retryStats?.id ?? null);
     toast.success(`Kept ${invalid.length} invalid row${invalid.length === 1 ? "" : "s"}. Fix them and upload a corrected CSV, or re-run.`);
   }
 
