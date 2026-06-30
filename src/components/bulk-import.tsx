@@ -483,7 +483,13 @@ export function BulkImport() {
           line_number: r.line, potential_id: String(p.potential_id),
           transaction_id: txId, status: rowStatus, error_message: rowError, row_data: r.raw,
         });
-        setProgress({ done: i + 1, total: valid.length });
+        setProgress((prev) => ({
+          done: i + 1,
+          total: valid.length,
+          succeeded: (prev?.succeeded ?? 0) + (rowStatus !== "error" ? 1 : 0),
+          failed: (prev?.failed ?? 0) + (rowStatus === "error" ? 1 : 0),
+          isRetry: prev?.isRetry ?? isRetryRun,
+        }));
       }
       await supabase.from("bulk_import_runs").update({
         imported_rows: imported, skipped_rows: skipped, updated_rows: updatedCount, linked_rows: linked,
@@ -494,6 +500,7 @@ export function BulkImport() {
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["bulk_import_runs"] });
+      qc.invalidateQueries({ queryKey: ["bulk_import_runs", "retry-stats", user?.id, kind] });
     } catch (e) {
       await supabase.from("bulk_import_runs").update({
         status: "failed", completed_at: new Date().toISOString(),
