@@ -1,58 +1,49 @@
-# MakeMyLabs Internal Transaction Platform — Phased Build
+## Bulk Import — Next Phase Plan
 
-This is a large enterprise platform. I'll build it in the phases you outlined, starting with a solid Phase 1 foundation in this first pass, then iterate. Confirming scope before I start writing code.
+Building on the existing Bulk Import for Public/Private Cloud (template, history, presets, retry, suggestions). This phase focuses on hardening, observability, and finishing the workflows already in flight.
 
-## Phase 1 — Foundation (this iteration)
+### 1. Server-side validation & atomicity
+- Move row validation + insert/update/link logic into a `createServerFn` (`bulkImportRows`) guarded by `requireSupabaseAuth` + `has_role` (ops_user/ops_lead/admin).
+- Process rows in chunks of 200 inside a single transaction per chunk; return per-row outcome (`imported | updated | linked | skipped | failed` + messages).
+- Enforce duplicate strategy and `update_fields` on the server so the client cannot bypass rules.
+- Stamp every audit log entry with run_id, filename, user, and outcome.
 
-**Backend (Lovable Cloud / Postgres + RLS)**
-- Enable Lovable Cloud (Postgres, Auth, Storage).
-- Migration creating:
-  - `app_role` enum: `admin`, `leadership`, `finance`, `ops_lead`, `ops_user`, `viewer`
-  - `user_roles` table + `has_role()` SECURITY DEFINER function (no role on profiles — prevents privilege escalation).
-  - `profiles` (id ↔ auth.users, full_name, email) + auto-create trigger on signup.
-  - `customers` (id, customer_name, normalized_name UNIQUE, is_active, timestamps).
-  - `config_master` (category, key, label, sort_order, is_active) for lab_type, cloud_provider, line_of_business, statuses — seeded.
-  - `transactions` (all fields per spec, `repository_type` + `cloud_provider` auto-set by BEFORE INSERT/UPDATE trigger from `lab_type`; `potential_id` UNIQUE; `is_deleted` for soft delete; created/updated by + at).
-  - `transaction_activity_log` (id, transaction_id, action, field_name, old/new value, changed_by, changed_at) populated by AFTER INSERT/UPDATE/DELETE trigger that diffs columns.
-- RLS on every table:
-  - `customers`, `config_master`, `transactions` readable by any authenticated user with a role.
-  - INSERT/UPDATE on `transactions` restricted to `ops_user`, `ops_lead`, `admin` (ops_user only on rows they created); soft-delete restricted to `ops_lead`/`admin`.
-  - `user_roles` readable by self + admin; writable by admin only.
-- GRANTs to `authenticated` + `service_role` on every public table.
-- Classification + audit logic lives in DB triggers, so it can't be bypassed by the client.
+### 2. Background job + progress
+- Replace the in-browser loop with a `bulk_import_jobs` queue row written on submit; status `queued → running → completed/failed` with `processed`, `succeeded`, `failed`, `total` counters.
+- Poll job via `useQuery` (2s interval) and drive the existing progress UI from server counters instead of local state.
+- Allow cancel (sets `cancel_requested`); server checks flag between chunks.
 
-**Frontend (TanStack Start)**
-- Auth: `/auth` page (email/password + Google via Lovable broker). First signup auto-gets `admin` role (bootstrap); subsequent users default to `viewer` until promoted.
-- `_authenticated` layout (integration-managed gate).
-- App shell with sidebar nav: Dashboard, Master ADR Entry, All Transactions, Public Cloud, Private Cloud, Customers, Reports, Admin Settings. Items hidden based on role.
-- **Master ADR Entry form** (single source of truth) — Zod validation matching every rule you listed:
-  - Unique Potential ID (server check + DB constraint), End ≥ Start, Users > 0, numeric Selling Cost, required fields, conditional Cloud Provider (required & ∈ {AWS,Azure,GCP} when Public; auto "MakeMyLabs Private Cloud" when Private).
-  - Customer combobox with "Create new customer" inline (case-insensitive normalized dedupe).
-  - Dropdowns sourced from `config_master`.
-- **Public Cloud Repository** view (filter: month/year/customer/provider/LOB/date range; sortable, paginated, column visibility, row → detail drawer with activity log).
-- **Private Cloud Repository** view (same shape, no provider filter).
-- **All Transactions** view (combined).
-- **Customers** module (list with status, transaction count, total users, total revenue; activate/deactivate).
-- **Transaction Detail drawer** showing all fields + activity log timeline.
-- Stub pages for Dashboard / Reports / Admin Settings with "Phase 2/3" placeholders so nav is complete.
+### 3. Storage of artifacts
+- Upload the original CSV and the generated error CSV/JSON to a private `bulk-imports` storage bucket, keyed by `run_id`.
+- History panel: "Download original" + "Download error report" pull signed URLs instead of regenerating client-side.
 
-**Design system**
-- Clean operational/enterprise look — neutral slate base, single accent (deep teal), data-dense tables, no marketing styling. All tokens in `src/styles.css`, semantic only.
+### 4. Preset & retry polish
+- Add a "Default preset per role" toggle (admin only) so new imports auto-load a shared preset.
+- On retry, snapshot the resolved mapping + duplicate strategy + `update_fields` onto the new run so history is self-describing even if the preset later changes.
+- Surface retry lineage in history (`parent_run_id`, chain view in details sheet).
 
-## Phases 2–5 (follow-up iterations, not this turn)
-- Phase 2: KPI dashboard + charts (recharts), global search, Excel export (xlsx) with filter metadata, customer summary.
-- Phase 3: Admin user/role management UI, config_master editor, soft-delete restore, deeper audit views.
-- Phase 4: P&L / cloud cost / profitability / forecasting tables + finance reports.
-- Phase 5: E2E tests, monitoring, migration tools, UAT/go-live checklists.
+### 5. Notifications & summary
+- After a run finishes, write a `notifications` row for the importer; toast on next login if they missed it.
+- Add an email summary (via existing transactional email infra) with counts and a link to the run.
 
-## Technical notes
-- DB triggers handle classification + audit (single source of truth, can't be bypassed).
-- Roles in separate `user_roles` table queried via `has_role()` SECURITY DEFINER to avoid recursive RLS.
-- Soft delete via `is_deleted` flag; all queries filter it out by default.
-- Server functions (`createServerFn` + `requireSupabaseAuth`) for uniqueness checks and any privileged ops; never `supabaseAdmin` for normal reads.
-- First user → admin bootstrap via a DB trigger checking if `user_roles` is empty.
+### 6. Observability & limits
+- Per-user rate limit: max 3 concurrent running jobs, max 50k rows per CSV (configurable in `config_master`).
+- Structured logs on the server fn (run_id, chunk, duration, failure reasons aggregated).
+- Admin page: list recent jobs across all users with filters (status/user/date) and a "force-fail stuck job" action.
 
-## Open questions before I start
-1. **First-user bootstrap**: OK with "first signup becomes admin, everyone after defaults to viewer until promoted"? Or do you want me to seed a specific admin email?
-2. **Auth providers**: Email/password + Google, or email/password only for Phase 1?
-3. **Phase 1 scope confirmation**: Ship Phase 1 as scoped above (foundation + entry + repositories + customers, with Dashboard/Reports/Admin as placeholders), then tackle Phase 2 next turn? Or do you want me to push further in one go (longer build, higher risk of issues)?
+### 7. Tests
+- Vitest: validation + suggestion helpers (enum casing, date parsing, numeric cleanup).
+- Playwright e2e: upload happy path, duplicate=update with `update_fields`, retry with suggestions, role gating (viewer blocked).
+
+### Technical notes
+- New tables: `bulk_import_jobs` (queue), extend `bulk_import_runs` with `parent_run_id`, `original_csv_path`, `error_artifact_path`.
+- New bucket: `bulk-imports` (private, RLS: importer + admin/ops_lead read).
+- Server fn lives in `src/lib/bulk-import.functions.ts`; admin/maintenance bits in `src/lib/bulk-import.server.ts`.
+- All GRANTs + RLS policies included in the migration; jobs table scoped by `created_by` with admin/ops_lead override via `has_role`.
+
+### Out of scope (call out before approving)
+- Scheduled/recurring imports from S3/SFTP.
+- Diff preview against existing transactions for `update` strategy beyond field list (full before/after table).
+- Multi-file (zip) uploads.
+
+Want me to drop any section, or push further on a specific one (e.g. cancel + email summary now, defer notifications)?
