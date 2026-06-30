@@ -269,7 +269,7 @@ export function BulkImport() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bulk_import_presets")
-        .select("id,name,kind,column_mapping,duplicate_strategy,update_fields")
+        .select("id,name,kind,column_mapping,duplicate_strategy,update_fields,is_shared,created_by,created_by_email")
         .eq("kind", kind)
         .order("name");
       if (error) throw error;
