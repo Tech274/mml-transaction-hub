@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert, Save, Bookmark, Ban } from "lucide-react";
+import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert, Save, Bookmark, Ban, Sparkles, Eye, Settings2, Pencil, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -197,6 +198,10 @@ export function BulkImport() {
   const [dupStrategy, setDupStrategy] = useState<DupStrategy>("skip");
   const [presetName, setPresetName] = useState("");
   const [selectedPresetId, setSelectedPresetId] = useState<string>("");
+  // Preview suggested corrections + preset manager dialogs
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [presetMgrOpen, setPresetMgrOpen] = useState(false);
+  const [editingPreset, setEditingPreset] = useState<{ id: string; name: string; is_shared: boolean } | null>(null);
   // Pre-import mapping step
   const [mapping, setMapping] = useState<{
     detected: string[];
@@ -393,6 +398,81 @@ export function BulkImport() {
     );
   }
 
+  // ---------- Suggested corrections ----------
+  // Compute the proposed corrected `raw` for an invalid row by running
+  // suggestCorrection on each field that failed validation.
+  function correctedRawFor(r: ParsedRow): Record<string, string> {
+    const failed = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim())));
+    const next: Record<string, string> = { ...r.raw };
+    for (const f of failed) {
+      const s = suggestCorrection(f, r.raw[f] ?? "", kind);
+      if (s) next[f] = s;
+    }
+    return next;
+  }
+
+  function suggestionDiffs() {
+    return rows
+      .filter((r) => r.errors.length > 0)
+      .map((r) => {
+        const corrected = correctedRawFor(r);
+        const failed = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim())));
+        const changes = failed
+          .filter((f) => (corrected[f] ?? "") !== (r.raw[f] ?? ""))
+          .map((f) => ({ field: f, before: r.raw[f] ?? "", after: corrected[f] ?? "" }));
+        return { line: r.line, potential_id: r.raw.potential_id ?? "", failed, changes, corrected, raw: r.raw };
+      });
+  }
+
+  // Download a CSV of all failed rows with suggested corrections applied,
+  // using the standard template column order so it can be re-uploaded as-is.
+  function downloadCorrectedCsv() {
+    const errs = rows.filter((r) => r.errors.length > 0);
+    if (!errs.length) { toast.error("No invalid rows"); return; }
+    const body = errs.map((r) => {
+      const c = correctedRawFor(r);
+      return headers.map((h) => c[h] ?? "");
+    });
+    downloadFile(
+      `${kind}-corrected-rows-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCsv(headers, body),
+    );
+  }
+
+  // Apply suggested corrections to every invalid row, re-validate the whole
+  // batch in place, and keep only the rows that were originally failing so
+  // the user can immediately re-run "Import valid rows".
+  function applySuggestedAndRetry() {
+    if (retryBlocked) {
+      toast.error(`Retry limit reached (${retryStats?.max_retries ?? MAX_RETRIES}). Start a fresh import.`);
+      return;
+    }
+    const invalid = rows.filter((r) => r.errors.length > 0);
+    if (!invalid.length) { toast.message("No invalid rows to retry"); return; }
+    const seen = new Set<string>();
+    const next: ParsedRow[] = invalid.map((r) => {
+      const raw = correctedRawFor(r);
+      const errors: string[] = [];
+      const res = schema.safeParse(raw);
+      if (!res.success) {
+        for (const issue of res.error.issues) {
+          errors.push(`${issue.path.join(".") || "row"}: ${issue.message}`);
+        }
+      } else {
+        const pid = res.data.potential_id;
+        if (seen.has(pid)) errors.push(`duplicate potential_id in file: ${pid}`);
+        seen.add(pid);
+      }
+      return { line: r.line, raw, parsed: res.success ? (res.data as Record<string, unknown>) : undefined, errors };
+    });
+    setRows(next);
+    setIsRetryRun(true);
+    setParentRunId(retryStats?.id ?? null);
+    setPreviewOpen(false);
+    const fixed = next.filter((r) => r.errors.length === 0).length;
+    toast.success(`Applied suggestions · ${fixed}/${next.length} now valid. Click "Import valid rows" to retry.`);
+  }
+
   // --- Presets ---
   async function saveAsPreset() {
     if (!mapping) { toast.error("Upload a CSV first"); return; }
@@ -411,6 +491,26 @@ export function BulkImport() {
     if (error) { toast.error(error.message); return; }
     toast.success(`Preset "${presetName.trim()}" saved`);
     setPresetName("");
+    qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
+  }
+
+  async function renamePreset(id: string, name: string, is_shared: boolean) {
+    const { error } = await supabase
+      .from("bulk_import_presets")
+      .update({ name: name.trim(), is_shared })
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Preset updated");
+    setEditingPreset(null);
+    qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
+  }
+
+  async function deletePreset(id: string) {
+    if (!confirm("Delete this preset? This cannot be undone.")) return;
+    const { error } = await supabase.from("bulk_import_presets").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    if (selectedPresetId === id) setSelectedPresetId("");
+    toast.success("Preset deleted");
     qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
   }
 
