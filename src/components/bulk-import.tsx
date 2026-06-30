@@ -189,8 +189,14 @@ export function BulkImport() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<
+    { done: number; total: number; succeeded: number; failed: number; isRetry: boolean } | null
+  >(null);
+  const [isRetryRun, setIsRetryRun] = useState(false);
+  const [parentRunId, setParentRunId] = useState<string | null>(null);
   const [dupStrategy, setDupStrategy] = useState<DupStrategy>("skip");
+  const [presetName, setPresetName] = useState("");
+  const [selectedPresetId, setSelectedPresetId] = useState<string>("");
   // Pre-import mapping step
   const [mapping, setMapping] = useState<{
     detected: string[];
