@@ -466,7 +466,13 @@ export function BulkImport() {
                 </Button>
               )}
               {errorCount > 0 && (
-                <Button size="sm" variant="outline" onClick={retryInvalidOnly}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={retryInvalidOnly}
+                  disabled={submitting || lastRunInFlight}
+                  title={lastRunInFlight ? "Wait for the previous import to finish" : "Keep only invalid rows; current mapping & duplicate strategy will be reused"}
+                >
                   <RotateCw className="h-4 w-4 mr-1" />Retry invalid rows
                 </Button>
               )}
