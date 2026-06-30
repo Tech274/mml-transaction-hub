@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert, Save, Bookmark, Ban } from "lucide-react";
+import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert, Save, Bookmark, Ban, Sparkles, Eye, Settings2, Pencil, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -197,6 +198,10 @@ export function BulkImport() {
   const [dupStrategy, setDupStrategy] = useState<DupStrategy>("skip");
   const [presetName, setPresetName] = useState("");
   const [selectedPresetId, setSelectedPresetId] = useState<string>("");
+  // Preview suggested corrections + preset manager dialogs
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [presetMgrOpen, setPresetMgrOpen] = useState(false);
+  const [editingPreset, setEditingPreset] = useState<{ id: string; name: string; is_shared: boolean } | null>(null);
   // Pre-import mapping step
   const [mapping, setMapping] = useState<{
     detected: string[];
@@ -264,7 +269,7 @@ export function BulkImport() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bulk_import_presets")
-        .select("id,name,kind,column_mapping,duplicate_strategy,update_fields")
+        .select("id,name,kind,column_mapping,duplicate_strategy,update_fields,is_shared,created_by,created_by_email")
         .eq("kind", kind)
         .order("name");
       if (error) throw error;
@@ -393,6 +398,81 @@ export function BulkImport() {
     );
   }
 
+  // ---------- Suggested corrections ----------
+  // Compute the proposed corrected `raw` for an invalid row by running
+  // suggestCorrection on each field that failed validation.
+  function correctedRawFor(r: ParsedRow): Record<string, string> {
+    const failed = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim())));
+    const next: Record<string, string> = { ...r.raw };
+    for (const f of failed) {
+      const s = suggestCorrection(f, r.raw[f] ?? "", kind);
+      if (s) next[f] = s;
+    }
+    return next;
+  }
+
+  function suggestionDiffs() {
+    return rows
+      .filter((r) => r.errors.length > 0)
+      .map((r) => {
+        const corrected = correctedRawFor(r);
+        const failed = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim())));
+        const changes = failed
+          .filter((f) => (corrected[f] ?? "") !== (r.raw[f] ?? ""))
+          .map((f) => ({ field: f, before: r.raw[f] ?? "", after: corrected[f] ?? "" }));
+        return { line: r.line, potential_id: r.raw.potential_id ?? "", failed, changes, corrected, raw: r.raw };
+      });
+  }
+
+  // Download a CSV of all failed rows with suggested corrections applied,
+  // using the standard template column order so it can be re-uploaded as-is.
+  function downloadCorrectedCsv() {
+    const errs = rows.filter((r) => r.errors.length > 0);
+    if (!errs.length) { toast.error("No invalid rows"); return; }
+    const body = errs.map((r) => {
+      const c = correctedRawFor(r);
+      return headers.map((h) => c[h] ?? "");
+    });
+    downloadFile(
+      `${kind}-corrected-rows-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCsv(headers, body),
+    );
+  }
+
+  // Apply suggested corrections to every invalid row, re-validate the whole
+  // batch in place, and keep only the rows that were originally failing so
+  // the user can immediately re-run "Import valid rows".
+  function applySuggestedAndRetry() {
+    if (retryBlocked) {
+      toast.error(`Retry limit reached (${retryStats?.max_retries ?? MAX_RETRIES}). Start a fresh import.`);
+      return;
+    }
+    const invalid = rows.filter((r) => r.errors.length > 0);
+    if (!invalid.length) { toast.message("No invalid rows to retry"); return; }
+    const seen = new Set<string>();
+    const next: ParsedRow[] = invalid.map((r) => {
+      const raw = correctedRawFor(r);
+      const errors: string[] = [];
+      const res = schema.safeParse(raw);
+      if (!res.success) {
+        for (const issue of res.error.issues) {
+          errors.push(`${issue.path.join(".") || "row"}: ${issue.message}`);
+        }
+      } else {
+        const pid = res.data.potential_id;
+        if (seen.has(pid)) errors.push(`duplicate potential_id in file: ${pid}`);
+        seen.add(pid);
+      }
+      return { line: r.line, raw, parsed: res.success ? (res.data as Record<string, unknown>) : undefined, errors };
+    });
+    setRows(next);
+    setIsRetryRun(true);
+    setParentRunId(retryStats?.id ?? null);
+    setPreviewOpen(false);
+    const fixed = next.filter((r) => r.errors.length === 0).length;
+    toast.success(`Applied suggestions · ${fixed}/${next.length} now valid. Click "Import valid rows" to retry.`);
+  }
+
   // --- Presets ---
   async function saveAsPreset() {
     if (!mapping) { toast.error("Upload a CSV first"); return; }
@@ -411,6 +491,26 @@ export function BulkImport() {
     if (error) { toast.error(error.message); return; }
     toast.success(`Preset "${presetName.trim()}" saved`);
     setPresetName("");
+    qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
+  }
+
+  async function renamePreset(id: string, name: string, is_shared: boolean) {
+    const { error } = await supabase
+      .from("bulk_import_presets")
+      .update({ name: name.trim(), is_shared })
+      .eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Preset updated");
+    setEditingPreset(null);
+    qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
+  }
+
+  async function deletePreset(id: string) {
+    if (!confirm("Delete this preset? This cannot be undone.")) return;
+    const { error } = await supabase.from("bulk_import_presets").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    if (selectedPresetId === id) setSelectedPresetId("");
+    toast.success("Preset deleted");
     qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
   }
 
@@ -631,6 +731,9 @@ export function BulkImport() {
           <div className="text-[11px] text-muted-foreground ml-auto self-end">
             Presets are shared with all Ops/Manager/Admin users in this workspace.
           </div>
+          <Button size="sm" variant="ghost" onClick={() => setPresetMgrOpen(true)} className="self-end">
+            <Settings2 className="h-4 w-4 mr-1" />Manage
+          </Button>
         </div>
 
         <div className="flex flex-wrap items-end gap-3">
@@ -663,6 +766,28 @@ export function BulkImport() {
               {errorCount > 0 && (
                 <Button size="sm" variant="outline" onClick={downloadErrorJson} title="JSON with raw input, failed_fields, validation_messages and suggested values">
                   <FileWarning className="h-4 w-4 mr-1" />Download JSON
+                </Button>
+              )}
+              {errorCount > 0 && (
+                <Button size="sm" variant="outline" onClick={downloadCorrectedCsv} title="CSV of failed rows with suggested corrections applied, ready to re-upload">
+                  <Download className="h-4 w-4 mr-1" />Corrected CSV
+                </Button>
+              )}
+              {errorCount > 0 && (
+                <Button size="sm" variant="outline" onClick={() => setPreviewOpen(true)} title="Preview before/after for suggested corrections">
+                  <Eye className="h-4 w-4 mr-1" />Preview suggestions
+                </Button>
+              )}
+              {errorCount > 0 && (
+                <Button
+                  size="sm"
+                  onClick={applySuggestedAndRetry}
+                  disabled={submitting || lastRunInFlight || retryBlocked}
+                  title={retryBlocked
+                    ? `Retry limit reached (${retryStats?.max_retries ?? MAX_RETRIES})`
+                    : "Apply suggested corrections to failed rows and re-validate"}
+                >
+                  <Sparkles className="h-4 w-4 mr-1" />Retry with suggestions
                 </Button>
               )}
               {errorCount > 0 && (
@@ -829,6 +954,162 @@ export function BulkImport() {
             </Table>
           </div>
         )}
+
+        {/* Preview suggested corrections — before/after per failed row */}
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Preview suggested corrections</DialogTitle>
+              <DialogDescription>
+                Review the proposed before/after values for each failed row. Apply to retry, or download artifacts.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-14">Line</TableHead>
+                    <TableHead>Potential ID</TableHead>
+                    <TableHead>Field</TableHead>
+                    <TableHead>Before</TableHead>
+                    <TableHead>After (suggested)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {suggestionDiffs().flatMap((d) =>
+                    d.changes.length === 0
+                      ? [(
+                          <TableRow key={`${d.line}-none`}>
+                            <TableCell className="text-muted-foreground">{d.line}</TableCell>
+                            <TableCell className="text-xs">{d.potential_id || "—"}</TableCell>
+                            <TableCell colSpan={3} className="text-xs text-muted-foreground">
+                              No automatic suggestion available for: {d.failed.join(", ") || "—"}
+                            </TableCell>
+                          </TableRow>
+                        )]
+                      : d.changes.map((c, i) => (
+                          <TableRow key={`${d.line}-${c.field}`}>
+                            {i === 0 ? (
+                              <>
+                                <TableCell className="text-muted-foreground align-top" rowSpan={d.changes.length}>{d.line}</TableCell>
+                                <TableCell className="text-xs align-top" rowSpan={d.changes.length}>{d.potential_id || "—"}</TableCell>
+                              </>
+                            ) : null}
+                            <TableCell className="text-xs font-medium">{c.field}</TableCell>
+                            <TableCell className="text-xs text-destructive line-through max-w-[180px] truncate" title={c.before}>{c.before || "(empty)"}</TableCell>
+                            <TableCell className="text-xs text-green-700 max-w-[180px] truncate" title={c.after}>{c.after}</TableCell>
+                          </TableRow>
+                        )),
+                  )}
+                  {suggestionDiffs().length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No invalid rows.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={downloadCorrectedCsv}>
+                <Download className="h-4 w-4 mr-1" />Download corrected CSV
+              </Button>
+              <Button variant="outline" onClick={downloadErrorJson}>
+                <FileWarning className="h-4 w-4 mr-1" />Download JSON artifact
+              </Button>
+              <Button onClick={applySuggestedAndRetry} disabled={submitting || lastRunInFlight || retryBlocked}>
+                <Sparkles className="h-4 w-4 mr-1" />Apply &amp; retry
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Preset management — create/edit/rename/delete + sharing toggle */}
+        <Dialog open={presetMgrOpen} onOpenChange={(o) => { setPresetMgrOpen(o); if (!o) setEditingPreset(null); }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Manage presets — {kind === "public_cloud" ? "Public" : "Private"} Cloud</DialogTitle>
+              <DialogDescription>
+                Saved header mappings and duplicate-handling choices. Shared presets are visible to all Ops/Manager/Admin users.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[55vh] overflow-auto border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Strategy</TableHead>
+                    <TableHead>Owner</TableHead>
+                    <TableHead>Sharing</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {presets.length === 0 && (
+                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No presets yet</TableCell></TableRow>
+                  )}
+                  {presets.map((p) => {
+                    const pAny = p as Preset & { created_by?: string; created_by_email?: string | null; is_shared?: boolean };
+                    const mine = pAny.created_by === user?.id;
+                    const isEditing = editingPreset?.id === p.id;
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell>
+                          {isEditing ? (
+                            <Input
+                              value={editingPreset!.name}
+                              onChange={(e) => setEditingPreset({ ...editingPreset!, name: e.target.value })}
+                              className="h-8"
+                            />
+                          ) : (
+                            <span className="font-medium">{p.name}</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-xs">{p.duplicate_strategy}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{pAny.created_by_email ?? "—"}</TableCell>
+                        <TableCell>
+                          {isEditing ? (
+                            <label className="flex items-center gap-2 text-xs cursor-pointer">
+                              <Checkbox
+                                checked={editingPreset!.is_shared}
+                                onCheckedChange={(c) => setEditingPreset({ ...editingPreset!, is_shared: !!c })}
+                              />
+                              Shared
+                            </label>
+                          ) : (
+                            <Badge variant={pAny.is_shared ? "outline" : "secondary"} className="text-xs">
+                              {pAny.is_shared ? "Shared" : "Private"}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex gap-1 justify-end">
+                            {isEditing ? (
+                              <>
+                                <Button size="sm" onClick={() => renamePreset(p.id, editingPreset!.name, editingPreset!.is_shared)} disabled={!editingPreset!.name.trim()}>Save</Button>
+                                <Button size="sm" variant="ghost" onClick={() => setEditingPreset(null)}>Cancel</Button>
+                              </>
+                            ) : (
+                              <>
+                                <Button size="sm" variant="ghost" onClick={() => applyPreset(p.id)} title="Load into form">Load</Button>
+                                <Button size="sm" variant="ghost" disabled={!mine} onClick={() => setEditingPreset({ id: p.id, name: p.name, is_shared: !!pAny.is_shared })} title={mine ? "Rename / sharing" : "Only the creator can edit"}>
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button size="sm" variant="ghost" disabled={!mine} onClick={() => deletePreset(p.id)} title={mine ? "Delete" : "Only the creator can delete"}>
+                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPresetMgrOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
