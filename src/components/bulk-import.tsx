@@ -67,6 +67,7 @@ const PRIVATE_SAMPLE: string[][] = [
 ];
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_ROWS_PER_CSV = 50_000;
 
 function buildRowSchema(kind: CloudKind) {
   const base = {
