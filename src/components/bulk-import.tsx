@@ -435,6 +435,11 @@ export function BulkImport() {
                   <FileWarning className="h-4 w-4 mr-1" />Download error report
                 </Button>
               )}
+              {errorCount > 0 && (
+                <Button size="sm" variant="outline" onClick={retryInvalidOnly}>
+                  <RotateCw className="h-4 w-4 mr-1" />Retry invalid rows
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onClick={reset}><X className="h-4 w-4 mr-1" />Clear</Button>
               <Button size="sm" disabled={submitting || validCount === 0} onClick={importValid}>
                 <Upload className="h-4 w-4 mr-1" />
@@ -442,6 +447,98 @@ export function BulkImport() {
                   ? `Importing ${progress.done}/${progress.total}…`
                   : `Import ${validCount} valid row${validCount === 1 ? "" : "s"}`}
               </Button>
+            </div>
+          )}
+        </div>
+
+        {submitting && progress && (
+          <div className="space-y-1">
+            <Progress value={(progress.done / Math.max(progress.total, 1)) * 100} />
+            <div className="text-xs text-muted-foreground">
+              Processing in the background · {progress.done} of {progress.total} rows · UI stays responsive.
+            </div>
+          </div>
+        )}
+
+        {/* Pre-import mapping preview */}
+        {mapping && rows.length === 0 && (
+          <div className="rounded-md border p-3 space-y-2 bg-muted/30">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <ShieldAlert className="h-4 w-4 text-amber-600" /> Confirm column mapping
+            </div>
+            <div className="grid md:grid-cols-3 gap-3 text-xs">
+              <div>
+                <div className="font-medium text-foreground mb-1">Matched ({mapping.matched.length})</div>
+                <ul className="space-y-0.5">
+                  {mapping.matched.map((h) => (
+                    <li key={h} className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-green-600" /> {h}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div className="font-medium text-foreground mb-1">Missing required ({mapping.missing.length})</div>
+                {mapping.missing.length === 0
+                  ? <div className="text-muted-foreground">None — good to go.</div>
+                  : <ul className="space-y-0.5">{mapping.missing.map((h) => (
+                      <li key={h} className="flex items-center gap-1 text-destructive">
+                        <X className="h-3 w-3" /> {h}
+                      </li>
+                    ))}</ul>}
+              </div>
+              <div>
+                <div className="font-medium text-foreground mb-1">Extra / ignored ({mapping.extra.length})</div>
+                {mapping.extra.length === 0
+                  ? <div className="text-muted-foreground">None.</div>
+                  : <ul className="space-y-0.5 text-muted-foreground">{mapping.extra.map((h) => (
+                      <li key={h}>· {h}</li>
+                    ))}</ul>}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" onClick={confirmMappingAndValidate} disabled={mapping.missing.length > 0}>
+                Confirm & validate {mapping.body.length} row{mapping.body.length === 1 ? "" : "s"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={reset}>Cancel</Button>
+            </div>
+          </div>
+        )}
+
+        {/* Duplicate handling explainer + per-field selector */}
+        <div className="rounded-md border p-3 text-xs space-y-2">
+          <div className="font-medium text-foreground">Duplicate handling: <span className="uppercase">{dupStrategy}</span></div>
+          {dupStrategy === "skip" && (
+            <div className="text-muted-foreground">Existing rows with the same potential_id are left unchanged. Incoming row is reported as skipped.</div>
+          )}
+          {dupStrategy === "link" && (
+            <div className="text-muted-foreground">No fields are written. All existing fields are preserved as-is. The audit log records a link reference only.</div>
+          )}
+          {dupStrategy === "update" && (
+            <div className="space-y-2">
+              <div className="text-muted-foreground">Pick which fields overwrite the existing record. Unchecked fields are preserved.</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
+                {UPDATABLE_FIELDS.map((f) => {
+                  const disabled = (f === "cloud_provider" && kind === "private_cloud")
+                    || (f === "system_config" && kind === "public_cloud");
+                  if (disabled) return null;
+                  return (
+                    <label key={f} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={updateFields.has(f)}
+                        onCheckedChange={(c) => {
+                          setUpdateFields((prev) => {
+                            const next = new Set(prev);
+                            if (c) next.add(f); else next.delete(f);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span>{f}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
