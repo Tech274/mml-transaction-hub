@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert } from "lucide-react";
+import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert, Save, Bookmark, Ban } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +19,15 @@ import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 type CloudKind = "public_cloud" | "private_cloud";
 type DupStrategy = "skip" | "update" | "link";
+
+interface Preset {
+  id: string;
+  name: string;
+  kind: CloudKind;
+  column_mapping: Record<string, number>;
+  duplicate_strategy: DupStrategy;
+  update_fields: string[] | null;
+}
 
 const PUBLIC_PROVIDERS = ["AWS", "Azure", "GCP"] as const;
 const SYSTEM_CONFIG_OPTIONS = [
@@ -140,6 +149,39 @@ interface ParsedRow {
   raw: Record<string, string>;
   parsed?: Record<string, unknown>;
   errors: string[];
+  failedFields?: string[];
+}
+
+// Heuristic correction suggestions per field; aimed at common fixable mistakes.
+function suggestCorrection(field: string, raw: string, kind: CloudKind): string {
+  const v = (raw ?? "").trim();
+  if (!v) return "";
+  if (field === "month") {
+    const n = parseInt(v, 10);
+    if (!isNaN(n)) return String(Math.min(12, Math.max(1, n)));
+  }
+  if (field === "year") {
+    const n = parseInt(v, 10);
+    if (!isNaN(n)) return String(Math.min(2100, Math.max(2000, n)));
+  }
+  if (field === "total_users" || field === "input_cost" || field === "selling_cost") {
+    const cleaned = v.replace(/[^0-9.\-]/g, "");
+    if (cleaned) return cleaned;
+  }
+  if (field === "start_date" || field === "end_date") {
+    const d = new Date(v);
+    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  if (field === "cloud_provider") {
+    const m = ["AWS", "Azure", "GCP"].find((p) => p.toLowerCase() === v.toLowerCase());
+    if (m) return m;
+  }
+  if (field === "system_config" && kind === "private_cloud") {
+    const norm = v.replace(/\s+/g, "").toLowerCase();
+    const m = SYSTEM_CONFIG_OPTIONS.find((o) => o.replace(/\s+/g, "").toLowerCase() === norm);
+    if (m) return m;
+  }
+  return "";
 }
 
 export function BulkImport() {
