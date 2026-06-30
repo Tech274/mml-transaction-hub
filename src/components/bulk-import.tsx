@@ -5,7 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Upload, CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -14,6 +16,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
 
 type CloudKind = "public_cloud" | "private_cloud";
+type DupStrategy = "skip" | "update" | "link";
 
 const PUBLIC_PROVIDERS = ["AWS", "Azure", "GCP"] as const;
 const SYSTEM_CONFIG_OPTIONS = [
@@ -143,6 +146,7 @@ export function BulkImport() {
   const [fileName, setFileName] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [dupStrategy, setDupStrategy] = useState<DupStrategy>("skip");
   const fileRef = useRef<HTMLInputElement>(null);
   const findOrCreate = useServerFn(findOrCreateCustomer);
   const checkUnique = useServerFn(checkPotentialIdUnique);
@@ -177,10 +181,13 @@ export function BulkImport() {
       toast.error(`Missing columns: ${missing.join(", ")}`);
       return;
     }
+    // Header-based mapping: build name->index map so column order in CSV is irrelevant.
+    const colIdx: Record<string, number> = {};
+    hdr.forEach((h, i) => { if (!(h in colIdx)) colIdx[h] = i; });
     const seen = new Set<string>();
     const parsed: ParsedRow[] = body.map((cols, idx) => {
       const raw: Record<string, string> = {};
-      hdr.forEach((h, i) => { raw[h] = (cols[i] ?? "").trim(); });
+      for (const h of headers) raw[h] = (cols[colIdx[h]] ?? "").trim();
       const errors: string[] = [];
       const res = schema.safeParse(raw);
       if (!res.success) {
@@ -199,6 +206,14 @@ export function BulkImport() {
     toast.success(`Parsed ${parsed.length} rows · ${ok} valid · ${parsed.length - ok} with errors`);
   }
 
+  function downloadErrorReport() {
+    const errs = rows.filter((r) => r.errors.length > 0);
+    if (!errs.length) { toast.error("No invalid rows"); return; }
+    const cols = ["line", ...headers, "errors"];
+    const body = errs.map((r) => [String(r.line), ...headers.map((h) => r.raw[h] ?? ""), r.errors.join("; ")]);
+    downloadFile(`${kind}-invalid-rows-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(cols, body));
+  }
+
   async function importValid() {
     const valid = rows.filter((r) => r.errors.length === 0 && r.parsed);
     if (!valid.length) { toast.error("No valid rows to import"); return; }
@@ -206,17 +221,54 @@ export function BulkImport() {
     setSubmitting(true);
     setProgress({ done: 0, total: valid.length });
     const updated = [...rows];
-    let imported = 0;
+    let imported = 0, skipped = 0, updatedCount = 0, linked = 0;
+
+    // Create run header
+    const { data: run, error: runErr } = await supabase
+      .from("bulk_import_runs")
+      .insert({
+        user_id: user.id,
+        user_email: user.email ?? null,
+        kind,
+        filename: fileName,
+        duplicate_strategy: dupStrategy,
+        total_rows: rows.length,
+        valid_rows: valid.length,
+        invalid_rows: rows.length - valid.length,
+        status: "pending",
+      })
+      .select("id").single();
+    if (runErr || !run) {
+      setSubmitting(false);
+      toast.error(`Could not start import run: ${runErr?.message ?? "unknown"}`);
+      return;
+    }
+    const runId = run.id;
+
+    // Log invalid rows up-front
+    const invalidRows = rows.filter((r) => r.errors.length > 0);
+    if (invalidRows.length) {
+      await supabase.from("bulk_import_row_audit").insert(
+        invalidRows.map((r) => ({
+          run_id: runId, user_id: user.id, filename: fileName,
+          line_number: r.line, potential_id: r.raw.potential_id || null,
+          status: "error", error_message: r.errors.join("; "), row_data: r.raw,
+        })),
+      );
+    }
+
     try {
       for (let i = 0; i < valid.length; i++) {
         const r = valid[i];
         const idx = updated.findIndex((x) => x.line === r.line);
         const p = r.parsed as Record<string, unknown>;
+        let rowStatus: "imported" | "updated" | "linked" | "skipped" | "error" = "imported";
+        let rowError: string | null = null;
+        let txId: string | null = null;
         try {
           const uq = await checkUnique({ data: { potentialId: String(p.potential_id) } });
-          if (!uq.unique) { updated[idx] = { ...r, errors: ["potential_id already exists in system"] }; continue; }
           const cust = await findOrCreate({ data: { customerName: String(p.customer_name) } });
-          const insert = {
+          const payload = {
             potential_id: String(p.potential_id),
             month: Number(p.month),
             year: Number(p.year),
@@ -235,18 +287,54 @@ export function BulkImport() {
             selling_cost: Number(p.selling_cost),
             created_by: user.id,
           };
-          const { error } = await supabase.from("transactions").insert(insert);
-          if (error) { updated[idx] = { ...r, errors: [error.message] }; continue; }
-          imported++;
+          if (!uq.unique) {
+            if (dupStrategy === "skip") {
+              updated[idx] = { ...r, errors: [`skipped: potential_id ${payload.potential_id} already exists`] };
+              rowStatus = "skipped"; skipped++;
+            } else if (dupStrategy === "update") {
+              const { data: existing, error: updErr } = await supabase
+                .from("transactions")
+                .update(payload)
+                .eq("potential_id", payload.potential_id)
+                .select("id").maybeSingle();
+              if (updErr) { rowStatus = "error"; rowError = updErr.message; updated[idx] = { ...r, errors: [updErr.message] }; }
+              else { rowStatus = "updated"; updatedCount++; txId = existing?.id ?? null; }
+            } else { // link
+              const { data: existing } = await supabase
+                .from("transactions").select("id").eq("potential_id", payload.potential_id).maybeSingle();
+              rowStatus = "linked"; linked++; txId = existing?.id ?? null;
+              updated[idx] = { ...r, errors: [`linked to existing transaction ${payload.potential_id}`] };
+            }
+          } else {
+            const { data: ins, error } = await supabase.from("transactions").insert(payload).select("id").single();
+            if (error) { rowStatus = "error"; rowError = error.message; updated[idx] = { ...r, errors: [error.message] }; }
+            else { imported++; txId = ins?.id ?? null; }
+          }
         } catch (err) {
-          updated[idx] = { ...r, errors: [(err as Error).message] };
+          rowStatus = "error"; rowError = (err as Error).message;
+          updated[idx] = { ...r, errors: [rowError] };
         }
+        await supabase.from("bulk_import_row_audit").insert({
+          run_id: runId, user_id: user.id, filename: fileName,
+          line_number: r.line, potential_id: String(p.potential_id),
+          transaction_id: txId, status: rowStatus, error_message: rowError, row_data: r.raw,
+        });
         setProgress({ done: i + 1, total: valid.length });
       }
+      await supabase.from("bulk_import_runs").update({
+        imported_rows: imported, skipped_rows: skipped, updated_rows: updatedCount, linked_rows: linked,
+        status: "completed", completed_at: new Date().toISOString(),
+      }).eq("id", runId);
       setRows(updated);
-      toast.success(`Imported ${imported} / ${valid.length} rows`);
+      toast.success(`Done · ${imported} new · ${updatedCount} updated · ${linked} linked · ${skipped} skipped`);
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
+      qc.invalidateQueries({ queryKey: ["bulk_import_runs"] });
+    } catch (e) {
+      await supabase.from("bulk_import_runs").update({
+        status: "failed", completed_at: new Date().toISOString(),
+      }).eq("id", runId);
+      toast.error(`Import failed: ${(e as Error).message}`);
     } finally {
       setSubmitting(false);
     }
@@ -261,7 +349,7 @@ export function BulkImport() {
         <CardTitle>Bulk Import Transactions</CardTitle>
         <p className="text-sm text-muted-foreground">
           Download a CSV template for Public or Private Cloud, fill it in, and upload to import multiple records at once.
-          New customers are created automatically.
+          Columns can appear in any order as long as the header names match. New customers are created automatically.
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -276,23 +364,40 @@ export function BulkImport() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} className="max-w-sm" />
-          {fileName && <span className="text-xs text-muted-foreground">{fileName}</span>}
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs">CSV file</Label>
+            <Input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} className="max-w-sm" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs">If potential_id already exists</Label>
+            <Select value={dupStrategy} onValueChange={(v) => setDupStrategy(v as DupStrategy)}>
+              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="skip">Skip the row</SelectItem>
+                <SelectItem value="update">Update existing record</SelectItem>
+                <SelectItem value="link">Link only (no write)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {fileName && <span className="text-xs text-muted-foreground self-end pb-2">{fileName}</span>}
           {rows.length > 0 && (
-            <>
+            <div className="flex flex-wrap items-center gap-2 ml-auto">
               <Badge variant="outline" className="gap-1"><CheckCircle2 className="h-3 w-3 text-green-600" />{validCount} valid</Badge>
               <Badge variant="outline" className="gap-1"><AlertTriangle className="h-3 w-3 text-amber-600" />{errorCount} errors</Badge>
-              <Button size="sm" variant="ghost" onClick={reset}><X className="h-4 w-4 mr-1" />Clear</Button>
-              <div className="ml-auto">
-                <Button size="sm" disabled={submitting || validCount === 0} onClick={importValid}>
-                  <Upload className="h-4 w-4 mr-1" />
-                  {submitting && progress
-                    ? `Importing ${progress.done}/${progress.total}…`
-                    : `Import ${validCount} valid row${validCount === 1 ? "" : "s"}`}
+              {errorCount > 0 && (
+                <Button size="sm" variant="outline" onClick={downloadErrorReport}>
+                  <FileWarning className="h-4 w-4 mr-1" />Download error report
                 </Button>
-              </div>
-            </>
+              )}
+              <Button size="sm" variant="ghost" onClick={reset}><X className="h-4 w-4 mr-1" />Clear</Button>
+              <Button size="sm" disabled={submitting || validCount === 0} onClick={importValid}>
+                <Upload className="h-4 w-4 mr-1" />
+                {submitting && progress
+                  ? `Importing ${progress.done}/${progress.total}…`
+                  : `Import ${validCount} valid row${validCount === 1 ? "" : "s"}`}
+              </Button>
+            </div>
           )}
         </div>
 
@@ -304,7 +409,7 @@ export function BulkImport() {
           ) : (
             <div className="mt-1">system_config must be one of: {SYSTEM_CONFIG_OPTIONS.join(", ")}.</div>
           )}
-          <div>Dates use ISO format YYYY-MM-DD. potential_id must be unique across the system.</div>
+          <div>Dates use ISO format YYYY-MM-DD. potential_id must be unique within the file. Column order is flexible.</div>
         </div>
 
         {rows.length > 0 && (
