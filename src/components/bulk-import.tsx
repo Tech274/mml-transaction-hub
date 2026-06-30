@@ -67,6 +67,7 @@ const PRIVATE_SAMPLE: string[][] = [
 ];
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_ROWS_PER_CSV = 50_000;
 
 function buildRowSchema(kind: CloudKind) {
   const base = {
@@ -189,6 +190,7 @@ export function BulkImport() {
   const [kind, setKind] = useState<CloudKind>("public_cloud");
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState<string>("");
+  const [rawCsvText, setRawCsvText] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<
     { done: number; total: number; succeeded: number; failed: number; isRetry: boolean } | null
@@ -286,7 +288,7 @@ export function BulkImport() {
   }
 
   function reset() {
-    setRows([]); setFileName(""); setProgress(null); setMapping(null);
+    setRows([]); setFileName(""); setRawCsvText(""); setProgress(null); setMapping(null);
     setIsRetryRun(false); setParentRunId(null);
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -299,6 +301,11 @@ export function BulkImport() {
     const text = await f.text();
     const matrix = parseCsv(text);
     if (matrix.length === 0) { toast.error("Empty CSV"); return; }
+    if (matrix.length - 1 > MAX_ROWS_PER_CSV) {
+      toast.error(`CSV has ${matrix.length - 1} rows; max allowed is ${MAX_ROWS_PER_CSV.toLocaleString()}.`);
+      return;
+    }
+    setRawCsvText(text);
     const [header, ...body] = matrix;
     const hdr = header.map((h) => h.trim().toLowerCase());
     const colIdx: Record<string, number> = {};
@@ -565,6 +572,17 @@ export function BulkImport() {
     }
     const runId = run.id;
 
+    // Upload original CSV to private storage so it can be re-downloaded from history.
+    if (rawCsvText) {
+      const path = `${user.id}/${runId}/original.csv`;
+      const up = await supabase.storage
+        .from("bulk-imports")
+        .upload(path, new Blob([rawCsvText], { type: "text/csv" }), { upsert: true, contentType: "text/csv" });
+      if (!up.error) {
+        await supabase.from("bulk_import_runs").update({ original_csv_path: path } as never).eq("id", runId);
+      }
+    }
+
     // Log invalid rows up-front
     const invalidRows = rows.filter((r) => r.errors.length > 0);
     if (invalidRows.length) {
@@ -659,6 +677,31 @@ export function BulkImport() {
         imported_rows: imported, skipped_rows: skipped, updated_rows: updatedCount, linked_rows: linked,
         status: "completed", completed_at: new Date().toISOString(),
       }).eq("id", runId);
+      // Upload structured error artifact (JSON) for fast post-mortem.
+      const failedRows = updated.filter((r) => r.errors.length > 0);
+      if (failedRows.length) {
+        const artifact = {
+          run_id: runId,
+          filename: fileName,
+          kind,
+          generated_at: new Date().toISOString(),
+          rows: failedRows.map((r) => ({
+            line: r.line,
+            potential_id: r.raw.potential_id ?? null,
+            failed_fields: r.errors.map((e) => e.split(":")[0]),
+            validation_messages: r.errors,
+            raw: r.raw,
+          })),
+        };
+        const path = `${user.id}/${runId}/errors.json`;
+        const up = await supabase.storage
+          .from("bulk-imports")
+          .upload(path, new Blob([JSON.stringify(artifact, null, 2)], { type: "application/json" }),
+                  { upsert: true, contentType: "application/json" });
+        if (!up.error) {
+          await supabase.from("bulk_import_runs").update({ error_artifact_path: path } as never).eq("id", runId);
+        }
+      }
       setRows(updated);
       toast.success(`Done · ${imported} new · ${updatedCount} updated · ${linked} linked · ${skipped} skipped`);
       qc.invalidateQueries({ queryKey: ["transactions"] });

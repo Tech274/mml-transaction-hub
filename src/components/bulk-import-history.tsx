@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Download, History, RefreshCw, FileWarning, Search } from "lucide-react";
+import { Download, History, RefreshCw, FileWarning, Search, FileText, GitBranch } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +32,8 @@ interface Run {
   retry_count?: number | null;
   max_retries?: number | null;
   parent_run_id?: string | null;
+  original_csv_path?: string | null;
+  error_artifact_path?: string | null;
 }
 
 interface RowAudit {
@@ -100,6 +102,13 @@ export function BulkImportHistory() {
     const a = document.createElement("a");
     a.href = url; a.download = `${run.filename.replace(/\.csv$/i, "")}-errors.csv`; a.click();
     URL.revokeObjectURL(url);
+  }
+
+  async function downloadArtifact(path: string, suggestedName: string) {
+    const { data, error } = await supabase.storage.from("bulk-imports").createSignedUrl(path, 60);
+    if (error || !data?.signedUrl) { toast.error(error?.message ?? "Could not create download link"); return; }
+    const a = document.createElement("a");
+    a.href = data.signedUrl; a.download = suggestedName; a.target = "_blank"; a.rel = "noopener"; a.click();
   }
 
   return (
@@ -187,6 +196,15 @@ export function BulkImportHistory() {
                   <TableCell className="text-right">
                     <div className="flex gap-1 justify-end">
                       <Button size="sm" variant="ghost" onClick={() => setOpen(r)}>Details</Button>
+                      {r.original_csv_path && (
+                        <Button
+                          size="sm" variant="ghost"
+                          title="Download original CSV"
+                          onClick={() => downloadArtifact(r.original_csv_path!, r.filename || "original.csv")}
+                        >
+                          <FileText className="h-3.5 w-3.5 mr-1" />Original
+                        </Button>
+                      )}
                       {r.invalid_rows > 0 && (
                         <Button size="sm" variant="ghost" onClick={() => downloadErrors(r)} title="Download failed rows CSV">
                           <FileWarning className="h-3.5 w-3.5 mr-1" />Failed rows
@@ -280,6 +298,31 @@ function RunDetails({ run, onDownload }: { run: Run; onDownload: () => void }) {
             <FileWarning className="h-4 w-4 mr-1" />Download error CSV
           </Button>
         )}
+        <div className="flex flex-wrap gap-2">
+          {run.original_csv_path && (
+            <Button size="sm" variant="outline" onClick={async () => {
+              const { data, error } = await supabase.storage.from("bulk-imports").createSignedUrl(run.original_csv_path!, 60);
+              if (error || !data?.signedUrl) { toast.error(error?.message ?? "Could not create download link"); return; }
+              const a = document.createElement("a");
+              a.href = data.signedUrl; a.download = run.filename || "original.csv"; a.target = "_blank"; a.rel = "noopener"; a.click();
+            }}>
+              <FileText className="h-4 w-4 mr-1" />Download original CSV
+            </Button>
+          )}
+          {run.error_artifact_path && (
+            <Button size="sm" variant="outline" onClick={async () => {
+              const { data, error } = await supabase.storage.from("bulk-imports").createSignedUrl(run.error_artifact_path!, 60);
+              if (error || !data?.signedUrl) { toast.error(error?.message ?? "Could not create download link"); return; }
+              const a = document.createElement("a");
+              a.href = data.signedUrl; a.download = `${run.filename.replace(/\.csv$/i,"")}-errors.json`; a.target = "_blank"; a.rel = "noopener"; a.click();
+            }}>
+              <Download className="h-4 w-4 mr-1" />Error JSON artifact
+            </Button>
+          )}
+          {run.parent_run_id && (
+            <Badge variant="secondary" className="gap-1"><GitBranch className="h-3 w-3" />Retry of {run.parent_run_id.slice(0, 8)}</Badge>
+          )}
+        </div>
         <div className="border rounded-md overflow-x-auto">
           <Table>
             <TableHeader>

@@ -47,6 +47,77 @@ export type Database = {
         }
         Relationships: []
       }
+      bulk_import_jobs: {
+        Row: {
+          cancel_requested: boolean
+          created_at: string
+          created_by: string
+          error_message: string | null
+          failed: number
+          finished_at: string | null
+          id: string
+          imported: number
+          linked: number
+          processed: number
+          run_id: string
+          skipped: number
+          started_at: string | null
+          status: string
+          succeeded: number
+          total: number
+          updated_at: string
+          updated_rows: number
+        }
+        Insert: {
+          cancel_requested?: boolean
+          created_at?: string
+          created_by?: string
+          error_message?: string | null
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          imported?: number
+          linked?: number
+          processed?: number
+          run_id: string
+          skipped?: number
+          started_at?: string | null
+          status?: string
+          succeeded?: number
+          total?: number
+          updated_at?: string
+          updated_rows?: number
+        }
+        Update: {
+          cancel_requested?: boolean
+          created_at?: string
+          created_by?: string
+          error_message?: string | null
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          imported?: number
+          linked?: number
+          processed?: number
+          run_id?: string
+          skipped?: number
+          started_at?: string | null
+          status?: string
+          succeeded?: number
+          total?: number
+          updated_at?: string
+          updated_rows?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_jobs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_import_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bulk_import_presets: {
         Row: {
           column_mapping: Json
@@ -145,6 +216,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           duplicate_strategy: string
+          error_artifact_path: string | null
           filename: string
           id: string
           imported_rows: number
@@ -152,6 +224,7 @@ export type Database = {
           kind: string
           linked_rows: number
           max_retries: number
+          original_csv_path: string | null
           parent_run_id: string | null
           retry_count: number
           skipped_rows: number
@@ -168,6 +241,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           duplicate_strategy?: string
+          error_artifact_path?: string | null
           filename: string
           id?: string
           imported_rows?: number
@@ -175,6 +249,7 @@ export type Database = {
           kind: string
           linked_rows?: number
           max_retries?: number
+          original_csv_path?: string | null
           parent_run_id?: string | null
           retry_count?: number
           skipped_rows?: number
@@ -191,6 +266,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           duplicate_strategy?: string
+          error_artifact_path?: string | null
           filename?: string
           id?: string
           imported_rows?: number
@@ -198,6 +274,7 @@ export type Database = {
           kind?: string
           linked_rows?: number
           max_retries?: number
+          original_csv_path?: string | null
           parent_run_id?: string | null
           retry_count?: number
           skipped_rows?: number
