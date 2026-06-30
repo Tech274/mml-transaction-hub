@@ -230,6 +230,17 @@ function RunDetails({ run, onDownload }: { run: Run; onDownload: () => void }) {
           <div><span className="text-muted-foreground">Status:</span> {run.status}</div>
           <div><span className="text-muted-foreground">Imported / Updated / Linked / Skipped:</span> {run.imported_rows} / {run.updated_rows} / {run.linked_rows} / {run.skipped_rows}</div>
         </div>
+        {(run.column_mapping || run.update_fields) && (
+          <div className="rounded-md border p-2 text-xs space-y-1 bg-muted/30">
+            <div className="font-medium text-foreground">Saved settings (reused on retry)</div>
+            {run.column_mapping && (
+              <div><span className="text-muted-foreground">Column mapping:</span> {Object.keys(run.column_mapping).join(", ")}</div>
+            )}
+            {run.update_fields && run.update_fields.length > 0 && (
+              <div><span className="text-muted-foreground">Update fields:</span> {run.update_fields.join(", ")}</div>
+            )}
+          </div>
+        )}
         {run.invalid_rows > 0 && (
           <Button size="sm" variant="outline" onClick={onDownload}>
             <FileWarning className="h-4 w-4 mr-1" />Download error CSV
