@@ -731,6 +731,9 @@ export function BulkImport() {
           <div className="text-[11px] text-muted-foreground ml-auto self-end">
             Presets are shared with all Ops/Manager/Admin users in this workspace.
           </div>
+          <Button size="sm" variant="ghost" onClick={() => setPresetMgrOpen(true)} className="self-end">
+            <Settings2 className="h-4 w-4 mr-1" />Manage
+          </Button>
         </div>
 
         <div className="flex flex-wrap items-end gap-3">
