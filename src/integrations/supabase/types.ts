@@ -99,6 +99,7 @@ export type Database = {
       }
       bulk_import_runs: {
         Row: {
+          column_mapping: Json | null
           completed_at: string | null
           created_at: string
           duplicate_strategy: string
@@ -111,12 +112,14 @@ export type Database = {
           skipped_rows: number
           status: string
           total_rows: number
+          update_fields: Json | null
           updated_rows: number
           user_email: string | null
           user_id: string
           valid_rows: number
         }
         Insert: {
+          column_mapping?: Json | null
           completed_at?: string | null
           created_at?: string
           duplicate_strategy?: string
@@ -129,12 +132,14 @@ export type Database = {
           skipped_rows?: number
           status?: string
           total_rows?: number
+          update_fields?: Json | null
           updated_rows?: number
           user_email?: string | null
           user_id: string
           valid_rows?: number
         }
         Update: {
+          column_mapping?: Json | null
           completed_at?: string | null
           created_at?: string
           duplicate_strategy?: string
@@ -147,6 +152,7 @@ export type Database = {
           skipped_rows?: number
           status?: string
           total_rows?: number
+          update_fields?: Json | null
           updated_rows?: number
           user_email?: string | null
           user_id?: string

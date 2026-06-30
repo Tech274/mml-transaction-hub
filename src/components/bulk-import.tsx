@@ -15,7 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { findOrCreateCustomer, checkPotentialIdUnique } from "@/lib/transactions.functions";
 import { useAuth } from "@/lib/auth-context";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 type CloudKind = "public_cloud" | "private_cloud";
 type DupStrategy = "skip" | "update" | "link";
@@ -173,6 +173,24 @@ export function BulkImport() {
   const { user } = useAuth();
   const qc = useQueryClient();
 
+  // Guard: block retry while a previous run for this user is still in-flight.
+  const { data: lastRun } = useQuery({
+    queryKey: ["bulk_import_runs", "latest", user?.id],
+    enabled: !!user,
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("bulk_import_runs")
+        .select("id,status")
+        .eq("user_id", user!.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
+    },
+    refetchInterval: submitting ? 2000 : false,
+  });
+  const lastRunInFlight = lastRun?.status === "pending";
+
   const headers = kind === "public_cloud" ? PUBLIC_HEADERS : PRIVATE_HEADERS;
   const sample = kind === "public_cloud" ? PUBLIC_SAMPLE : PRIVATE_SAMPLE;
   const schema = useMemo(() => buildRowSchema(kind), [kind]);
@@ -246,8 +264,18 @@ export function BulkImport() {
   function downloadErrorReport() {
     const errs = rows.filter((r) => r.errors.length > 0);
     if (!errs.length) { toast.error("No invalid rows"); return; }
-    const cols = ["line", ...headers, "errors"];
-    const body = errs.map((r) => [String(r.line), ...headers.map((h) => r.raw[h] ?? ""), r.errors.join("; ")]);
+    // Break out per-field error columns so admins see exactly which field failed and why.
+    const cols = ["line", "potential_id", ...headers, "failed_fields", "validation_messages"];
+    const body = errs.map((r) => {
+      const fields = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim()))).join(", ");
+      return [
+        String(r.line),
+        r.raw.potential_id ?? "",
+        ...headers.map((h) => r.raw[h] ?? ""),
+        fields,
+        r.errors.join(" | "),
+      ];
+    });
     downloadFile(`${kind}-invalid-rows-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(cols, body));
   }
 
@@ -273,6 +301,8 @@ export function BulkImport() {
         valid_rows: valid.length,
         invalid_rows: rows.length - valid.length,
         status: "pending",
+        column_mapping: mapping?.colIdx ?? null,
+        update_fields: dupStrategy === "update" ? Array.from(updateFields) : null,
       })
       .select("id").single();
     if (runErr || !run) {
@@ -436,7 +466,13 @@ export function BulkImport() {
                 </Button>
               )}
               {errorCount > 0 && (
-                <Button size="sm" variant="outline" onClick={retryInvalidOnly}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={retryInvalidOnly}
+                  disabled={submitting || lastRunInFlight}
+                  title={lastRunInFlight ? "Wait for the previous import to finish" : "Keep only invalid rows; current mapping & duplicate strategy will be reused"}
+                >
                   <RotateCw className="h-4 w-4 mr-1" />Retry invalid rows
                 </Button>
               )}
