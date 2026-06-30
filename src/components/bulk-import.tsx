@@ -370,7 +370,7 @@ export function BulkImport() {
     if (!valid.length) { toast.error("No valid rows to import"); return; }
     if (!user) { toast.error("Not authenticated"); return; }
     setSubmitting(true);
-    setProgress({ done: 0, total: valid.length });
+    setProgress({ done: 0, total: valid.length, succeeded: 0, failed: 0, isRetry: isRetryRun });
     const updated = [...rows];
     let imported = 0, skipped = 0, updatedCount = 0, linked = 0;
 
@@ -389,6 +389,9 @@ export function BulkImport() {
         status: "pending",
         column_mapping: mapping?.colIdx ?? null,
         update_fields: dupStrategy === "update" ? Array.from(updateFields) : null,
+        parent_run_id: isRetryRun ? parentRunId : null,
+        retry_count: isRetryRun ? ((retryStats?.retry_count ?? 0) + 1) : 0,
+        max_retries: MAX_RETRIES,
       })
       .select("id").single();
     if (runErr || !run) {
