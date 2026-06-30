@@ -301,6 +301,8 @@ export function BulkImport() {
         valid_rows: valid.length,
         invalid_rows: rows.length - valid.length,
         status: "pending",
+        column_mapping: mapping?.colIdx ?? null,
+        update_fields: dupStrategy === "update" ? Array.from(updateFields) : null,
       })
       .select("id").single();
     if (runErr || !run) {
