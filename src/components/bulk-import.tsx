@@ -189,6 +189,7 @@ export function BulkImport() {
   const [kind, setKind] = useState<CloudKind>("public_cloud");
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState<string>("");
+  const [rawCsvText, setRawCsvText] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<
     { done: number; total: number; succeeded: number; failed: number; isRetry: boolean } | null
@@ -286,7 +287,7 @@ export function BulkImport() {
   }
 
   function reset() {
-    setRows([]); setFileName(""); setProgress(null); setMapping(null);
+    setRows([]); setFileName(""); setRawCsvText(""); setProgress(null); setMapping(null);
     setIsRetryRun(false); setParentRunId(null);
     if (fileRef.current) fileRef.current.value = "";
   }
@@ -299,6 +300,11 @@ export function BulkImport() {
     const text = await f.text();
     const matrix = parseCsv(text);
     if (matrix.length === 0) { toast.error("Empty CSV"); return; }
+    if (matrix.length - 1 > MAX_ROWS_PER_CSV) {
+      toast.error(`CSV has ${matrix.length - 1} rows; max allowed is ${MAX_ROWS_PER_CSV.toLocaleString()}.`);
+      return;
+    }
+    setRawCsvText(text);
     const [header, ...body] = matrix;
     const hdr = header.map((h) => h.trim().toLowerCase());
     const colIdx: Record<string, number> = {};
