@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { MasterAdrForm } from "@/components/master-adr-form";
 import { BulkImport } from "@/components/bulk-import";
+import { BulkImportHistory } from "@/components/bulk-import-history";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
@@ -22,9 +23,11 @@ function EntryPage() {
           <TabsList>
             <TabsTrigger value="single">Single Entry</TabsTrigger>
             <TabsTrigger value="bulk">Bulk Import</TabsTrigger>
+          <TabsTrigger value="history">Import History</TabsTrigger>
           </TabsList>
           <TabsContent value="single"><MasterAdrForm /></TabsContent>
-          <TabsContent value="bulk"><BulkImport /></TabsContent>
+        <TabsContent value="bulk"><BulkImport /></TabsContent>
+        <TabsContent value="history"><BulkImportHistory /></TabsContent>
         </Tabs>
       ) : (
         <Card><CardContent className="py-12 text-center text-muted-foreground">
