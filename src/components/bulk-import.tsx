@@ -766,6 +766,28 @@ export function BulkImport() {
                 </Button>
               )}
               {errorCount > 0 && (
+                <Button size="sm" variant="outline" onClick={downloadCorrectedCsv} title="CSV of failed rows with suggested corrections applied, ready to re-upload">
+                  <Download className="h-4 w-4 mr-1" />Corrected CSV
+                </Button>
+              )}
+              {errorCount > 0 && (
+                <Button size="sm" variant="outline" onClick={() => setPreviewOpen(true)} title="Preview before/after for suggested corrections">
+                  <Eye className="h-4 w-4 mr-1" />Preview suggestions
+                </Button>
+              )}
+              {errorCount > 0 && (
+                <Button
+                  size="sm"
+                  onClick={applySuggestedAndRetry}
+                  disabled={submitting || lastRunInFlight || retryBlocked}
+                  title={retryBlocked
+                    ? `Retry limit reached (${retryStats?.max_retries ?? MAX_RETRIES})`
+                    : "Apply suggested corrections to failed rows and re-validate"}
+                >
+                  <Sparkles className="h-4 w-4 mr-1" />Retry with suggestions
+                </Button>
+              )}
+              {errorCount > 0 && (
                 <Button
                   size="sm"
                   variant="outline"
