@@ -150,7 +150,7 @@ export function BulkImport() {
   const fileRef = useRef<HTMLInputElement>(null);
   const findOrCreate = useServerFn(findOrCreateCustomer);
   const checkUnique = useServerFn(checkPotentialIdUnique);
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const qc = useQueryClient();
 
   const headers = kind === "public_cloud" ? PUBLIC_HEADERS : PRIVATE_HEADERS;
@@ -228,7 +228,7 @@ export function BulkImport() {
       .from("bulk_import_runs")
       .insert({
         user_id: user.id,
-        user_email: profile?.email ?? null,
+        user_email: user.email ?? null,
         kind,
         filename: fileName,
         duplicate_strategy: dupStrategy,
