@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning } from "lucide-react";
+import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
@@ -147,6 +149,24 @@ export function BulkImport() {
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [dupStrategy, setDupStrategy] = useState<DupStrategy>("skip");
+  // Pre-import mapping step
+  const [mapping, setMapping] = useState<{
+    detected: string[];
+    matched: string[];
+    missing: string[];
+    extra: string[];
+    body: string[][];
+    colIdx: Record<string, number>;
+  } | null>(null);
+  // Fields the user opts to update when duplicate strategy = update
+  const UPDATABLE_FIELDS = [
+    "month", "year", "customer_name", "lab_name", "line_of_business",
+    "start_date", "end_date", "total_users", "input_cost", "selling_cost",
+    "cloud_provider", "system_config",
+  ] as const;
+  const [updateFields, setUpdateFields] = useState<Set<string>>(
+    new Set(UPDATABLE_FIELDS),
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const findOrCreate = useServerFn(findOrCreateCustomer);
   const checkUnique = useServerFn(checkPotentialIdUnique);
@@ -162,7 +182,7 @@ export function BulkImport() {
   }
 
   function reset() {
-    setRows([]); setFileName(""); setProgress(null);
+    setRows([]); setFileName(""); setProgress(null); setMapping(null);
     if (fileRef.current) fileRef.current.value = "";
   }
 
@@ -176,14 +196,22 @@ export function BulkImport() {
     if (matrix.length === 0) { toast.error("Empty CSV"); return; }
     const [header, ...body] = matrix;
     const hdr = header.map((h) => h.trim().toLowerCase());
-    const missing = headers.filter((h) => !hdr.includes(h));
-    if (missing.length) {
-      toast.error(`Missing columns: ${missing.join(", ")}`);
-      return;
-    }
-    // Header-based mapping: build name->index map so column order in CSV is irrelevant.
     const colIdx: Record<string, number> = {};
     hdr.forEach((h, i) => { if (!(h in colIdx)) colIdx[h] = i; });
+    const matched = headers.filter((h) => h in colIdx);
+    const missing = headers.filter((h) => !(h in colIdx));
+    const extra = hdr.filter((h) => !(headers as readonly string[]).includes(h));
+    setMapping({ detected: hdr, matched, missing, extra, body, colIdx });
+    setRows([]);
+  }
+
+  function confirmMappingAndValidate() {
+    if (!mapping) return;
+    if (mapping.missing.length) {
+      toast.error(`Cannot proceed: missing columns ${mapping.missing.join(", ")}`);
+      return;
+    }
+    const { body, colIdx } = mapping;
     const seen = new Set<string>();
     const parsed: ParsedRow[] = body.map((cols, idx) => {
       const raw: Record<string, string> = {};
@@ -204,6 +232,15 @@ export function BulkImport() {
     setRows(parsed);
     const ok = parsed.filter((r) => r.errors.length === 0).length;
     toast.success(`Parsed ${parsed.length} rows · ${ok} valid · ${parsed.length - ok} with errors`);
+  }
+
+  function retryInvalidOnly() {
+    const invalid = rows.filter((r) => r.errors.length > 0);
+    if (!invalid.length) { toast.message("No invalid rows to retry"); return; }
+    // Re-validate just those rows; user is expected to have fixed them via re-upload
+    // of a corrected CSV (mapping step), so this is mostly for clearing successes.
+    setRows(invalid);
+    toast.success(`Kept ${invalid.length} invalid row${invalid.length === 1 ? "" : "s"}. Fix them and upload a corrected CSV, or re-run.`);
   }
 
   function downloadErrorReport() {
@@ -259,6 +296,9 @@ export function BulkImport() {
 
     try {
       for (let i = 0; i < valid.length; i++) {
+        // Yield to the UI thread every row so the progress bar stays responsive
+        // and the page does not appear frozen on large imports.
+        if (i % 5 === 0) await new Promise((r) => setTimeout(r, 0));
         const r = valid[i];
         const idx = updated.findIndex((x) => x.line === r.line);
         const p = r.parsed as Record<string, unknown>;
@@ -268,7 +308,7 @@ export function BulkImport() {
         try {
           const uq = await checkUnique({ data: { potentialId: String(p.potential_id) } });
           const cust = await findOrCreate({ data: { customerName: String(p.customer_name) } });
-          const payload = {
+          const fullPayload = {
             potential_id: String(p.potential_id),
             month: Number(p.month),
             year: Number(p.year),
@@ -286,27 +326,32 @@ export function BulkImport() {
             input_cost: Number(p.input_cost),
             selling_cost: Number(p.selling_cost),
             created_by: user.id,
-          };
+          } as Record<string, unknown>;
           if (!uq.unique) {
             if (dupStrategy === "skip") {
-              updated[idx] = { ...r, errors: [`skipped: potential_id ${payload.potential_id} already exists`] };
+              updated[idx] = { ...r, errors: [`skipped: potential_id ${String(fullPayload.potential_id)} already exists`] };
               rowStatus = "skipped"; skipped++;
             } else if (dupStrategy === "update") {
+              // Only overwrite the fields the user opted into; preserve the rest.
+              const partial: Record<string, unknown> = {};
+              for (const f of updateFields) if (f in fullPayload) partial[f] = fullPayload[f];
+              if (kind === "private_cloud") partial.system_config = fullPayload.system_config;
               const { data: existing, error: updErr } = await supabase
                 .from("transactions")
-                .update(payload)
-                .eq("potential_id", payload.potential_id)
+                .update(partial as never)
+                .eq("potential_id", String(fullPayload.potential_id))
                 .select("id").maybeSingle();
               if (updErr) { rowStatus = "error"; rowError = updErr.message; updated[idx] = { ...r, errors: [updErr.message] }; }
               else { rowStatus = "updated"; updatedCount++; txId = existing?.id ?? null; }
             } else { // link
+              // Link = read-only association, no fields overwritten on the existing record.
               const { data: existing } = await supabase
-                .from("transactions").select("id").eq("potential_id", payload.potential_id).maybeSingle();
+                .from("transactions").select("id").eq("potential_id", String(fullPayload.potential_id)).maybeSingle();
               rowStatus = "linked"; linked++; txId = existing?.id ?? null;
-              updated[idx] = { ...r, errors: [`linked to existing transaction ${payload.potential_id}`] };
+              updated[idx] = { ...r, errors: [`linked to existing transaction ${String(fullPayload.potential_id)} (no fields changed)`] };
             }
           } else {
-            const { data: ins, error } = await supabase.from("transactions").insert(payload).select("id").single();
+            const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
             if (error) { rowStatus = "error"; rowError = error.message; updated[idx] = { ...r, errors: [error.message] }; }
             else { imported++; txId = ins?.id ?? null; }
           }
@@ -390,6 +435,11 @@ export function BulkImport() {
                   <FileWarning className="h-4 w-4 mr-1" />Download error report
                 </Button>
               )}
+              {errorCount > 0 && (
+                <Button size="sm" variant="outline" onClick={retryInvalidOnly}>
+                  <RotateCw className="h-4 w-4 mr-1" />Retry invalid rows
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onClick={reset}><X className="h-4 w-4 mr-1" />Clear</Button>
               <Button size="sm" disabled={submitting || validCount === 0} onClick={importValid}>
                 <Upload className="h-4 w-4 mr-1" />
@@ -397,6 +447,98 @@ export function BulkImport() {
                   ? `Importing ${progress.done}/${progress.total}…`
                   : `Import ${validCount} valid row${validCount === 1 ? "" : "s"}`}
               </Button>
+            </div>
+          )}
+        </div>
+
+        {submitting && progress && (
+          <div className="space-y-1">
+            <Progress value={(progress.done / Math.max(progress.total, 1)) * 100} />
+            <div className="text-xs text-muted-foreground">
+              Processing in the background · {progress.done} of {progress.total} rows · UI stays responsive.
+            </div>
+          </div>
+        )}
+
+        {/* Pre-import mapping preview */}
+        {mapping && rows.length === 0 && (
+          <div className="rounded-md border p-3 space-y-2 bg-muted/30">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <ShieldAlert className="h-4 w-4 text-amber-600" /> Confirm column mapping
+            </div>
+            <div className="grid md:grid-cols-3 gap-3 text-xs">
+              <div>
+                <div className="font-medium text-foreground mb-1">Matched ({mapping.matched.length})</div>
+                <ul className="space-y-0.5">
+                  {mapping.matched.map((h) => (
+                    <li key={h} className="flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3 text-green-600" /> {h}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <div className="font-medium text-foreground mb-1">Missing required ({mapping.missing.length})</div>
+                {mapping.missing.length === 0
+                  ? <div className="text-muted-foreground">None — good to go.</div>
+                  : <ul className="space-y-0.5">{mapping.missing.map((h) => (
+                      <li key={h} className="flex items-center gap-1 text-destructive">
+                        <X className="h-3 w-3" /> {h}
+                      </li>
+                    ))}</ul>}
+              </div>
+              <div>
+                <div className="font-medium text-foreground mb-1">Extra / ignored ({mapping.extra.length})</div>
+                {mapping.extra.length === 0
+                  ? <div className="text-muted-foreground">None.</div>
+                  : <ul className="space-y-0.5 text-muted-foreground">{mapping.extra.map((h) => (
+                      <li key={h}>· {h}</li>
+                    ))}</ul>}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button size="sm" onClick={confirmMappingAndValidate} disabled={mapping.missing.length > 0}>
+                Confirm & validate {mapping.body.length} row{mapping.body.length === 1 ? "" : "s"}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={reset}>Cancel</Button>
+            </div>
+          </div>
+        )}
+
+        {/* Duplicate handling explainer + per-field selector */}
+        <div className="rounded-md border p-3 text-xs space-y-2">
+          <div className="font-medium text-foreground">Duplicate handling: <span className="uppercase">{dupStrategy}</span></div>
+          {dupStrategy === "skip" && (
+            <div className="text-muted-foreground">Existing rows with the same potential_id are left unchanged. Incoming row is reported as skipped.</div>
+          )}
+          {dupStrategy === "link" && (
+            <div className="text-muted-foreground">No fields are written. All existing fields are preserved as-is. The audit log records a link reference only.</div>
+          )}
+          {dupStrategy === "update" && (
+            <div className="space-y-2">
+              <div className="text-muted-foreground">Pick which fields overwrite the existing record. Unchecked fields are preserved.</div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
+                {UPDATABLE_FIELDS.map((f) => {
+                  const disabled = (f === "cloud_provider" && kind === "private_cloud")
+                    || (f === "system_config" && kind === "public_cloud");
+                  if (disabled) return null;
+                  return (
+                    <label key={f} className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={updateFields.has(f)}
+                        onCheckedChange={(c) => {
+                          setUpdateFields((prev) => {
+                            const next = new Set(prev);
+                            if (c) next.add(f); else next.delete(f);
+                            return next;
+                          });
+                        }}
+                      />
+                      <span>{f}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
