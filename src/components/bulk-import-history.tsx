@@ -138,9 +138,34 @@ export function BulkImportHistory() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2"><History className="h-4 w-4" />Bulk Import History</CardTitle>
-        <Button size="sm" variant="ghost" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? "animate-spin" : ""}`} />Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <div className="flex items-center gap-1 border rounded-md pl-2 pr-1 py-0.5 bg-muted/30" aria-label="Admin cleanup">
+              <span className="text-xs text-muted-foreground">Retention</span>
+              <Input
+                type="number" min={1} max={3650}
+                value={cleanupDays}
+                onChange={(e) => setCleanupDays(Math.max(1, Number(e.target.value) || 90))}
+                className="h-7 w-16 text-xs"
+                aria-label="Retention days"
+              />
+              <span className="text-xs text-muted-foreground">days</span>
+              <Button
+                size="sm" variant="ghost"
+                onClick={triggerCleanup}
+                disabled={cleanupRunning}
+                title="Delete stored CSV + error artifacts older than the chosen days (admin only)"
+                data-testid="admin-cleanup-trigger"
+              >
+                <Trash2 className={`h-3.5 w-3.5 mr-1 ${cleanupRunning ? "animate-pulse" : ""}`} />
+                {cleanupRunning ? "Cleaning…" : "Run cleanup"}
+              </Button>
+            </div>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? "animate-spin" : ""}`} />Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap items-end gap-2 mb-3">
