@@ -308,6 +308,7 @@ export function BulkImport() {
     setRows([]); setFileName(""); setRawCsvText(""); setProgress(null); setMapping(null);
     setIsRetryRun(false); setParentRunId(null);
     if (fileRef.current) fileRef.current.value = "";
+    setSuggestionSelection({});
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
