@@ -58,16 +58,18 @@ const PUBLIC_HEADERS = [...COMMON_HEADERS, "cloud_provider"] as const;
 const PRIVATE_HEADERS = [...COMMON_HEADERS, "system_config"] as const;
 
 const PUBLIC_SAMPLE: string[][] = [
-  ["POT-2026-001", "1", "2026", "Acme Corp", "AWS Lab A", "Training", "2026-01-01", "2026-01-31", "10", "1000.00", "1500.00", "AWS"],
-  ["POT-2026-002", "2", "2026", "Beta Ltd", "Azure POC", "Consulting", "2026-02-01", "2026-02-28", "5", "500.00", "900.00", "Azure"],
+  ["POT-2026-001", "1", "2026", "Acme Corp", "AWS Lab A", "VILT", "2026-01-01", "2026-01-31", "10", "1000.00", "1500.00", "AWS"],
+  ["POT-2026-002", "2", "2026", "Beta Ltd", "Azure POC", "Standalone", "2026-02-01", "2026-02-28", "5", "500.00", "900.00", "Azure"],
 ];
 const PRIVATE_SAMPLE: string[][] = [
-  ["POT-2026-101", "1", "2026", "Acme Corp", "Private Lab A", "Training", "2026-01-01", "2026-01-31", "20", "2000.00", "3000.00", "16GB 4vCPUs"],
-  ["POT-2026-102", "2", "2026", "Beta Ltd", "Private Lab B", "Consulting", "2026-02-01", "2026-02-28", "8", "1200.00", "1800.00", "8GB 4vCPUs"],
+  ["POT-2026-101", "1", "2026", "Acme Corp", "Private Lab A", "Integrated", "2026-01-01", "2026-01-31", "20", "2000.00", "3000.00", "16GB 4vCPUs"],
+  ["POT-2026-102", "2", "2026", "Beta Ltd", "Private Lab B", "VILT", "2026-02-01", "2026-02-28", "8", "1200.00", "1800.00", "8GB 4vCPUs"],
 ];
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROWS_PER_CSV = 50_000;
+
+const LINE_OF_BUSINESS_OPTIONS = ["VILT", "Standalone", "Integrated"] as const;
 
 function buildRowSchema(kind: CloudKind) {
   const base = {
@@ -76,7 +78,11 @@ function buildRowSchema(kind: CloudKind) {
     year: z.coerce.number().int().min(2000).max(2100),
     customer_name: z.string().trim().min(1).max(200),
     lab_name: z.string().trim().min(1).max(200),
-    line_of_business: z.string().trim().min(1),
+    line_of_business: z.enum(LINE_OF_BUSINESS_OPTIONS, {
+      errorMap: () => ({
+        message: `line_of_business must be one of ${LINE_OF_BUSINESS_OPTIONS.join(", ")}`,
+      }),
+    }),
     start_date: z.string().regex(dateRe, "start_date must be YYYY-MM-DD"),
     end_date: z.string().regex(dateRe, "end_date must be YYYY-MM-DD"),
     total_users: z.coerce.number().int().positive(),
