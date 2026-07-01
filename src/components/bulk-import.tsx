@@ -1002,6 +1002,25 @@ export function BulkImport() {
         )}
 
         {/* Pre-import mapping preview */}
+        {templateVersionMismatch && (
+          <div
+            role="alert"
+            data-testid="template-version-mismatch-banner"
+            className="rounded-md border border-amber-500/40 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100 p-3 text-sm flex items-start gap-2"
+          >
+            <FileWarning className="h-4 w-4 mt-0.5 shrink-0" />
+            <div className="space-y-1">
+              <div className="font-medium">Template version mismatch</div>
+              <div>
+                Uploaded file template_version is{" "}
+                <strong data-testid="tvm-detected">{templateVersionMismatch.detected}</strong>,
+                but the current downloadable template is{" "}
+                <strong data-testid="tvm-current">{templateVersionMismatch.current}</strong>.
+                Re-download the latest template to avoid validation drift.
+              </div>
+            </div>
+          </div>
+        )}
         {mapping && rows.length === 0 && (
           <div className="rounded-md border p-3 space-y-2 bg-muted/30">
             <div className="flex items-center gap-2 text-sm font-medium">
