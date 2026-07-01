@@ -1090,6 +1090,7 @@ export function BulkImport() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">Apply</TableHead>
                     <TableHead className="w-14">Line</TableHead>
                     <TableHead>Potential ID</TableHead>
                     <TableHead>Field</TableHead>
@@ -1102,6 +1103,7 @@ export function BulkImport() {
                     d.changes.length === 0
                       ? [(
                           <TableRow key={`${d.line}-none`}>
+                            <TableCell />
                             <TableCell className="text-muted-foreground">{d.line}</TableCell>
                             <TableCell className="text-xs">{d.potential_id || "—"}</TableCell>
                             <TableCell colSpan={3} className="text-xs text-muted-foreground">
@@ -1111,6 +1113,13 @@ export function BulkImport() {
                         )]
                       : d.changes.map((c, i) => (
                           <TableRow key={`${d.line}-${c.field}`}>
+                            <TableCell>
+                              <Checkbox
+                                checked={isSuggestionSelected(d.line, c.field)}
+                                onCheckedChange={(v) => toggleSuggestion(d.line, c.field, v === true)}
+                                aria-label={`Apply suggestion for line ${d.line} field ${c.field}`}
+                              />
+                            </TableCell>
                             {i === 0 ? (
                               <>
                                 <TableCell className="text-muted-foreground align-top" rowSpan={d.changes.length}>{d.line}</TableCell>
@@ -1124,12 +1133,24 @@ export function BulkImport() {
                         )),
                   )}
                   {suggestionDiffs().length === 0 && (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No invalid rows.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No invalid rows.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
             <DialogFooter className="gap-2">
+              <div className="mr-auto flex gap-2 text-xs">
+                <Button size="sm" variant="ghost" onClick={() => {
+                  const next: Record<string, boolean> = {};
+                  for (const d of suggestionDiffs()) for (const c of d.changes) next[`${d.line}:${c.field}`] = true;
+                  setSuggestionSelection(next);
+                }}>Select all</Button>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  const next: Record<string, boolean> = {};
+                  for (const d of suggestionDiffs()) for (const c of d.changes) next[`${d.line}:${c.field}`] = false;
+                  setSuggestionSelection(next);
+                }}>Clear all</Button>
+              </div>
               <Button variant="outline" onClick={downloadCorrectedCsv}>
                 <Download className="h-4 w-4 mr-1" />Download corrected CSV
               </Button>
