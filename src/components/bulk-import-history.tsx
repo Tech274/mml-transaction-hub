@@ -65,8 +65,14 @@ export function BulkImportHistory() {
     setCleanupRunning(true);
     try {
       const res = await cleanupFn({ data: { days: cleanupDays } });
+      const bucketSummary = Object.entries(res.buckets ?? {})
+        .map(
+          ([b, c]) =>
+            `${b}: ${c.total} (csv ${c.originalCsv} + err ${c.errorArtifact})`,
+        )
+        .join(" · ");
       toast.success(
-        `Cleanup done · ${res.expiredRuns} expired runs · ${res.deletedObjects}/${res.pathsAttempted} objects removed · ${res.clearedRows} rows cleared`,
+        `Cleanup done · ${res.expiredRuns} expired runs · ${res.deletedObjects}/${res.pathsAttempted} objects removed · ${res.clearedRows} paths cleared${bucketSummary ? ` · ${bucketSummary}` : ""}`,
       );
       refetch();
     } catch (e) {
