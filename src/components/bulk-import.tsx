@@ -69,6 +69,8 @@ const PRIVATE_SAMPLE: string[][] = [
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROWS_PER_CSV = 50_000;
 
+const LINE_OF_BUSINESS_OPTIONS = ["VILT", "Standalone", "Integrated"] as const;
+
 function buildRowSchema(kind: CloudKind) {
   const base = {
     potential_id: z.string().trim().min(1, "potential_id required").max(50),
@@ -76,7 +78,11 @@ function buildRowSchema(kind: CloudKind) {
     year: z.coerce.number().int().min(2000).max(2100),
     customer_name: z.string().trim().min(1).max(200),
     lab_name: z.string().trim().min(1).max(200),
-    line_of_business: z.string().trim().min(1),
+    line_of_business: z.enum(LINE_OF_BUSINESS_OPTIONS, {
+      errorMap: () => ({
+        message: `line_of_business must be one of ${LINE_OF_BUSINESS_OPTIONS.join(", ")}`,
+      }),
+    }),
     start_date: z.string().regex(dateRe, "start_date must be YYYY-MM-DD"),
     end_date: z.string().regex(dateRe, "end_date must be YYYY-MM-DD"),
     total_users: z.coerce.number().int().positive(),
