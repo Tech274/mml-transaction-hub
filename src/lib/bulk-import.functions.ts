@@ -7,7 +7,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // were removed and how many run records had their artifact paths cleared.
 export const runArtifactCleanup = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((raw) => z.object({ days: z.number().int().min(1).max(3650) }).parse(raw))
+  .inputValidator((raw) =>
+    z
+      .object({
+        days: z.number().int().min(1).max(3650),
+        dryRun: z.boolean().optional().default(false),
+      })
+      .parse(raw),
+  )
   .handler(async ({ data, context }) => {
     const { data: isAdmin, error: rErr } = await context.supabase.rpc("has_role", {
       _user_id: context.userId,
@@ -47,8 +54,8 @@ export const runArtifactCleanup = createServerFn({ method: "POST" })
       return removed;
     }
 
-    const csvRemoved = await removeAll("bulk-imports", csvPaths);
-    const errorRemoved = await removeAll("bulk-imports", errorPaths);
+    const csvRemoved = data.dryRun ? csvPaths.length : await removeAll("bulk-imports", csvPaths);
+    const errorRemoved = data.dryRun ? errorPaths.length : await removeAll("bulk-imports", errorPaths);
     const deletedObjects = csvRemoved + errorRemoved;
     const buckets: Record<string, { originalCsv: number; errorArtifact: number; total: number }> = {
       "bulk-imports": {
@@ -61,15 +68,20 @@ export const runArtifactCleanup = createServerFn({ method: "POST" })
     let clearedRows = 0;
     const runIds = list.map((r) => r.run_id);
     if (runIds.length) {
-      const { data: c } = await supabaseAdmin.rpc(
-        "clear_bulk_import_artifact_paths",
-        { _run_ids: runIds } as never,
-      );
-      clearedRows = Number(c ?? 0);
+      if (data.dryRun) {
+        clearedRows = runIds.length;
+      } else {
+        const { data: c } = await supabaseAdmin.rpc(
+          "clear_bulk_import_artifact_paths",
+          { _run_ids: runIds } as never,
+        );
+        clearedRows = Number(c ?? 0);
+      }
     }
 
     return {
       days: data.days,
+      dryRun: data.dryRun,
       expiredRuns: list.length,
       deletedObjects,
       clearedRows,
