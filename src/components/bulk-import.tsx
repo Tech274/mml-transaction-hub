@@ -1079,18 +1079,59 @@ export function BulkImport() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => (
-                  <TableRow key={r.line} className={r.errors.length ? "bg-destructive/5" : ""}>
-                    <TableCell className="text-muted-foreground">{r.line}</TableCell>
-                    <TableCell>
-                      {r.errors.length === 0
-                        ? <Badge variant="outline" className="text-green-700 border-green-600/40">Valid</Badge>
-                        : <Badge variant="destructive">Error</Badge>}
-                    </TableCell>
-                    {headers.map((h) => <TableCell key={h} className="max-w-[180px] truncate">{r.raw[h]}</TableCell>)}
-                    <TableCell className="text-xs text-destructive">{r.errors.join("; ")}</TableCell>
-                  </TableRow>
-                ))}
+                 {rows.map((r) => {
+                   const parsedErrs = r.errors.map(parseRowError);
+                   const invalidFields = new Set(parsedErrs.map((e) => e.field));
+                   return (
+                     <TableRow key={r.line} className={r.errors.length ? "bg-destructive/5" : ""}>
+                       <TableCell className="text-muted-foreground">{r.line}</TableCell>
+                       <TableCell>
+                         {r.errors.length === 0
+                           ? <Badge variant="outline" className="text-green-700 border-green-600/40">Valid</Badge>
+                           : <Badge variant="destructive">Error</Badge>}
+                       </TableCell>
+                       {headers.map((h, hi) => {
+                         const bad = invalidFields.has(h);
+                         return (
+                           <TableCell
+                             key={h}
+                             data-testid={bad ? `invalid-cell-${r.line}-${h}` : undefined}
+                             className={`max-w-[180px] truncate ${bad ? "bg-destructive/10 text-destructive font-medium ring-1 ring-destructive/40" : ""}`}
+                             title={bad ? `Row ${r.line} · Column ${colLetter(hi + 2)} (${h}) is invalid: "${r.raw[h] ?? ""}"` : undefined}
+                           >
+                             {r.raw[h]}
+                           </TableCell>
+                         );
+                       })}
+                       <TableCell className="text-xs">
+                         {parsedErrs.length === 0 ? null : (
+                           <ul className="space-y-1" data-testid={`row-errors-${r.line}`}>
+                             {parsedErrs.map((e, i) => {
+                               const hi = headers.indexOf(e.field as (typeof headers)[number]);
+                               const isLob = e.field === "line_of_business";
+                               return (
+                                 <li key={i} className="flex flex-wrap items-center gap-1 text-destructive" data-testid={`row-error-${r.line}-${e.field}`}>
+                                   <Badge variant="outline" className="text-[10px] border-destructive/50 text-destructive">
+                                     Row {r.line}
+                                   </Badge>
+                                   <Badge variant="outline" className="text-[10px] border-destructive/50 text-destructive">
+                                     Col {hi >= 0 ? `${colLetter(hi + 2)} · ` : ""}{e.field}
+                                   </Badge>
+                                   <span>{e.message}</span>
+                                   {isLob && (
+                                     <span className="text-[11px] text-muted-foreground" data-testid={`lob-allowed-hint-${r.line}`}>
+                                       Allowed: {LINE_OF_BUSINESS_OPTIONS.join(", ")}. Got: "{r.raw["line_of_business"] ?? ""}"
+                                     </span>
+                                   )}
+                                 </li>
+                               );
+                             })}
+                           </ul>
+                         )}
+                       </TableCell>
+                     </TableRow>
+                   );
+                 })}
               </TableBody>
             </Table>
           </div>
