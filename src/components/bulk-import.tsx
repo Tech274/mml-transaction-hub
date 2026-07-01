@@ -40,22 +40,14 @@ const SYSTEM_CONFIG_OPTIONS = [
   "32GB 8vCPUs",
 ] as const;
 
-const COMMON_HEADERS = [
-  "potential_id",
-  "month",
-  "year",
-  "customer_name",
-  "lab_name",
-  "line_of_business",
-  "start_date",
-  "end_date",
-  "total_users",
-  "input_cost",
-  "selling_cost",
-] as const;
-
-const PUBLIC_HEADERS = [...COMMON_HEADERS, "cloud_provider"] as const;
-const PRIVATE_HEADERS = [...COMMON_HEADERS, "system_config"] as const;
+import {
+  LINE_OF_BUSINESS_OPTIONS,
+  PUBLIC_HEADERS,
+  PRIVATE_HEADERS,
+  TEMPLATE_VERSION,
+  TEMPLATE_VERSION_COMMENT_PREFIX,
+  enrichPgConstraintError,
+} from "@/lib/bulk-template";
 
 const PUBLIC_SAMPLE: string[][] = [
   ["POT-2026-001", "1", "2026", "Acme Corp", "AWS Lab A", "VILT", "2026-01-01", "2026-01-31", "10", "1000.00", "1500.00", "AWS"],
@@ -68,8 +60,6 @@ const PRIVATE_SAMPLE: string[][] = [
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROWS_PER_CSV = 50_000;
-
-const LINE_OF_BUSINESS_OPTIONS = ["VILT", "Standalone", "Integrated"] as const;
 
 // Excel-style column letter for a zero-based index (A, B, ..., Z, AA, AB, ...)
 function colLetter(idx: number): string {
