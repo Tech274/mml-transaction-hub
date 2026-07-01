@@ -204,6 +204,23 @@ export function BulkImport() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [presetMgrOpen, setPresetMgrOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<{ id: string; name: string; is_shared: boolean } | null>(null);
+  // Per-row / per-field selection for suggested corrections in the Preview dialog.
+  // Keyed by `${line}:${field}`; if a key is absent it defaults to selected.
+  const [suggestionSelection, setSuggestionSelection] = useState<Record<string, boolean>>({});
+  const isSuggestionSelected = (line: number, field: string) => {
+    const k = `${line}:${field}`;
+    return suggestionSelection[k] !== false; // default true
+  };
+  function toggleSuggestion(line: number, field: string, value: boolean) {
+    setSuggestionSelection((s) => ({ ...s, [`${line}:${field}`]: value }));
+  }
+  function setAllForField(field: string, value: boolean) {
+    setSuggestionSelection((s) => {
+      const next = { ...s };
+      for (const r of rows) if (r.errors.length) next[`${r.line}:${field}`] = value;
+      return next;
+    });
+  }
   // Pre-import mapping step
   const [mapping, setMapping] = useState<{
     detected: string[];
