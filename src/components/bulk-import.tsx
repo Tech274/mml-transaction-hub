@@ -337,6 +337,7 @@ export function BulkImport() {
   function reset() {
     setRows([]); setFileName(""); setRawCsvText(""); setProgress(null); setMapping(null);
     setIsRetryRun(false); setParentRunId(null);
+    setTemplateVersionMismatch(null);
     if (fileRef.current) fileRef.current.value = "";
     setSuggestionSelection({});
   }
