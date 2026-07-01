@@ -430,6 +430,7 @@ export function BulkImport() {
     const failed = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim())));
     const next: Record<string, string> = { ...r.raw };
     for (const f of failed) {
+      if (!isSuggestionSelected(r.line, f)) continue;
       const s = suggestCorrection(f, r.raw[f] ?? "", kind);
       if (s) next[f] = s;
     }
