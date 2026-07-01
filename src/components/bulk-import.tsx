@@ -204,6 +204,16 @@ export function BulkImport() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [presetMgrOpen, setPresetMgrOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<{ id: string; name: string; is_shared: boolean } | null>(null);
+  // Per-row / per-field selection for suggested corrections in the Preview dialog.
+  // Keyed by `${line}:${field}`; if a key is absent it defaults to selected.
+  const [suggestionSelection, setSuggestionSelection] = useState<Record<string, boolean>>({});
+  const isSuggestionSelected = (line: number, field: string) => {
+    const k = `${line}:${field}`;
+    return suggestionSelection[k] !== false; // default true
+  };
+  function toggleSuggestion(line: number, field: string, value: boolean) {
+    setSuggestionSelection((s) => ({ ...s, [`${line}:${field}`]: value }));
+  }
   // Pre-import mapping step
   const [mapping, setMapping] = useState<{
     detected: string[];
@@ -291,6 +301,7 @@ export function BulkImport() {
     setRows([]); setFileName(""); setRawCsvText(""); setProgress(null); setMapping(null);
     setIsRetryRun(false); setParentRunId(null);
     if (fileRef.current) fileRef.current.value = "";
+    setSuggestionSelection({});
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -412,6 +423,7 @@ export function BulkImport() {
     const failed = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim())));
     const next: Record<string, string> = { ...r.raw };
     for (const f of failed) {
+      if (!isSuggestionSelected(r.line, f)) continue;
       const s = suggestCorrection(f, r.raw[f] ?? "", kind);
       if (s) next[f] = s;
     }
@@ -477,6 +489,20 @@ export function BulkImport() {
     setParentRunId(retryStats?.id ?? null);
     setPreviewOpen(false);
     const fixed = next.filter((r) => r.errors.length === 0).length;
+    if (user) {
+      const applied = invalid.reduce((acc, r) => {
+        const failed = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim())));
+        return acc + failed.filter((f) => isSuggestionSelected(r.line, f)).length;
+      }, 0);
+      void supabase.from("bulk_import_audit_events").insert({
+        run_id: null,
+        parent_run_id: retryStats?.id ?? null,
+        event_type: "apply_suggestions",
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        details: { kind, filename: fileName, invalid_rows: invalid.length, fixed_after_apply: fixed, fields_applied: applied },
+      } as never);
+    }
     toast.success(`Applied suggestions · ${fixed}/${next.length} now valid. Click "Import valid rows" to retry.`);
   }
 
@@ -572,6 +598,32 @@ export function BulkImport() {
     }
     const runId = run.id;
 
+    // Audit: record that a retry run started.
+    if (isRetryRun) {
+      void supabase.from("bulk_import_audit_events").insert({
+        run_id: runId,
+        parent_run_id: parentRunId,
+        event_type: "retry_started",
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        details: { kind, filename: fileName, valid_rows: valid.length, invalid_rows: rows.length - valid.length },
+      } as never);
+    }
+
+    // Idempotency for retries: skip lines that already succeeded in the
+    // parent run chain so a re-import can't create duplicate transactions.
+    // potential_id can legitimately repeat across records, so we key on
+    // (parent_run_id, line_number) instead of potential_id.
+    const alreadyDoneLines = new Set<number>();
+    if (isRetryRun && parentRunId) {
+      const { data: prior } = await supabase
+        .from("bulk_import_row_audit")
+        .select("line_number,status")
+        .eq("run_id", parentRunId)
+        .in("status", ["imported", "updated", "linked"]);
+      for (const p of (prior ?? []) as Array<{ line_number: number }>) alreadyDoneLines.add(p.line_number);
+    }
+
     // Upload original CSV to private storage so it can be re-downloaded from history.
     if (rawCsvText) {
       const path = `${user.id}/${runId}/original.csv`;
@@ -606,6 +658,26 @@ export function BulkImport() {
         let rowStatus: "imported" | "updated" | "linked" | "skipped" | "error" = "imported";
         let rowError: string | null = null;
         let txId: string | null = null;
+        // Idempotent retry: if this line already succeeded in the parent run,
+        // skip it here to avoid creating a duplicate transaction.
+        if (alreadyDoneLines.has(r.line)) {
+          rowStatus = "skipped"; skipped++;
+          updated[idx] = { ...r, errors: [`skipped: line ${r.line} already imported in parent run`] };
+          await supabase.from("bulk_import_row_audit").insert({
+            run_id: runId, user_id: user.id, filename: fileName,
+            line_number: r.line, potential_id: String(p.potential_id),
+            transaction_id: null, status: rowStatus,
+            error_message: "idempotent: already processed in parent run",
+            row_data: r.raw,
+          });
+          setProgress((prev) => ({
+            done: i + 1, total: valid.length,
+            succeeded: (prev?.succeeded ?? 0) + 1,
+            failed: prev?.failed ?? 0,
+            isRetry: prev?.isRetry ?? isRetryRun,
+          }));
+          continue;
+        }
         try {
           const uq = await checkUnique({ data: { potentialId: String(p.potential_id) } });
           const cust = await findOrCreate({ data: { customerName: String(p.customer_name) } });
@@ -1011,6 +1083,7 @@ export function BulkImport() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">Apply</TableHead>
                     <TableHead className="w-14">Line</TableHead>
                     <TableHead>Potential ID</TableHead>
                     <TableHead>Field</TableHead>
@@ -1023,6 +1096,7 @@ export function BulkImport() {
                     d.changes.length === 0
                       ? [(
                           <TableRow key={`${d.line}-none`}>
+                            <TableCell />
                             <TableCell className="text-muted-foreground">{d.line}</TableCell>
                             <TableCell className="text-xs">{d.potential_id || "—"}</TableCell>
                             <TableCell colSpan={3} className="text-xs text-muted-foreground">
@@ -1032,6 +1106,13 @@ export function BulkImport() {
                         )]
                       : d.changes.map((c, i) => (
                           <TableRow key={`${d.line}-${c.field}`}>
+                            <TableCell>
+                              <Checkbox
+                                checked={isSuggestionSelected(d.line, c.field)}
+                                onCheckedChange={(v) => toggleSuggestion(d.line, c.field, v === true)}
+                                aria-label={`Apply suggestion for line ${d.line} field ${c.field}`}
+                              />
+                            </TableCell>
                             {i === 0 ? (
                               <>
                                 <TableCell className="text-muted-foreground align-top" rowSpan={d.changes.length}>{d.line}</TableCell>
@@ -1045,12 +1126,24 @@ export function BulkImport() {
                         )),
                   )}
                   {suggestionDiffs().length === 0 && (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No invalid rows.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-6">No invalid rows.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
             </div>
             <DialogFooter className="gap-2">
+              <div className="mr-auto flex gap-2 text-xs">
+                <Button size="sm" variant="ghost" onClick={() => {
+                  const next: Record<string, boolean> = {};
+                  for (const d of suggestionDiffs()) for (const c of d.changes) next[`${d.line}:${c.field}`] = true;
+                  setSuggestionSelection(next);
+                }}>Select all</Button>
+                <Button size="sm" variant="ghost" onClick={() => {
+                  const next: Record<string, boolean> = {};
+                  for (const d of suggestionDiffs()) for (const c of d.changes) next[`${d.line}:${c.field}`] = false;
+                  setSuggestionSelection(next);
+                }}>Clear all</Button>
+              </div>
               <Button variant="outline" onClick={downloadCorrectedCsv}>
                 <Download className="h-4 w-4 mr-1" />Download corrected CSV
               </Button>

@@ -47,6 +47,54 @@ export type Database = {
         }
         Relationships: []
       }
+      bulk_import_audit_events: {
+        Row: {
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          details: Json
+          event_type: string
+          id: string
+          parent_run_id: string | null
+          run_id: string | null
+        }
+        Insert: {
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          event_type: string
+          id?: string
+          parent_run_id?: string | null
+          run_id?: string | null
+        }
+        Update: {
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          event_type?: string
+          id?: string
+          parent_run_id?: string | null
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_audit_events_parent_run_id_fkey"
+            columns: ["parent_run_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_import_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_import_audit_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_import_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bulk_import_jobs: {
         Row: {
           cancel_requested: boolean
@@ -701,6 +749,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clear_bulk_import_artifact_paths: {
+        Args: { _run_ids: string[] }
+        Returns: number
+      }
+      expired_bulk_import_artifacts: {
+        Args: { _days: number }
+        Returns: {
+          error_artifact_path: string
+          original_csv_path: string
+          run_id: string
+        }[]
+      }
       fuzzy_search_transactions: {
         Args: { max_rows?: number; q: string; threshold?: number }
         Returns: {

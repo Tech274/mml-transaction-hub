@@ -21,6 +21,7 @@ import { Route as AuthenticatedEntryRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ApiPublicHooksBulkImportCleanupRouteImport } from './routes/api/public/hooks/bulk-import-cleanup'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -84,6 +85,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicHooksBulkImportCleanupRoute =
+  ApiPublicHooksBulkImportCleanupRouteImport.update({
+    id: '/api/public/hooks/bulk-import-cleanup',
+    path: '/api/public/hooks/bulk-import-cleanup',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -97,6 +104,7 @@ export interface FileRoutesByFullPath {
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
+  '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,6 +118,7 @@ export interface FileRoutesByTo {
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
+  '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,6 +134,7 @@ export interface FileRoutesById {
   '/_authenticated/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
+  '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -140,6 +150,7 @@ export interface FileRouteTypes {
     | '/public-cloud'
     | '/reports'
     | '/transactions'
+    | '/api/public/hooks/bulk-import-cleanup'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -153,6 +164,7 @@ export interface FileRouteTypes {
     | '/public-cloud'
     | '/reports'
     | '/transactions'
+    | '/api/public/hooks/bulk-import-cleanup'
   id:
     | '__root__'
     | '/'
@@ -167,6 +179,7 @@ export interface FileRouteTypes {
     | '/_authenticated/public-cloud'
     | '/_authenticated/reports'
     | '/_authenticated/transactions'
+    | '/api/public/hooks/bulk-import-cleanup'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -174,6 +187,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiPublicHooksBulkImportCleanupRoute: typeof ApiPublicHooksBulkImportCleanupRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -262,6 +276,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/bulk-import-cleanup': {
+      id: '/api/public/hooks/bulk-import-cleanup'
+      path: '/api/public/hooks/bulk-import-cleanup'
+      fullPath: '/api/public/hooks/bulk-import-cleanup'
+      preLoaderRoute: typeof ApiPublicHooksBulkImportCleanupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -295,17 +316,8 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiPublicHooksBulkImportCleanupRoute: ApiPublicHooksBulkImportCleanupRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
