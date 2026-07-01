@@ -32,12 +32,31 @@ export const runArtifactCleanup = createServerFn({ method: "POST" })
       [r.original_csv_path, r.error_artifact_path].filter((p): p is string => !!p),
     );
 
-    let deletedObjects = 0;
-    for (let i = 0; i < paths.length; i += 100) {
-      const chunk = paths.slice(i, i + 100);
-      const { error } = await supabaseAdmin.storage.from("bulk-imports").remove(chunk);
-      if (!error) deletedObjects += chunk.length;
+    // Track removals per storage bucket + per artifact kind so the admin UI
+    // can render an accurate summary.
+    const csvPaths = list.map((r) => r.original_csv_path).filter((p): p is string => !!p);
+    const errorPaths = list.map((r) => r.error_artifact_path).filter((p): p is string => !!p);
+
+    async function removeAll(bucket: string, all: string[]): Promise<number> {
+      let removed = 0;
+      for (let i = 0; i < all.length; i += 100) {
+        const chunk = all.slice(i, i + 100);
+        const { error } = await supabaseAdmin.storage.from(bucket).remove(chunk);
+        if (!error) removed += chunk.length;
+      }
+      return removed;
     }
+
+    const csvRemoved = await removeAll("bulk-imports", csvPaths);
+    const errorRemoved = await removeAll("bulk-imports", errorPaths);
+    const deletedObjects = csvRemoved + errorRemoved;
+    const buckets: Record<string, { originalCsv: number; errorArtifact: number; total: number }> = {
+      "bulk-imports": {
+        originalCsv: csvRemoved,
+        errorArtifact: errorRemoved,
+        total: csvRemoved + errorRemoved,
+      },
+    };
 
     let clearedRows = 0;
     const runIds = list.map((r) => r.run_id);
@@ -55,5 +74,6 @@ export const runArtifactCleanup = createServerFn({ method: "POST" })
       deletedObjects,
       clearedRows,
       pathsAttempted: paths.length,
+      buckets,
     };
   });
