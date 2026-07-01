@@ -327,7 +327,8 @@ export function BulkImport() {
   const schema = useMemo(() => buildRowSchema(kind), [kind]);
 
   function downloadTemplate() {
-    downloadFile(`${kind}-template.csv`, toCsv(headers, sample));
+    const versionLine = `${TEMPLATE_VERSION_COMMENT_PREFIX} ${TEMPLATE_VERSION}`;
+    downloadFile(`${kind}-template.csv`, `${versionLine}\n${toCsv(headers, sample)}`);
   }
 
   function reset() {
