@@ -71,6 +71,26 @@ const MAX_ROWS_PER_CSV = 50_000;
 
 const LINE_OF_BUSINESS_OPTIONS = ["VILT", "Standalone", "Integrated"] as const;
 
+// Excel-style column letter for a zero-based index (A, B, ..., Z, AA, AB, ...)
+function colLetter(idx: number): string {
+  let n = idx + 1;
+  let out = "";
+  while (n > 0) {
+    const rem = (n - 1) % 26;
+    out = String.fromCharCode(65 + rem) + out;
+    n = Math.floor((n - 1) / 26);
+  }
+  return out;
+}
+
+// Parse "field: message" error strings into structured pieces so the UI can
+// point at the exact row + column and surface allowed-value hints.
+function parseRowError(err: string): { field: string; message: string } {
+  const i = err.indexOf(":");
+  if (i === -1) return { field: "row", message: err };
+  return { field: err.slice(0, i).trim(), message: err.slice(i + 1).trim() };
+}
+
 function buildRowSchema(kind: CloudKind) {
   const base = {
     potential_id: z.string().trim().min(1, "potential_id required").max(50),
