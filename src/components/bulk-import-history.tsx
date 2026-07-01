@@ -59,22 +59,26 @@ export function BulkImportHistory() {
   const cleanupFn = useServerFn(runArtifactCleanup);
   const [cleanupDays, setCleanupDays] = useState<number>(90);
   const [cleanupRunning, setCleanupRunning] = useState(false);
+  const [cleanupDryRun, setCleanupDryRun] = useState<boolean>(true);
 
   async function triggerCleanup() {
-    if (!confirm(`Delete stored CSV and error artifacts older than ${cleanupDays} day(s)? This cannot be undone.`)) return;
+    if (!cleanupDryRun && !confirm(`Delete stored CSV and error artifacts older than ${cleanupDays} day(s)? This cannot be undone.`)) return;
     setCleanupRunning(true);
     try {
-      const res = await cleanupFn({ data: { days: cleanupDays } });
+      const res = await cleanupFn({ data: { days: cleanupDays, dryRun: cleanupDryRun } });
       const bucketSummary = Object.entries(res.buckets ?? {})
         .map(
           ([b, c]) =>
             `${b}: ${c.total} (csv ${c.originalCsv} + err ${c.errorArtifact})`,
         )
         .join(" · ");
+      const verb = res.dryRun ? "Dry-run preview" : "Cleanup done";
+      const noun = res.dryRun ? "would remove" : "removed";
+      const pathVerb = res.dryRun ? "would clear" : "cleared";
       toast.success(
-        `Cleanup done · ${res.expiredRuns} expired runs · ${res.deletedObjects}/${res.pathsAttempted} objects removed · ${res.clearedRows} paths cleared${bucketSummary ? ` · ${bucketSummary}` : ""}`,
+        `${verb} · ${res.expiredRuns} expired runs · ${res.deletedObjects}/${res.pathsAttempted} objects ${noun} · ${res.clearedRows} paths ${pathVerb}${bucketSummary ? ` · ${bucketSummary}` : ""}`,
       );
-      refetch();
+      if (!res.dryRun) refetch();
     } catch (e) {
       toast.error(`Cleanup failed: ${(e as Error).message}`);
     } finally {
@@ -156,15 +160,24 @@ export function BulkImportHistory() {
                 aria-label="Retention days"
               />
               <span className="text-xs text-muted-foreground">days</span>
+              <label className="flex items-center gap-1 text-xs text-muted-foreground pl-1" title="Preview only — do not delete">
+                <input
+                  type="checkbox"
+                  checked={cleanupDryRun}
+                  onChange={(e) => setCleanupDryRun(e.target.checked)}
+                  data-testid="admin-cleanup-dryrun"
+                />
+                Dry-run
+              </label>
               <Button
                 size="sm" variant="ghost"
                 onClick={triggerCleanup}
                 disabled={cleanupRunning}
-                title="Delete stored CSV + error artifacts older than the chosen days (admin only)"
+                title={cleanupDryRun ? "Preview how many objects/paths would be removed (no deletion)" : "Delete stored CSV + error artifacts older than the chosen days (admin only)"}
                 data-testid="admin-cleanup-trigger"
               >
                 <Trash2 className={`h-3.5 w-3.5 mr-1 ${cleanupRunning ? "animate-pulse" : ""}`} />
-                {cleanupRunning ? "Cleaning…" : "Run cleanup"}
+                {cleanupRunning ? "Working…" : cleanupDryRun ? "Preview" : "Run cleanup"}
               </Button>
             </div>
           )}
