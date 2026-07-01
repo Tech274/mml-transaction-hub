@@ -40,22 +40,14 @@ const SYSTEM_CONFIG_OPTIONS = [
   "32GB 8vCPUs",
 ] as const;
 
-const COMMON_HEADERS = [
-  "potential_id",
-  "month",
-  "year",
-  "customer_name",
-  "lab_name",
-  "line_of_business",
-  "start_date",
-  "end_date",
-  "total_users",
-  "input_cost",
-  "selling_cost",
-] as const;
-
-const PUBLIC_HEADERS = [...COMMON_HEADERS, "cloud_provider"] as const;
-const PRIVATE_HEADERS = [...COMMON_HEADERS, "system_config"] as const;
+import {
+  LINE_OF_BUSINESS_OPTIONS,
+  PUBLIC_HEADERS,
+  PRIVATE_HEADERS,
+  TEMPLATE_VERSION,
+  TEMPLATE_VERSION_COMMENT_PREFIX,
+  enrichPgConstraintError,
+} from "@/lib/bulk-template";
 
 const PUBLIC_SAMPLE: string[][] = [
   ["POT-2026-001", "1", "2026", "Acme Corp", "AWS Lab A", "VILT", "2026-01-01", "2026-01-31", "10", "1000.00", "1500.00", "AWS"],
@@ -68,8 +60,6 @@ const PRIVATE_SAMPLE: string[][] = [
 
 const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROWS_PER_CSV = 50_000;
-
-const LINE_OF_BUSINESS_OPTIONS = ["VILT", "Standalone", "Integrated"] as const;
 
 // Excel-style column letter for a zero-based index (A, B, ..., Z, AA, AB, ...)
 function colLetter(idx: number): string {
@@ -155,7 +145,24 @@ function parseCsv(text: string): string[][] {
     }
   }
   if (field.length > 0 || cur.length > 0) { cur.push(field); rows.push(cur); }
-  return rows.filter((r) => r.some((c) => c.trim() !== ""));
+  // Drop blank rows and "# ..." comment lines (used for the template-version
+  // header). The template version is inspected separately via extractTemplateVersion.
+  return rows.filter(
+    (r) => r.some((c) => c.trim() !== "") && !(r[0] ?? "").trim().startsWith("#"),
+  );
+}
+
+/** Read the `# template_version:` marker written by downloadTemplate, if any. */
+function extractTemplateVersion(text: string): string | null {
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t) continue;
+    if (!t.startsWith("#")) return null; // comments only allowed at the top
+    if (t.startsWith(TEMPLATE_VERSION_COMMENT_PREFIX)) {
+      return t.slice(TEMPLATE_VERSION_COMMENT_PREFIX.length).trim();
+    }
+  }
+  return null;
 }
 
 function toCsv(headers: readonly string[], rows: string[][]): string {
@@ -320,7 +327,8 @@ export function BulkImport() {
   const schema = useMemo(() => buildRowSchema(kind), [kind]);
 
   function downloadTemplate() {
-    downloadFile(`${kind}-template.csv`, toCsv(headers, sample));
+    const versionLine = `${TEMPLATE_VERSION_COMMENT_PREFIX} ${TEMPLATE_VERSION}`;
+    downloadFile(`${kind}-template.csv`, `${versionLine}\n${toCsv(headers, sample)}`);
   }
 
   function reset() {
@@ -336,6 +344,12 @@ export function BulkImport() {
     if (f.size > 5 * 1024 * 1024) { toast.error("File exceeds 5MB"); return; }
     setFileName(f.name);
     const text = await f.text();
+    const uploadedVersion = extractTemplateVersion(text);
+    if (uploadedVersion && uploadedVersion !== TEMPLATE_VERSION) {
+      toast.warning(
+        `Template version mismatch: file says ${uploadedVersion}, current template is ${TEMPLATE_VERSION}. Re-download the template to avoid validation drift.`,
+      );
+    }
     const matrix = parseCsv(text);
     if (matrix.length === 0) { toast.error("Empty CSV"); return; }
     if (matrix.length - 1 > MAX_ROWS_PER_CSV) {
@@ -740,7 +754,11 @@ export function BulkImport() {
                 .update(partial as never)
                 .eq("potential_id", String(fullPayload.potential_id))
                 .select("id").maybeSingle();
-              if (updErr) { rowStatus = "error"; rowError = updErr.message; updated[idx] = { ...r, errors: [updErr.message] }; }
+              if (updErr) {
+                const enriched = enrichPgConstraintError(updErr.message, (updErr as { code?: string }).code);
+                rowStatus = "error"; rowError = enriched.message;
+                updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
+              }
               else { rowStatus = "updated"; updatedCount++; txId = existing?.id ?? null; }
             } else { // link
               // Link = read-only association, no fields overwritten on the existing record.
@@ -751,7 +769,11 @@ export function BulkImport() {
             }
           } else {
             const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
-            if (error) { rowStatus = "error"; rowError = error.message; updated[idx] = { ...r, errors: [error.message] }; }
+            if (error) {
+              const enriched = enrichPgConstraintError(error.message, (error as { code?: string }).code);
+              rowStatus = "error"; rowError = enriched.message;
+              updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
+            }
             else { imported++; txId = ins?.id ?? null; }
           }
         } catch (err) {
