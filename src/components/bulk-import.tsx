@@ -665,6 +665,26 @@ export function BulkImport() {
         let rowStatus: "imported" | "updated" | "linked" | "skipped" | "error" = "imported";
         let rowError: string | null = null;
         let txId: string | null = null;
+        // Idempotent retry: if this line already succeeded in the parent run,
+        // skip it here to avoid creating a duplicate transaction.
+        if (alreadyDoneLines.has(r.line)) {
+          rowStatus = "skipped"; skipped++;
+          updated[idx] = { ...r, errors: [`skipped: line ${r.line} already imported in parent run`] };
+          await supabase.from("bulk_import_row_audit").insert({
+            run_id: runId, user_id: user.id, filename: fileName,
+            line_number: r.line, potential_id: String(p.potential_id),
+            transaction_id: null, status: rowStatus,
+            error_message: "idempotent: already processed in parent run",
+            row_data: r.raw,
+          });
+          setProgress((prev) => ({
+            done: i + 1, total: valid.length,
+            succeeded: (prev?.succeeded ?? 0) + 1,
+            failed: prev?.failed ?? 0,
+            isRetry: prev?.isRetry ?? isRetryRun,
+          }));
+          continue;
+        }
         try {
           const uq = await checkUnique({ data: { potentialId: String(p.potential_id) } });
           const cust = await findOrCreate({ data: { customerName: String(p.customer_name) } });
