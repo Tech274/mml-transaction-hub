@@ -145,7 +145,24 @@ function parseCsv(text: string): string[][] {
     }
   }
   if (field.length > 0 || cur.length > 0) { cur.push(field); rows.push(cur); }
-  return rows.filter((r) => r.some((c) => c.trim() !== ""));
+  // Drop blank rows and "# ..." comment lines (used for the template-version
+  // header). The template version is inspected separately via extractTemplateVersion.
+  return rows.filter(
+    (r) => r.some((c) => c.trim() !== "") && !(r[0] ?? "").trim().startsWith("#"),
+  );
+}
+
+/** Read the `# template_version:` marker written by downloadTemplate, if any. */
+function extractTemplateVersion(text: string): string | null {
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    if (!t) continue;
+    if (!t.startsWith("#")) return null; // comments only allowed at the top
+    if (t.startsWith(TEMPLATE_VERSION_COMMENT_PREFIX)) {
+      return t.slice(TEMPLATE_VERSION_COMMENT_PREFIX.length).trim();
+    }
+  }
+  return null;
 }
 
 function toCsv(headers: readonly string[], rows: string[][]): string {
