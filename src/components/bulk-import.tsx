@@ -214,13 +214,6 @@ export function BulkImport() {
   function toggleSuggestion(line: number, field: string, value: boolean) {
     setSuggestionSelection((s) => ({ ...s, [`${line}:${field}`]: value }));
   }
-  function setAllForField(field: string, value: boolean) {
-    setSuggestionSelection((s) => {
-      const next = { ...s };
-      for (const r of rows) if (r.errors.length) next[`${r.line}:${field}`] = value;
-      return next;
-    });
-  }
   // Pre-import mapping step
   const [mapping, setMapping] = useState<{
     detected: string[];
