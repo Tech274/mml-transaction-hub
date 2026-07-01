@@ -1,15 +1,18 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Download, History, RefreshCw, FileWarning, Search, FileText, GitBranch } from "lucide-react";
+import { Download, History, RefreshCw, FileWarning, Search, FileText, GitBranch, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth-context";
+import { runArtifactCleanup } from "@/lib/bulk-import.functions";
 
 interface Run {
   id: string;
@@ -52,6 +55,26 @@ export function BulkImportHistory() {
   const [statusF, setStatusF] = useState<string>("all");
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
+  const { isAdmin } = useAuth();
+  const cleanupFn = useServerFn(runArtifactCleanup);
+  const [cleanupDays, setCleanupDays] = useState<number>(90);
+  const [cleanupRunning, setCleanupRunning] = useState(false);
+
+  async function triggerCleanup() {
+    if (!confirm(`Delete stored CSV and error artifacts older than ${cleanupDays} day(s)? This cannot be undone.`)) return;
+    setCleanupRunning(true);
+    try {
+      const res = await cleanupFn({ data: { days: cleanupDays } });
+      toast.success(
+        `Cleanup done · ${res.expiredRuns} expired runs · ${res.deletedObjects}/${res.pathsAttempted} objects removed · ${res.clearedRows} rows cleared`,
+      );
+      refetch();
+    } catch (e) {
+      toast.error(`Cleanup failed: ${(e as Error).message}`);
+    } finally {
+      setCleanupRunning(false);
+    }
+  }
 
   const { data: runs = [], isFetching, refetch } = useQuery({
     queryKey: ["bulk_import_runs"],
@@ -115,9 +138,34 @@ export function BulkImportHistory() {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2"><History className="h-4 w-4" />Bulk Import History</CardTitle>
-        <Button size="sm" variant="ghost" onClick={() => refetch()} disabled={isFetching}>
-          <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? "animate-spin" : ""}`} />Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <div className="flex items-center gap-1 border rounded-md pl-2 pr-1 py-0.5 bg-muted/30" aria-label="Admin cleanup">
+              <span className="text-xs text-muted-foreground">Retention</span>
+              <Input
+                type="number" min={1} max={3650}
+                value={cleanupDays}
+                onChange={(e) => setCleanupDays(Math.max(1, Number(e.target.value) || 90))}
+                className="h-7 w-16 text-xs"
+                aria-label="Retention days"
+              />
+              <span className="text-xs text-muted-foreground">days</span>
+              <Button
+                size="sm" variant="ghost"
+                onClick={triggerCleanup}
+                disabled={cleanupRunning}
+                title="Delete stored CSV + error artifacts older than the chosen days (admin only)"
+                data-testid="admin-cleanup-trigger"
+              >
+                <Trash2 className={`h-3.5 w-3.5 mr-1 ${cleanupRunning ? "animate-pulse" : ""}`} />
+                {cleanupRunning ? "Cleaning…" : "Run cleanup"}
+              </Button>
+            </div>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-1 ${isFetching ? "animate-spin" : ""}`} />Refresh
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap items-end gap-2 mb-3">
