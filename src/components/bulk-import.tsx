@@ -754,7 +754,11 @@ export function BulkImport() {
                 .update(partial as never)
                 .eq("potential_id", String(fullPayload.potential_id))
                 .select("id").maybeSingle();
-              if (updErr) { rowStatus = "error"; rowError = updErr.message; updated[idx] = { ...r, errors: [updErr.message] }; }
+              if (updErr) {
+                const enriched = enrichPgConstraintError(updErr.message, (updErr as { code?: string }).code);
+                rowStatus = "error"; rowError = enriched.message;
+                updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
+              }
               else { rowStatus = "updated"; updatedCount++; txId = existing?.id ?? null; }
             } else { // link
               // Link = read-only association, no fields overwritten on the existing record.
@@ -765,7 +769,11 @@ export function BulkImport() {
             }
           } else {
             const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
-            if (error) { rowStatus = "error"; rowError = error.message; updated[idx] = { ...r, errors: [error.message] }; }
+            if (error) {
+              const enriched = enrichPgConstraintError(error.message, (error as { code?: string }).code);
+              rowStatus = "error"; rowError = enriched.message;
+              updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
+            }
             else { imported++; txId = ins?.id ?? null; }
           }
         } catch (err) {
