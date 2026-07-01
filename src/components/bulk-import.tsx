@@ -344,6 +344,12 @@ export function BulkImport() {
     if (f.size > 5 * 1024 * 1024) { toast.error("File exceeds 5MB"); return; }
     setFileName(f.name);
     const text = await f.text();
+    const uploadedVersion = extractTemplateVersion(text);
+    if (uploadedVersion && uploadedVersion !== TEMPLATE_VERSION) {
+      toast.warning(
+        `Template version mismatch: file says ${uploadedVersion}, current template is ${TEMPLATE_VERSION}. Re-download the template to avoid validation drift.`,
+      );
+    }
     const matrix = parseCsv(text);
     if (matrix.length === 0) { toast.error("Empty CSV"); return; }
     if (matrix.length - 1 > MAX_ROWS_PER_CSV) {
