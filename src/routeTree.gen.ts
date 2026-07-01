@@ -21,6 +21,7 @@ import { Route as AuthenticatedEntryRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ApiPublicBulkTemplateVersionRouteImport } from './routes/api/public/bulk-template-version'
 import { Route as ApiPublicHooksBulkImportCleanupRouteImport } from './routes/api/public/hooks/bulk-import-cleanup'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -85,6 +86,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicBulkTemplateVersionRoute =
+  ApiPublicBulkTemplateVersionRouteImport.update({
+    id: '/api/public/bulk-template-version',
+    path: '/api/public/bulk-template-version',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksBulkImportCleanupRoute =
   ApiPublicHooksBulkImportCleanupRouteImport.update({
     id: '/api/public/hooks/bulk-import-cleanup',
@@ -104,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
+  '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
 }
 export interface FileRoutesByTo {
@@ -118,6 +126,7 @@ export interface FileRoutesByTo {
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
+  '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
 }
 export interface FileRoutesById {
@@ -134,6 +143,7 @@ export interface FileRoutesById {
   '/_authenticated/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
   '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
+  '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
 }
 export interface FileRouteTypes {
@@ -150,6 +160,7 @@ export interface FileRouteTypes {
     | '/public-cloud'
     | '/reports'
     | '/transactions'
+    | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -164,6 +175,7 @@ export interface FileRouteTypes {
     | '/public-cloud'
     | '/reports'
     | '/transactions'
+    | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
   id:
     | '__root__'
@@ -179,6 +191,7 @@ export interface FileRouteTypes {
     | '/_authenticated/public-cloud'
     | '/_authenticated/reports'
     | '/_authenticated/transactions'
+    | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
   fileRoutesById: FileRoutesById
 }
@@ -187,6 +200,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiPublicBulkTemplateVersionRoute: typeof ApiPublicBulkTemplateVersionRoute
   ApiPublicHooksBulkImportCleanupRoute: typeof ApiPublicHooksBulkImportCleanupRoute
 }
 
@@ -276,6 +290,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/bulk-template-version': {
+      id: '/api/public/bulk-template-version'
+      path: '/api/public/bulk-template-version'
+      fullPath: '/api/public/bulk-template-version'
+      preLoaderRoute: typeof ApiPublicBulkTemplateVersionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/bulk-import-cleanup': {
       id: '/api/public/hooks/bulk-import-cleanup'
       path: '/api/public/hooks/bulk-import-cleanup'
@@ -316,6 +337,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiPublicBulkTemplateVersionRoute: ApiPublicBulkTemplateVersionRoute,
   ApiPublicHooksBulkImportCleanupRoute: ApiPublicHooksBulkImportCleanupRoute,
 }
 export const routeTree = rootRouteImport

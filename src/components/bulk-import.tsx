@@ -224,6 +224,9 @@ export function BulkImport() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [rawCsvText, setRawCsvText] = useState<string>("");
+  const [templateVersionMismatch, setTemplateVersionMismatch] = useState<
+    { detected: string; current: string } | null
+  >(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<
     { done: number; total: number; succeeded: number; failed: number; isRetry: boolean } | null
@@ -349,6 +352,9 @@ export function BulkImport() {
       toast.warning(
         `Template version mismatch: file says ${uploadedVersion}, current template is ${TEMPLATE_VERSION}. Re-download the template to avoid validation drift.`,
       );
+      setTemplateVersionMismatch({ detected: uploadedVersion, current: TEMPLATE_VERSION });
+    } else {
+      setTemplateVersionMismatch(null);
     }
     const matrix = parseCsv(text);
     if (matrix.length === 0) { toast.error("Empty CSV"); return; }
