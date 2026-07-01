@@ -55,6 +55,26 @@ export function BulkImportHistory() {
   const [statusF, setStatusF] = useState<string>("all");
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
+  const { isAdmin } = useAuth();
+  const cleanupFn = useServerFn(runArtifactCleanup);
+  const [cleanupDays, setCleanupDays] = useState<number>(90);
+  const [cleanupRunning, setCleanupRunning] = useState(false);
+
+  async function triggerCleanup() {
+    if (!confirm(`Delete stored CSV and error artifacts older than ${cleanupDays} day(s)? This cannot be undone.`)) return;
+    setCleanupRunning(true);
+    try {
+      const res = await cleanupFn({ data: { days: cleanupDays } });
+      toast.success(
+        `Cleanup done · ${res.expiredRuns} expired runs · ${res.deletedObjects}/${res.pathsAttempted} objects removed · ${res.clearedRows} rows cleared`,
+      );
+      refetch();
+    } catch (e) {
+      toast.error(`Cleanup failed: ${(e as Error).message}`);
+    } finally {
+      setCleanupRunning(false);
+    }
+  }
 
   const { data: runs = [], isFetching, refetch } = useQuery({
     queryKey: ["bulk_import_runs"],
