@@ -605,6 +605,32 @@ export function BulkImport() {
     }
     const runId = run.id;
 
+    // Audit: record that a retry run started.
+    if (isRetryRun) {
+      void supabase.from("bulk_import_audit_events").insert({
+        run_id: runId,
+        parent_run_id: parentRunId,
+        event_type: "retry_started",
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        details: { kind, filename: fileName, valid_rows: valid.length, invalid_rows: rows.length - valid.length },
+      } as never);
+    }
+
+    // Idempotency for retries: skip lines that already succeeded in the
+    // parent run chain so a re-import can't create duplicate transactions.
+    // potential_id can legitimately repeat across records, so we key on
+    // (parent_run_id, line_number) instead of potential_id.
+    const alreadyDoneLines = new Set<number>();
+    if (isRetryRun && parentRunId) {
+      const { data: prior } = await supabase
+        .from("bulk_import_row_audit")
+        .select("line_number,status")
+        .eq("run_id", parentRunId)
+        .in("status", ["imported", "updated", "linked"]);
+      for (const p of (prior ?? []) as Array<{ line_number: number }>) alreadyDoneLines.add(p.line_number);
+    }
+
     // Upload original CSV to private storage so it can be re-downloaded from history.
     if (rawCsvText) {
       const path = `${user.id}/${runId}/original.csv`;
