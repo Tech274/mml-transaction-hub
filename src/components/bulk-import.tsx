@@ -1107,7 +1107,7 @@ export function BulkImport() {
                          {parsedErrs.length === 0 ? null : (
                            <ul className="space-y-1" data-testid={`row-errors-${r.line}`}>
                              {parsedErrs.map((e, i) => {
-                               const hi = headers.indexOf(e.field as (typeof headers)[number]);
+                               const hi = (headers as readonly string[]).indexOf(e.field);
                                const isLob = e.field === "line_of_business";
                                return (
                                  <li key={i} className="flex flex-wrap items-center gap-1 text-destructive" data-testid={`row-error-${r.line}-${e.field}`}>
