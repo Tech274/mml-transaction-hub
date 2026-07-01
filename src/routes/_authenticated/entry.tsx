@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { MasterAdrForm } from "@/components/master-adr-form";
 import { BulkImport } from "@/components/bulk-import";
 import { BulkImportHistory } from "@/components/bulk-import-history";
+import { BulkImportAuditLog } from "@/components/bulk-import-audit-log";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
@@ -27,10 +28,12 @@ function EntryPage() {
             <TabsTrigger value="single">Single Entry</TabsTrigger>
             {canBulk && <TabsTrigger value="bulk">Bulk Import</TabsTrigger>}
             {canHistory && <TabsTrigger value="history">Import History</TabsTrigger>}
+            {canHistory && <TabsTrigger value="audit">Audit Log</TabsTrigger>}
           </TabsList>
           <TabsContent value="single"><MasterAdrForm /></TabsContent>
           {canBulk && <TabsContent value="bulk"><BulkImport /></TabsContent>}
           {canHistory && <TabsContent value="history"><BulkImportHistory /></TabsContent>}
+          {canHistory && <TabsContent value="audit"><BulkImportAuditLog /></TabsContent>}
         </Tabs>
       ) : (
         <Card><CardContent className="py-12 text-center text-muted-foreground">
