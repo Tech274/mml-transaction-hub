@@ -496,6 +496,20 @@ export function BulkImport() {
     setParentRunId(retryStats?.id ?? null);
     setPreviewOpen(false);
     const fixed = next.filter((r) => r.errors.length === 0).length;
+    if (user) {
+      const applied = invalid.reduce((acc, r) => {
+        const failed = Array.from(new Set(r.errors.map((e) => e.split(":")[0].trim())));
+        return acc + failed.filter((f) => isSuggestionSelected(r.line, f)).length;
+      }, 0);
+      void supabase.from("bulk_import_audit_events").insert({
+        run_id: null,
+        parent_run_id: retryStats?.id ?? null,
+        event_type: "apply_suggestions",
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        details: { kind, filename: fileName, invalid_rows: invalid.length, fixed_after_apply: fixed, fields_applied: applied },
+      } as never);
+    }
     toast.success(`Applied suggestions · ${fixed}/${next.length} now valid. Click "Import valid rows" to retry.`);
   }
 
