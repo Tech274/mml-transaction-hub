@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Download } from "lucide-react";
+import { Download, ArrowUp, ArrowDown, AlertCircle, Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { fmtCurrency, fmtNumber, MONTH_NAMES, YEARS } from "@/lib/format";
 import {
   computeTotals, groupByKey, computeForecast, forecastByDimension, type ReportRow,
@@ -27,7 +28,7 @@ export function ReportsView() {
   const [provider, setProvider] = useState<string>(ALL);
   const [lob, setLob] = useState<string>(ALL);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, isError, refetch, isFetching } = useQuery({
     queryKey: ["reports", "transactions"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -38,6 +39,7 @@ export function ReportsView() {
       return (data ?? []) as Row[];
     },
   });
+  const errMsg = error instanceof Error ? error.message : error ? String(error) : "";
 
   const rows = data ?? [];
   const providers = useMemo(() => Array.from(new Set(rows.map((r) => r.cloud_provider).filter(Boolean))).sort(), [rows]);
@@ -197,6 +199,20 @@ export function ReportsView() {
           </div>
         </CardContent>
       </Card>
+
+      {isError && (
+        <Alert variant="destructive" data-testid="reports-error">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Failed to load reports data</AlertTitle>
+          <AlertDescription className="flex items-center justify-between gap-3">
+            <span className="truncate">{errMsg || "Unknown error"}</span>
+            <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              {isFetching ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Totals strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -395,6 +411,20 @@ export function ReportsView() {
           <Card>
             <CardHeader><CardTitle>Projected revenue vs cost — next 12 months</CardTitle></CardHeader>
             <CardContent className="h-80">
+              {isLoading ? (
+                <div data-testid="forecast-loading" className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading forecast…
+                </div>
+              ) : isError ? (
+                <div data-testid="forecast-error" className="h-full flex flex-col items-center justify-center gap-2 text-sm">
+                  <div className="text-destructive">Could not load forecast data.</div>
+                  <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+                </div>
+              ) : forecast.every((f) => f.revenue === 0 && f.cost === 0) ? (
+                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+                  No projected revenue in the next 12 months for the current filters.
+                </div>
+              ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={forecast}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
@@ -407,6 +437,7 @@ export function ReportsView() {
                   <Line type="monotone" dataKey="profit" stroke={COLORS[1]} name="Profit" />
                 </LineChart>
               </ResponsiveContainer>
+              )}
             </CardContent>
           </Card>
 
@@ -431,7 +462,21 @@ export function ReportsView() {
       <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>
         <DialogContent className="max-w-5xl">
           <DialogHeader><DialogTitle>{drill?.title}</DialogTitle></DialogHeader>
-          {drill && <DrillTable rows={drill.rows} />}
+          {drill && (
+            isError ? (
+              <div data-testid="drill-error" className="py-6 text-sm">
+                <div className="text-destructive mb-2">Could not load underlying transactions.</div>
+                <div className="text-muted-foreground mb-3 truncate">{errMsg}</div>
+                <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+              </div>
+            ) : isLoading ? (
+              <div data-testid="drill-loading" className="py-10 flex items-center justify-center text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading transactions…
+              </div>
+            ) : (
+              <DrillTable rows={drill.rows} />
+            )
+          )}
         </DialogContent>
       </Dialog>
     </div>
@@ -463,23 +508,149 @@ function DrillTable({ rows }: { rows: Row[] }) {
       cur.count += 1;
       map.set(r.repository_type, cur);
     }
-    return Array.from(map.values());
+    return Array.from(map.values()).map((r) => ({ ...r, profit: r.revenue - r.cost }));
   }, [rows]);
+
+  const txRows = useMemo(() => rows.map((r) => ({
+    customer_name: r.customer_name,
+    lab_name: r.lab_name,
+    cloud_provider: r.cloud_provider,
+    line_of_business: r.line_of_business,
+    total_users: Number(r.total_users ?? 0),
+    selling_cost: Number(r.selling_cost ?? 0),
+    input_cost: Number(r.input_cost ?? 0),
+  })), [rows]);
+
   return (
-    <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-      <div>
+    <div className="space-y-4 max-h-[70vh] overflow-y-auto" data-testid="drill-content">
+      <div data-testid="drill-repo">
         <div className="text-sm font-medium mb-2">Repository breakdown</div>
-        <ReportTable
-          headers={["Repository", "Txns", "Revenue", "Cost", "Profit"]}
-          rows={byRepo.map((r) => [r.key, fmtNumber(r.count), fmtCurrency(r.revenue), fmtCurrency(r.cost), fmtCurrency(r.revenue - r.cost)])}
+        <SortablePaginatedTable
+          data={byRepo}
+          pageSize={10}
+          columns={[
+            { key: "key", label: "Repository" },
+            { key: "count", label: "Txns", numeric: true, render: (r) => fmtNumber(r.count) },
+            { key: "revenue", label: "Revenue", numeric: true, render: (r) => fmtCurrency(r.revenue) },
+            { key: "cost", label: "Cost", numeric: true, render: (r) => fmtCurrency(r.cost) },
+            { key: "profit", label: "Profit", numeric: true, render: (r) => fmtCurrency(r.profit) },
+          ]}
         />
       </div>
-      <div>
+      <div data-testid="drill-transactions">
         <div className="text-sm font-medium mb-2">Underlying transactions ({rows.length})</div>
-        <ReportTable
-          headers={["Customer", "Lab", "Provider", "LOB", "Users", "Revenue", "Cost"]}
-          rows={rows.map((r) => [r.customer_name, r.lab_name, r.cloud_provider, r.line_of_business, fmtNumber(r.total_users), fmtCurrency(r.selling_cost), fmtCurrency(r.input_cost)])}
+        <SortablePaginatedTable
+          data={txRows}
+          pageSize={25}
+          columns={[
+            { key: "customer_name", label: "Customer" },
+            { key: "lab_name", label: "Lab" },
+            { key: "cloud_provider", label: "Provider" },
+            { key: "line_of_business", label: "LOB" },
+            { key: "total_users", label: "Users", numeric: true, render: (r) => fmtNumber(r.total_users) },
+            { key: "selling_cost", label: "Revenue", numeric: true, render: (r) => fmtCurrency(r.selling_cost) },
+            { key: "input_cost", label: "Cost", numeric: true, render: (r) => fmtCurrency(r.input_cost) },
+          ]}
         />
+      </div>
+    </div>
+  );
+}
+
+type SortDir = "asc" | "desc";
+type Col<T> = { key: keyof T & string; label: string; numeric?: boolean; render?: (row: T) => React.ReactNode };
+
+function SortablePaginatedTable<T extends Record<string, unknown>>({
+  data, columns, pageSize = 25,
+}: { data: T[]; columns: Col<T>[]; pageSize?: number }) {
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [page, setPage] = useState(1);
+
+  const sorted = useMemo(() => {
+    if (!sortKey) return data;
+    const col = columns.find((c) => c.key === sortKey);
+    const numeric = col?.numeric ?? false;
+    const arr = [...data];
+    arr.sort((a, b) => {
+      const av = a[sortKey as keyof T];
+      const bv = b[sortKey as keyof T];
+      let cmp: number;
+      if (numeric) cmp = Number(av ?? 0) - Number(bv ?? 0);
+      else cmp = String(av ?? "").localeCompare(String(bv ?? ""));
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return arr;
+  }, [data, sortKey, sortDir, columns]);
+
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const start = (currentPage - 1) * pageSize;
+  const paged = sorted.slice(start, start + pageSize);
+
+  const toggleSort = (key: string) => {
+    if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+    setPage(1);
+  };
+
+  if (data.length === 0) {
+    return <div className="text-sm text-muted-foreground py-6 text-center">No data.</div>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {columns.map((c) => (
+                <TableHead
+                  key={c.key}
+                  className="cursor-pointer select-none"
+                  onClick={() => toggleSort(c.key)}
+                  data-testid={`sort-${c.key}`}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    {c.label}
+                    {sortKey === c.key && (sortDir === "asc"
+                      ? <ArrowUp className="h-3 w-3" />
+                      : <ArrowDown className="h-3 w-3" />)}
+                  </span>
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paged.map((r, i) => (
+              <TableRow key={i}>
+                {columns.map((c, j) => (
+                  <TableCell key={c.key} className={j === 0 ? "font-medium" : ""}>
+                    {c.render ? c.render(r) : String(r[c.key as keyof T] ?? "")}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div data-testid="pagination-info">
+          Showing {start + 1}–{Math.min(start + pageSize, sorted.length)} of {sorted.length}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm" variant="outline" data-testid="page-prev"
+            disabled={currentPage <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >Previous</Button>
+          <span>Page {currentPage} of {totalPages}</span>
+          <Button
+            size="sm" variant="outline" data-testid="page-next"
+            disabled={currentPage >= totalPages}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          >Next</Button>
+        </div>
       </div>
     </div>
   );
