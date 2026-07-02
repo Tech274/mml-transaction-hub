@@ -512,7 +512,7 @@ function FilterSelect({
   );
 }
 
-function ReportTable({ headers, rows, empty }: { headers: string[]; rows: (string | number)[][]; empty?: string }) {
+function ReportTable({ headers, rows, empty, onRowClick }: { headers: string[]; rows: (string | number)[][]; empty?: string; onRowClick?: (index: number) => void }) {
   if (rows.length === 0) {
     return <div className="text-sm text-muted-foreground py-6 text-center">{empty ?? "No data."}</div>;
   }
