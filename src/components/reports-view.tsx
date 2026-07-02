@@ -51,8 +51,12 @@ export function ReportsView() {
     (lob === ALL || r.line_of_business === lob),
   ), [rows, year, provider, lob]);
 
-  const [drill, setDrill] = useState<{ title: string; rows: Row[] } | null>(null);
-  const openDrill = (title: string, subset: Row[]) => setDrill({ title, rows: subset });
+  const [drill, setDrill] = useState<{ title: string; predicate: (r: Row) => boolean } | null>(null);
+  const openDrill = (title: string, predicate: (r: Row) => boolean) => setDrill({ title, predicate });
+  const drillRows = useMemo(
+    () => (drill ? filtered.filter(drill.predicate) : []),
+    [drill, filtered],
+  );
 
   // Cloud cost by provider × month
   const byMonthProvider = useMemo(() => {
@@ -265,7 +269,7 @@ export function ReportsView() {
                 rows={providerTotals.map((p) => [p.provider, fmtCurrency(p.spend), fmtCurrency(p.cost), fmtCurrency(p.profit)])}
                 onRowClick={(i) => {
                   const p = providerTotals[i];
-                  openDrill(`Transactions — ${p.provider}`, filtered.filter((r) => r.cloud_provider === p.provider));
+                  openDrill(`Transactions — ${p.provider}`, (r) => r.cloud_provider === p.provider);
                 }}
               />
             </CardContent>
@@ -280,7 +284,7 @@ export function ReportsView() {
                 empty="No labs in current filter."
                 onRowClick={(i) => {
                   const l = topLabs[i];
-                  openDrill(`Transactions — ${l.lab} · ${l.provider}`, filtered.filter((r) => r.lab_name === l.lab && r.cloud_provider === l.provider));
+                  openDrill(`Transactions — ${l.lab} · ${l.provider}`, (r) => r.lab_name === l.lab && r.cloud_provider === l.provider);
                 }}
               />
             </CardContent>
@@ -324,7 +328,7 @@ export function ReportsView() {
                 empty="No customers in current filter."
                 onRowClick={(i) => {
                   const c = customers[i];
-                  openDrill(`Transactions — ${c.customer}`, filtered.filter((r) => r.customer_name === c.customer));
+                  openDrill(`Transactions — ${c.customer}`, (r) => r.customer_name === c.customer);
                 }}
               />
             </CardContent>
@@ -379,7 +383,7 @@ export function ReportsView() {
                 empty="No data for current filter."
                 onRowClick={(i) => {
                   const m = marginByLob[i];
-                  openDrill(`Transactions — LOB ${m.key}`, filtered.filter((r) => r.line_of_business === m.key));
+                  openDrill(`Transactions — LOB ${m.key}`, (r) => r.line_of_business === m.key);
                 }}
               />
             </CardContent>
@@ -394,7 +398,7 @@ export function ReportsView() {
                 empty="No data for current filter."
                 onRowClick={(i) => {
                   const m = marginByProvider[i];
-                  openDrill(`Transactions — ${m.key}`, filtered.filter((r) => r.cloud_provider === m.key));
+                  openDrill(`Transactions — ${m.key}`, (r) => r.cloud_provider === m.key);
                 }}
               />
             </CardContent>
@@ -474,7 +478,7 @@ export function ReportsView() {
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading transactions…
               </div>
             ) : (
-              <DrillTable rows={drill.rows} />
+              <DrillTable rows={drillRows} />
             )
           )}
         </DialogContent>
