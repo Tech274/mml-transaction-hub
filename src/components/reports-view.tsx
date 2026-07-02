@@ -578,6 +578,7 @@ function SortablePaginatedTable<T extends Record<string, unknown>>({
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
+  const [size, setSize] = useState<number>(pageSize);
 
   const sorted = useMemo(() => {
     if (!sortKey) return data;
@@ -595,10 +596,10 @@ function SortablePaginatedTable<T extends Record<string, unknown>>({
     return arr;
   }, [data, sortKey, sortDir, columns]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / size));
   const currentPage = Math.min(page, totalPages);
-  const start = (currentPage - 1) * pageSize;
-  const paged = sorted.slice(start, start + pageSize);
+  const start = (currentPage - 1) * size;
+  const paged = sorted.slice(start, start + size);
 
   const toggleSort = (key: string) => {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -648,9 +649,20 @@ function SortablePaginatedTable<T extends Record<string, unknown>>({
       </div>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div data-testid="pagination-info">
-          Showing {start + 1}–{Math.min(start + pageSize, sorted.length)} of {sorted.length}
+          Showing {start + 1}–{Math.min(start + size, sorted.length)} of {sorted.length}
         </div>
         <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1">
+            Rows
+            <select
+              data-testid="page-size"
+              className="h-7 rounded border border-input bg-background px-1 text-xs"
+              value={size}
+              onChange={(e) => { setSize(Number(e.target.value)); setPage(1); }}
+            >
+              {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
           <Button
             size="sm" variant="outline" data-testid="page-prev"
             disabled={currentPage <= 1}
