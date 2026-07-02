@@ -503,6 +503,13 @@ function ForecastGroupCard({ title, data }: { title: string; data: { key: string
 }
 
 function DrillTable({ rows }: { rows: Row[] }) {
+  if (rows.length === 0) {
+    return (
+      <div data-testid="drill-empty" className="py-10 text-center text-sm text-muted-foreground">
+        No matching transactions for the current filters.
+      </div>
+    );
+  }
   const byRepo = useMemo(() => {
     const map = new Map<string, { key: string; revenue: number; cost: number; count: number }>();
     for (const r of rows) {
