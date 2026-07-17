@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,18 @@ import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — MakeMyLabs Transaction Platform" }] }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" ? s.next : "",
+  }),
   component: AuthPage,
 });
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { next } = useSearch({ from: "/auth" });
+  // Only follow same-origin relative paths — never a scheme/host.
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "";
+  const redirectTo = (): string => safeNext || "/dashboard";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -23,9 +30,9 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) navigate({ to: "/dashboard" });
+      if (data.session) window.location.href = redirectTo();
     });
-  }, [navigate]);
+  }, [navigate, safeNext]);
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
@@ -34,7 +41,7 @@ function AuthPage() {
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success("Signed in");
-    navigate({ to: "/dashboard" });
+    window.location.href = redirectTo();
   }
 
   async function signUp(e: React.FormEvent) {
@@ -44,7 +51,7 @@ function AuthPage() {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: window.location.origin + redirectTo(),
         data: { full_name: fullName },
       },
     });
