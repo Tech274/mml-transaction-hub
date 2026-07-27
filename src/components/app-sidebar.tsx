@@ -1,7 +1,7 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, FilePlus2, ListTree, Cloud, Server, Users,
-  BarChart3, Settings, LogOut, PlugZap,
+  BarChart3, Settings, LogOut, PlugZap, ScrollText,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -21,6 +21,7 @@ const nav: { to: string; label: string; icon: typeof LayoutDashboard; roles: App
   { to: "/customers", label: "Customers", icon: Users, roles: null },
   { to: "/reports", label: "Reports", icon: BarChart3, roles: null, permission: "feature_reports_access" },
   { to: "/agent-integrations", label: "Agent integrations", icon: PlugZap, roles: null },
+  { to: "/mcp-audit", label: "MCP audit log", icon: ScrollText, roles: ["admin"] },
   { to: "/admin", label: "Admin Settings", icon: Settings, roles: ["admin"] },
 ];
 
