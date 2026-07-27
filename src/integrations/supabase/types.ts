@@ -461,6 +461,48 @@ export type Database = {
         }
         Relationships: []
       }
+      mcp_tool_audit_log: {
+        Row: {
+          arguments: Json
+          client_id: string | null
+          created_at: string
+          duration_ms: number | null
+          error_code: string | null
+          error_message: string | null
+          id: string
+          success: boolean
+          tool_name: string
+          user_email: string | null
+          user_id: string
+        }
+        Insert: {
+          arguments?: Json
+          client_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          success: boolean
+          tool_name: string
+          user_email?: string | null
+          user_id: string
+        }
+        Update: {
+          arguments?: Json
+          client_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          success?: boolean
+          tool_name?: string
+          user_email?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       permission_audit_log: {
         Row: {
           action: string
