@@ -25,6 +25,7 @@ export function withAudit<Input>(
     }
 
     const userId = ctx.getUserId();
+    if (!userId) return makeError("unauthenticated", "Missing user id in token.");
     const email = ctx.getUserEmail() ?? null;
     const clientId = ctx.getClientId() ?? null;
     const supabase = supabaseForUser(ctx);
