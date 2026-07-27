@@ -18,9 +18,11 @@ import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authent
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPublicCloudRouteImport } from './routes/_authenticated/public-cloud'
 import { Route as AuthenticatedPrivateCloudRouteImport } from './routes/_authenticated/private-cloud'
+import { Route as AuthenticatedMcpAuditRouteImport } from './routes/_authenticated/mcp-audit'
 import { Route as AuthenticatedEntryRouteImport } from './routes/_authenticated/entry'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
+import { Route as AuthenticatedAgentIntegrationsRouteImport } from './routes/_authenticated/agent-integrations'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
@@ -76,6 +78,11 @@ const AuthenticatedPrivateCloudRoute =
     path: '/private-cloud',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedMcpAuditRoute = AuthenticatedMcpAuditRouteImport.update({
+  id: '/mcp-audit',
+  path: '/mcp-audit',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedEntryRoute = AuthenticatedEntryRouteImport.update({
   id: '/entry',
   path: '/entry',
@@ -91,6 +98,12 @@ const AuthenticatedCustomersRoute = AuthenticatedCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAgentIntegrationsRoute =
+  AuthenticatedAgentIntegrationsRouteImport.update({
+    id: '/agent-integrations',
+    path: '/agent-integrations',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -140,9 +153,11 @@ export interface FileRoutesByFullPath {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/agent-integrations': typeof AuthenticatedAgentIntegrationsRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/entry': typeof AuthenticatedEntryRoute
+  '/mcp-audit': typeof AuthenticatedMcpAuditRoute
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -160,9 +175,11 @@ export interface FileRoutesByTo {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin': typeof AuthenticatedAdminRoute
+  '/agent-integrations': typeof AuthenticatedAgentIntegrationsRoute
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/entry': typeof AuthenticatedEntryRoute
+  '/mcp-audit': typeof AuthenticatedMcpAuditRoute
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -182,9 +199,11 @@ export interface FileRoutesById {
   '/.mcp/list-tools': typeof Char91DotmcpChar93ListToolsRoute
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
+  '/_authenticated/agent-integrations': typeof AuthenticatedAgentIntegrationsRoute
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/entry': typeof AuthenticatedEntryRoute
+  '/_authenticated/mcp-audit': typeof AuthenticatedMcpAuditRoute
   '/_authenticated/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/_authenticated/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
@@ -204,9 +223,11 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin'
+    | '/agent-integrations'
     | '/customers'
     | '/dashboard'
     | '/entry'
+    | '/mcp-audit'
     | '/private-cloud'
     | '/public-cloud'
     | '/reports'
@@ -224,9 +245,11 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/admin'
+    | '/agent-integrations'
     | '/customers'
     | '/dashboard'
     | '/entry'
+    | '/mcp-audit'
     | '/private-cloud'
     | '/public-cloud'
     | '/reports'
@@ -245,9 +268,11 @@ export interface FileRouteTypes {
     | '/.mcp/list-tools'
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/admin'
+    | '/_authenticated/agent-integrations'
     | '/_authenticated/customers'
     | '/_authenticated/dashboard'
     | '/_authenticated/entry'
+    | '/_authenticated/mcp-audit'
     | '/_authenticated/private-cloud'
     | '/_authenticated/public-cloud'
     | '/_authenticated/reports'
@@ -337,6 +362,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPrivateCloudRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/mcp-audit': {
+      id: '/_authenticated/mcp-audit'
+      path: '/mcp-audit'
+      fullPath: '/mcp-audit'
+      preLoaderRoute: typeof AuthenticatedMcpAuditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/entry': {
       id: '/_authenticated/entry'
       path: '/entry'
@@ -356,6 +388,13 @@ declare module '@tanstack/react-router' {
       path: '/customers'
       fullPath: '/customers'
       preLoaderRoute: typeof AuthenticatedCustomersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/agent-integrations': {
+      id: '/_authenticated/agent-integrations'
+      path: '/agent-integrations'
+      fullPath: '/agent-integrations'
+      preLoaderRoute: typeof AuthenticatedAgentIntegrationsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/admin': {
@@ -412,9 +451,11 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
+  AuthenticatedAgentIntegrationsRoute: typeof AuthenticatedAgentIntegrationsRoute
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEntryRoute: typeof AuthenticatedEntryRoute
+  AuthenticatedMcpAuditRoute: typeof AuthenticatedMcpAuditRoute
   AuthenticatedPrivateCloudRoute: typeof AuthenticatedPrivateCloudRoute
   AuthenticatedPublicCloudRoute: typeof AuthenticatedPublicCloudRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
@@ -423,9 +464,11 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
+  AuthenticatedAgentIntegrationsRoute: AuthenticatedAgentIntegrationsRoute,
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEntryRoute: AuthenticatedEntryRoute,
+  AuthenticatedMcpAuditRoute: AuthenticatedMcpAuditRoute,
   AuthenticatedPrivateCloudRoute: AuthenticatedPrivateCloudRoute,
   AuthenticatedPublicCloudRoute: AuthenticatedPublicCloudRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
