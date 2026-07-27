@@ -2,13 +2,15 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
+
 export interface McpAuditRow {
   id: string;
   user_id: string;
   user_email: string | null;
   client_id: string | null;
   tool_name: string;
-  arguments: Record<string, unknown>;
+  arguments: JsonValue;
   success: boolean;
   error_code: string | null;
   error_message: string | null;
