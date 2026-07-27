@@ -5,7 +5,7 @@ import { makeError, type McpErrorCode } from "./errors";
 type ToolResult = {
   isError?: boolean;
   content: Array<{ type: "text"; text: string }>;
-  structuredContent?: unknown;
+  structuredContent?: Record<string, unknown>;
 };
 
 /**
