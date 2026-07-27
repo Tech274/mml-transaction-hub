@@ -41,7 +41,7 @@ export function withAudit<Input>(
         const result = makeError("revoked", "Client access revoked by user.");
         await logRow(supabase, {
           user_id: userId, user_email: email, client_id: clientId,
-          tool_name: toolName, arguments: input as unknown as Record<string, unknown>,
+          tool_name: toolName, arguments: sanitize(input),
           success: false, error_code: "revoked",
           error_message: "Client access revoked by user.",
           duration_ms: Date.now() - started,
@@ -75,7 +75,7 @@ export function withAudit<Input>(
       user_email: email,
       client_id: clientId,
       tool_name: toolName,
-      arguments: sanitize(input as unknown),
+      arguments: sanitize(input),
       success: !result.isError,
       error_code: errorCode,
       error_message: errorMessage,
@@ -112,7 +112,8 @@ async function logRow(
   },
 ) {
   try {
-    await supabase.from("mcp_tool_audit_log").insert(row);
+    // Types are regenerated after migration approval; cast until then.
+    await supabase.from("mcp_tool_audit_log").insert(row as never);
   } catch {
     // swallow: audit must never break a tool call
   }
