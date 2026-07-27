@@ -461,6 +461,27 @@ export type Database = {
         }
         Relationships: []
       }
+      mcp_revoked_clients: {
+        Row: {
+          client_id: string
+          id: string
+          revoked_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          id?: string
+          revoked_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          id?: string
+          revoked_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mcp_tool_audit_log: {
         Row: {
           arguments: Json
