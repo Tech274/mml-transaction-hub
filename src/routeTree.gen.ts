@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authenticated/transactions'
+import { Route as AuthenticatedSyncStatusRouteImport } from './routes/_authenticated/sync-status'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPublicCloudRouteImport } from './routes/_authenticated/public-cloud'
 import { Route as AuthenticatedPrivateCloudRouteImport } from './routes/_authenticated/private-cloud'
@@ -62,6 +63,11 @@ const AuthenticatedTransactionsRoute =
     path: '/transactions',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSyncStatusRoute = AuthenticatedSyncStatusRouteImport.update({
+  id: '/sync-status',
+  path: '/sync-status',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/sync-status': typeof AuthenticatedSyncStatusRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -190,6 +197,7 @@ export interface FileRoutesByTo {
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/sync-status': typeof AuthenticatedSyncStatusRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -215,6 +223,7 @@ export interface FileRoutesById {
   '/_authenticated/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/_authenticated/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/sync-status': typeof AuthenticatedSyncStatusRoute
   '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
@@ -240,6 +249,7 @@ export interface FileRouteTypes {
     | '/private-cloud'
     | '/public-cloud'
     | '/reports'
+    | '/sync-status'
     | '/transactions'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -263,6 +273,7 @@ export interface FileRouteTypes {
     | '/private-cloud'
     | '/public-cloud'
     | '/reports'
+    | '/sync-status'
     | '/transactions'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/_authenticated/private-cloud'
     | '/_authenticated/public-cloud'
     | '/_authenticated/reports'
+    | '/_authenticated/sync-status'
     | '/_authenticated/transactions'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
@@ -352,6 +364,13 @@ declare module '@tanstack/react-router' {
       path: '/transactions'
       fullPath: '/transactions'
       preLoaderRoute: typeof AuthenticatedTransactionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sync-status': {
+      id: '/_authenticated/sync-status'
+      path: '/sync-status'
+      fullPath: '/sync-status'
+      preLoaderRoute: typeof AuthenticatedSyncStatusRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/reports': {
@@ -479,6 +498,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPrivateCloudRoute: typeof AuthenticatedPrivateCloudRoute
   AuthenticatedPublicCloudRoute: typeof AuthenticatedPublicCloudRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedSyncStatusRoute: typeof AuthenticatedSyncStatusRoute
   AuthenticatedTransactionsRoute: typeof AuthenticatedTransactionsRoute
 }
 
@@ -492,6 +512,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPrivateCloudRoute: AuthenticatedPrivateCloudRoute,
   AuthenticatedPublicCloudRoute: AuthenticatedPublicCloudRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedSyncStatusRoute: AuthenticatedSyncStatusRoute,
   AuthenticatedTransactionsRoute: AuthenticatedTransactionsRoute,
 }
 
