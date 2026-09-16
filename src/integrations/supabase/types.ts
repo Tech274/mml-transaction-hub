@@ -596,6 +596,71 @@ export type Database = {
         }
         Relationships: []
       }
+      report_snapshots: {
+        Row: {
+          cloud_provider: string
+          cost: number
+          created_at: string
+          customer_name: string
+          id: string
+          lab_name: string
+          line_of_business: string
+          margin_pct: number
+          month: number
+          profit: number
+          revenue: number
+          run_id: string
+          snapshot_date: string
+          total_users: number
+          transactions_count: number
+          year: number
+        }
+        Insert: {
+          cloud_provider: string
+          cost?: number
+          created_at?: string
+          customer_name: string
+          id?: string
+          lab_name: string
+          line_of_business: string
+          margin_pct?: number
+          month: number
+          profit?: number
+          revenue?: number
+          run_id: string
+          snapshot_date?: string
+          total_users?: number
+          transactions_count?: number
+          year: number
+        }
+        Update: {
+          cloud_provider?: string
+          cost?: number
+          created_at?: string
+          customer_name?: string
+          id?: string
+          lab_name?: string
+          line_of_business?: string
+          margin_pct?: number
+          month?: number
+          profit?: number
+          revenue?: number
+          run_id?: string
+          snapshot_date?: string
+          total_users?: number
+          transactions_count?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_snapshots_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_audit_log: {
         Row: {
           action: string
@@ -658,6 +723,60 @@ export type Database = {
           kind?: string
           role?: Database["public"]["Enums"]["app_role"]
           sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sync_runs: {
+        Row: {
+          created_at: string
+          customers_count: number
+          duration_ms: number | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          report_rows: number
+          started_at: string
+          status: string
+          transactions_count: number
+          trigger_source: string
+          triggered_by: string | null
+          triggered_by_email: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customers_count?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          report_rows?: number
+          started_at?: string
+          status?: string
+          transactions_count?: number
+          trigger_source?: string
+          triggered_by?: string | null
+          triggered_by_email?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customers_count?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          report_rows?: number
+          started_at?: string
+          status?: string
+          transactions_count?: number
+          trigger_source?: string
+          triggered_by?: string | null
+          triggered_by_email?: string | null
           updated_at?: string
         }
         Relationships: []
