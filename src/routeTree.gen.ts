@@ -15,6 +15,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authenticated/transactions'
+import { Route as AuthenticatedSyncStatusRouteImport } from './routes/_authenticated/sync-status'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedPublicCloudRouteImport } from './routes/_authenticated/public-cloud'
 import { Route as AuthenticatedPrivateCloudRouteImport } from './routes/_authenticated/private-cloud'
@@ -29,6 +30,7 @@ import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]
 import { Route as ApiPublicBulkTemplateVersionRouteImport } from './routes/api/public/bulk-template-version'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as ApiPublicHooksMcpSyncRouteImport } from './routes/api/public/hooks/mcp-sync'
 import { Route as ApiPublicHooksBulkImportCleanupRouteImport } from './routes/api/public/hooks/bulk-import-cleanup'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -61,6 +63,11 @@ const AuthenticatedTransactionsRoute =
     path: '/transactions',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedSyncStatusRoute = AuthenticatedSyncStatusRouteImport.update({
+  id: '/sync-status',
+  path: '/sync-status',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -138,6 +145,11 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksMcpSyncRoute = ApiPublicHooksMcpSyncRouteImport.update({
+  id: '/api/public/hooks/mcp-sync',
+  path: '/api/public/hooks/mcp-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksBulkImportCleanupRoute =
   ApiPublicHooksBulkImportCleanupRouteImport.update({
     id: '/api/public/hooks/bulk-import-cleanup',
@@ -161,11 +173,13 @@ export interface FileRoutesByFullPath {
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/sync-status': typeof AuthenticatedSyncStatusRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
+  '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -183,11 +197,13 @@ export interface FileRoutesByTo {
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
+  '/sync-status': typeof AuthenticatedSyncStatusRoute
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
+  '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -207,11 +223,13 @@ export interface FileRoutesById {
   '/_authenticated/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/_authenticated/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
+  '/_authenticated/sync-status': typeof AuthenticatedSyncStatusRoute
   '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
+  '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -231,11 +249,13 @@ export interface FileRouteTypes {
     | '/private-cloud'
     | '/public-cloud'
     | '/reports'
+    | '/sync-status'
     | '/transactions'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
+    | '/api/public/hooks/mcp-sync'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -253,11 +273,13 @@ export interface FileRouteTypes {
     | '/private-cloud'
     | '/public-cloud'
     | '/reports'
+    | '/sync-status'
     | '/transactions'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
+    | '/api/public/hooks/mcp-sync'
   id:
     | '__root__'
     | '/'
@@ -276,11 +298,13 @@ export interface FileRouteTypes {
     | '/_authenticated/private-cloud'
     | '/_authenticated/public-cloud'
     | '/_authenticated/reports'
+    | '/_authenticated/sync-status'
     | '/_authenticated/transactions'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
+    | '/api/public/hooks/mcp-sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -295,6 +319,7 @@ export interface RootRouteChildren {
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicBulkTemplateVersionRoute: typeof ApiPublicBulkTemplateVersionRoute
   ApiPublicHooksBulkImportCleanupRoute: typeof ApiPublicHooksBulkImportCleanupRoute
+  ApiPublicHooksMcpSyncRoute: typeof ApiPublicHooksMcpSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -339,6 +364,13 @@ declare module '@tanstack/react-router' {
       path: '/transactions'
       fullPath: '/transactions'
       preLoaderRoute: typeof AuthenticatedTransactionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sync-status': {
+      id: '/_authenticated/sync-status'
+      path: '/sync-status'
+      fullPath: '/sync-status'
+      preLoaderRoute: typeof AuthenticatedSyncStatusRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/reports': {
@@ -439,6 +471,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/mcp-sync': {
+      id: '/api/public/hooks/mcp-sync'
+      path: '/api/public/hooks/mcp-sync'
+      fullPath: '/api/public/hooks/mcp-sync'
+      preLoaderRoute: typeof ApiPublicHooksMcpSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/bulk-import-cleanup': {
       id: '/api/public/hooks/bulk-import-cleanup'
       path: '/api/public/hooks/bulk-import-cleanup'
@@ -459,6 +498,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPrivateCloudRoute: typeof AuthenticatedPrivateCloudRoute
   AuthenticatedPublicCloudRoute: typeof AuthenticatedPublicCloudRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
+  AuthenticatedSyncStatusRoute: typeof AuthenticatedSyncStatusRoute
   AuthenticatedTransactionsRoute: typeof AuthenticatedTransactionsRoute
 }
 
@@ -472,6 +512,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPrivateCloudRoute: AuthenticatedPrivateCloudRoute,
   AuthenticatedPublicCloudRoute: AuthenticatedPublicCloudRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
+  AuthenticatedSyncStatusRoute: AuthenticatedSyncStatusRoute,
   AuthenticatedTransactionsRoute: AuthenticatedTransactionsRoute,
 }
 
@@ -491,6 +532,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicBulkTemplateVersionRoute: ApiPublicBulkTemplateVersionRoute,
   ApiPublicHooksBulkImportCleanupRoute: ApiPublicHooksBulkImportCleanupRoute,
+  ApiPublicHooksMcpSyncRoute: ApiPublicHooksMcpSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
