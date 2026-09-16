@@ -18,7 +18,7 @@ import { formatDistanceToNow, format } from "date-fns";
 import { RefreshCw, Database, AlertTriangle, Eye, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
-  getSyncOverview, triggerSyncNow, listSnapshotRows, type SyncRunRow,
+  getSyncOverview, triggerSyncNow, listSnapshotRows, type SyncRunRow, type SnapshotRow,
 } from "@/lib/sync.functions";
 
 export const Route = createFileRoute("/_authenticated/sync-status")({
@@ -51,7 +51,7 @@ function SyncStatusPage() {
 
   const detailRows = useQuery({
     queryKey: ["sync", "rows", openRun?.id],
-    queryFn: () => rowsFn({ data: { run_id: openRun!.id, limit: 200 } }),
+    queryFn: () => rowsFn({ data: { run_id: openRun!.id, limit: 200 } }) as Promise<SnapshotRow[]>,
     enabled: !!openRun,
   });
 
@@ -217,12 +217,12 @@ function SyncStatusPage() {
                 </TableHeader>
                 <TableBody>
                   {detailRows.data.map((row, i) => (
-                    <TableRow key={String(row.id ?? i)}>
-                      <TableCell>{String(row.month)}/{String(row.year)}</TableCell>
-                      <TableCell>{String(row.customer_name)}</TableCell>
-                      <TableCell>{String(row.lab_name)}</TableCell>
-                      <TableCell>{String(row.cloud_provider)}</TableCell>
-                      <TableCell>{String(row.line_of_business)}</TableCell>
+                    <TableRow key={row.id ?? i}>
+                      <TableCell>{row.month}/{row.year}</TableCell>
+                      <TableCell>{row.customer_name}</TableCell>
+                      <TableCell>{row.lab_name}</TableCell>
+                      <TableCell>{row.cloud_provider}</TableCell>
+                      <TableCell>{row.line_of_business}</TableCell>
                       <TableCell className="text-right">{Number(row.revenue).toLocaleString()}</TableCell>
                       <TableCell className="text-right">{Number(row.cost).toLocaleString()}</TableCell>
                       <TableCell className="text-right">{Number(row.profit).toLocaleString()}</TableCell>

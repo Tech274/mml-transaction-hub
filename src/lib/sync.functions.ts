@@ -17,6 +17,22 @@ export interface SyncRunRow {
   duration_ms: number | null;
 }
 
+export interface SnapshotRow {
+  id: string;
+  year: number;
+  month: number;
+  customer_name: string;
+  lab_name: string;
+  cloud_provider: string;
+  line_of_business: string;
+  transactions_count: number;
+  total_users: number;
+  revenue: number;
+  cost: number;
+  profit: number;
+  margin_pct: number;
+}
+
 export interface SyncOverview {
   runs: SyncRunRow[];
   last_success: SyncRunRow | null;
@@ -82,7 +98,7 @@ export const listSnapshotRows = createServerFn({ method: "GET" })
   .inputValidator((d: { run_id: string; limit?: number }) =>
     z.object({ run_id: z.string().uuid(), limit: z.number().int().min(1).max(500).optional() }).parse(d),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }): Promise<SnapshotRow[]> => {
     const sb = context.supabase as unknown as { from: (t: string) => any };
     const { data: rows, error } = await sb
       .from("report_snapshots")
@@ -92,5 +108,5 @@ export const listSnapshotRows = createServerFn({ method: "GET" })
       .order("month", { ascending: false })
       .limit(data.limit ?? 200);
     if (error) throw new Error(error.message);
-    return (rows ?? []) as Array<Record<string, unknown>>;
+    return (rows ?? []) as SnapshotRow[];
   });
