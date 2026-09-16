@@ -29,6 +29,7 @@ import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]
 import { Route as ApiPublicBulkTemplateVersionRouteImport } from './routes/api/public/bulk-template-version'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as ApiPublicHooksMcpSyncRouteImport } from './routes/api/public/hooks/mcp-sync'
 import { Route as ApiPublicHooksBulkImportCleanupRouteImport } from './routes/api/public/hooks/bulk-import-cleanup'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -138,6 +139,11 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksMcpSyncRoute = ApiPublicHooksMcpSyncRouteImport.update({
+  id: '/api/public/hooks/mcp-sync',
+  path: '/api/public/hooks/mcp-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksBulkImportCleanupRoute =
   ApiPublicHooksBulkImportCleanupRouteImport.update({
     id: '/api/public/hooks/bulk-import-cleanup',
@@ -166,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
+  '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -188,6 +195,7 @@ export interface FileRoutesByTo {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
+  '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -212,6 +220,7 @@ export interface FileRoutesById {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
+  '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -236,6 +245,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
+    | '/api/public/hooks/mcp-sync'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -258,6 +268,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
+    | '/api/public/hooks/mcp-sync'
   id:
     | '__root__'
     | '/'
@@ -281,6 +292,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
+    | '/api/public/hooks/mcp-sync'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -295,6 +307,7 @@ export interface RootRouteChildren {
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicBulkTemplateVersionRoute: typeof ApiPublicBulkTemplateVersionRoute
   ApiPublicHooksBulkImportCleanupRoute: typeof ApiPublicHooksBulkImportCleanupRoute
+  ApiPublicHooksMcpSyncRoute: typeof ApiPublicHooksMcpSyncRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -439,6 +452,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/mcp-sync': {
+      id: '/api/public/hooks/mcp-sync'
+      path: '/api/public/hooks/mcp-sync'
+      fullPath: '/api/public/hooks/mcp-sync'
+      preLoaderRoute: typeof ApiPublicHooksMcpSyncRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/bulk-import-cleanup': {
       id: '/api/public/hooks/bulk-import-cleanup'
       path: '/api/public/hooks/bulk-import-cleanup'
@@ -491,6 +511,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicBulkTemplateVersionRoute: ApiPublicBulkTemplateVersionRoute,
   ApiPublicHooksBulkImportCleanupRoute: ApiPublicHooksBulkImportCleanupRoute,
+  ApiPublicHooksMcpSyncRoute: ApiPublicHooksMcpSyncRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
