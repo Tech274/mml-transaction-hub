@@ -259,6 +259,18 @@ function CustomersByAccountManager() {
   const allowed = can("widget_customers_by_am");
   const [rangeMonths, setRangeMonths] = useState<3 | 6 | 12>(6);
 
+  const { data } = useQuery({
+    queryKey: ["dashboard-customers-by-am"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("customers")
+        .select("id, account_manager_name, is_active, created_at");
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: allowed,
+  });
+
   // Hide entirely for non-admins who lack the permission.
   // When an admin is previewing as a role that lacks it, show an explanatory
   // fallback so they can see what that role would experience.
@@ -284,16 +296,6 @@ function CustomersByAccountManager() {
     );
   }
 
-  const { data } = useQuery({
-    queryKey: ["dashboard-customers-by-am"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("id, account_manager_name, is_active, created_at");
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
   const rows = data ?? [];
 
   // Range cutoff for "new customers" within the selected window
