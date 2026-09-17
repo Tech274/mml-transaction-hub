@@ -137,3 +137,197 @@ export const syncFreshdeskNow = createServerFn({ method: "POST" })
     return runFreshdeskSync(data.maxPages ? { maxPages: data.maxPages } : undefined);
 
   });
+
+/* ---------------------------------------------------------------------------
+ * Agent identity, ticket history and the resolution flow
+ * ------------------------------------------------------------------------- */
+
+export interface AgentOption {
+  id: number;
+  name: string;
+  email: string | null;
+}
+
+export interface AgentIdentity {
+  agent_name: string;
+  agent_id: number | null;
+  auto_matched: boolean;
+}
+
+export interface TicketActionEntry {
+  id: string;
+  ticket_id: number;
+  action: string;
+  field_name: string | null;
+  old_value: string | null;
+  new_value: string | null;
+  resolution_note: string | null;
+  actor_email: string | null;
+  created_at: string;
+}
+
+async function assertTicketActor(context: { supabase: any; userId: string }) {
+  const { data: allowed } = await context.supabase.rpc("has_any_role", {
+    _user_id: context.userId,
+    _roles: ["admin", "ops_lead", "ops_user"],
+  } as never);
+  if (!allowed) throw new Error("You do not have permission to update support tickets");
+}
+
+/** Helpdesk agents plus the caller's saved (or auto-matched) identity. */
+export const getAgentDirectory = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ agents: AgentOption[]; identity: AgentIdentity | null }> => {
+    const { listFreshdeskAgents } = await import("@/lib/freshdesk.server");
+    let agents: AgentOption[] = [];
+    try {
+      agents = (await listFreshdeskAgents()).map((a) => ({ id: a.id, name: a.name, email: a.email }));
+    } catch {
+      agents = [];
+    }
+
+    const sb = context.supabase as unknown as { from: (t: string) => any };
+    const { data: saved } = await sb
+      .from("agent_identities")
+      .select("agent_name, agent_id, auto_matched")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+
+    if (saved) return { agents, identity: saved as AgentIdentity };
+
+    // Nothing saved yet — try matching the signed-in email to an agent.
+    const email = (context.claims as { email?: string } | undefined)?.email?.toLowerCase();
+    const match = email ? agents.find((a) => a.email?.toLowerCase() === email) : undefined;
+    if (!match) return { agents, identity: null };
+
+    await sb
+      .from("agent_identities")
+      .upsert({ user_id: context.userId, agent_name: match.name, agent_id: match.id, auto_matched: true });
+    return { agents, identity: { agent_name: match.name, agent_id: match.id, auto_matched: true } };
+  });
+
+/** Manually choose which helpdesk agent the signed-in user is. */
+export const setMyAgentIdentity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { agentName: string; agentId?: number | null }) =>
+    z.object({ agentName: z.string().min(1), agentId: z.number().int().nullable().optional() }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as { from: (t: string) => any };
+    const { error } = await sb.from("agent_identities").upsert({
+      user_id: context.userId,
+      agent_name: data.agentName,
+      agent_id: data.agentId ?? null,
+      auto_matched: false,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Conversation trail from Freshdesk merged with in-app actions. */
+export const getTicketHistory = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { ticketId: number }) => z.object({ ticketId: z.number().int().positive() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const sb = context.supabase as unknown as { from: (t: string) => any };
+    const { data: actions, error } = await sb
+      .from("ticket_action_log")
+      .select("*")
+      .eq("ticket_id", data.ticketId)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(error.message);
+
+    const { fetchTicketConversations } = await import("@/lib/freshdesk.server");
+    let conversations: Awaited<ReturnType<typeof fetchTicketConversations>> = [];
+    let conversationsError: string | null = null;
+    try {
+      conversations = await fetchTicketConversations(data.ticketId);
+    } catch (e) {
+      conversationsError = e instanceof Error ? e.message : String(e);
+    }
+
+    return {
+      actions: (actions ?? []) as TicketActionEntry[],
+      conversations,
+      conversations_error: conversationsError,
+    };
+  });
+
+/** Assign, change status and/or close with a resolution note — pushed to Freshdesk and logged. */
+export const resolveTicket = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(
+    (d: { ticketId: number; agentId?: number | null; agentName?: string | null; status?: string; resolutionNote?: string }) =>
+      z
+        .object({
+          ticketId: z.number().int().positive(),
+          agentId: z.number().int().nullable().optional(),
+          agentName: z.string().nullable().optional(),
+          status: z.string().optional(),
+          resolutionNote: z.string().max(5000).optional(),
+        })
+        .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertTicketActor(context as never);
+    const sb = context.supabase as unknown as { from: (t: string) => any };
+    const actorEmail = (context.claims as { email?: string } | undefined)?.email ?? null;
+
+    const { data: before, error: beforeErr } = await sb
+      .from("freshdesk_tickets")
+      .select("id, status, agent_name")
+      .eq("id", data.ticketId)
+      .maybeSingle();
+    if (beforeErr) throw new Error(beforeErr.message);
+    if (!before) throw new Error(`Ticket #${data.ticketId} is not in this app yet`);
+
+    const { STATUS_IDS, updateFreshdeskTicket, addFreshdeskNote } = await import("@/lib/freshdesk.server");
+
+    const payload: { status?: number; responder_id?: number | null } = {};
+    if (data.status) {
+      const id = STATUS_IDS[data.status];
+      if (!id) throw new Error(`Unknown status "${data.status}"`);
+      payload.status = id;
+    }
+    if (data.agentId !== undefined) payload.responder_id = data.agentId;
+
+    if (data.resolutionNote?.trim()) {
+      await addFreshdeskNote(data.ticketId, data.resolutionNote.trim());
+    }
+
+    let result = { status: before.status as string | null, agent_name: before.agent_name as string | null };
+    if (Object.keys(payload).length > 0) {
+      result = await updateFreshdeskTicket(data.ticketId, payload);
+    }
+
+    const entries: Record<string, unknown>[] = [];
+    const base = { ticket_id: data.ticketId, actor_id: context.userId, actor_email: actorEmail };
+    if (data.agentId !== undefined && (data.agentName ?? null) !== before.agent_name) {
+      entries.push({
+        ...base,
+        action: "assign",
+        field_name: "agent_name",
+        old_value: before.agent_name,
+        new_value: data.agentName ?? null,
+      });
+    }
+    if (data.status && data.status !== before.status) {
+      entries.push({
+        ...base,
+        action: data.status === "Closed" || data.status === "Resolved" ? "close" : "status_change",
+        field_name: "status",
+        old_value: before.status,
+        new_value: data.status,
+        resolution_note: data.resolutionNote?.trim() || null,
+      });
+    }
+    if (data.resolutionNote?.trim() && entries.every((e) => !e.resolution_note)) {
+      entries.push({ ...base, action: "note", resolution_note: data.resolutionNote.trim() });
+    }
+    if (entries.length > 0) {
+      const { error: logErr } = await sb.from("ticket_action_log").insert(entries);
+      if (logErr) throw new Error(logErr.message);
+    }
+
+    return { ok: true, status: result.status, agent_name: result.agent_name };
+  });
