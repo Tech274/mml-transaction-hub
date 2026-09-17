@@ -30,6 +30,7 @@ import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } fr
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as ApiPublicBulkTemplateVersionRouteImport } from './routes/api/public/bulk-template-version'
 import { Route as AuthenticatedAiCommandCenterRunNowRouteImport } from './routes/_authenticated/ai-command-center.run-now'
+import { Route as AuthenticatedAiCommandCenterInboxRouteImport } from './routes/_authenticated/ai-command-center.inbox'
 import { Route as AuthenticatedAiCommandCenterAuditRouteImport } from './routes/_authenticated/ai-command-center.audit'
 import { Route as AuthenticatedAiCommandCenterAgentsRouteImport } from './routes/_authenticated/ai-command-center.agents'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
@@ -150,6 +151,12 @@ const AuthenticatedAiCommandCenterRunNowRoute =
     path: '/ai-command-center/run-now',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAiCommandCenterInboxRoute =
+  AuthenticatedAiCommandCenterInboxRouteImport.update({
+    id: '/ai-command-center/inbox',
+    path: '/ai-command-center/inbox',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAiCommandCenterAuditRoute =
   AuthenticatedAiCommandCenterAuditRouteImport.update({
     id: '/ai-command-center/audit',
@@ -214,6 +221,7 @@ export interface FileRoutesByFullPath {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ai-command-center/agents': typeof AuthenticatedAiCommandCenterAgentsRoute
   '/ai-command-center/audit': typeof AuthenticatedAiCommandCenterAuditRoute
+  '/ai-command-center/inbox': typeof AuthenticatedAiCommandCenterInboxRoute
   '/ai-command-center/run-now': typeof AuthenticatedAiCommandCenterRunNowRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
@@ -243,6 +251,7 @@ export interface FileRoutesByTo {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/ai-command-center/agents': typeof AuthenticatedAiCommandCenterAgentsRoute
   '/ai-command-center/audit': typeof AuthenticatedAiCommandCenterAuditRoute
+  '/ai-command-center/inbox': typeof AuthenticatedAiCommandCenterInboxRoute
   '/ai-command-center/run-now': typeof AuthenticatedAiCommandCenterRunNowRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
@@ -274,6 +283,7 @@ export interface FileRoutesById {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/_authenticated/ai-command-center/agents': typeof AuthenticatedAiCommandCenterAgentsRoute
   '/_authenticated/ai-command-center/audit': typeof AuthenticatedAiCommandCenterAuditRoute
+  '/_authenticated/ai-command-center/inbox': typeof AuthenticatedAiCommandCenterInboxRoute
   '/_authenticated/ai-command-center/run-now': typeof AuthenticatedAiCommandCenterRunNowRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
@@ -305,6 +315,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/ai-command-center/agents'
     | '/ai-command-center/audit'
+    | '/ai-command-center/inbox'
     | '/ai-command-center/run-now'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
@@ -334,6 +345,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/ai-command-center/agents'
     | '/ai-command-center/audit'
+    | '/ai-command-center/inbox'
     | '/ai-command-center/run-now'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
@@ -364,6 +376,7 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/_authenticated/ai-command-center/agents'
     | '/_authenticated/ai-command-center/audit'
+    | '/_authenticated/ai-command-center/inbox'
     | '/_authenticated/ai-command-center/run-now'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
@@ -536,6 +549,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAiCommandCenterRunNowRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ai-command-center/inbox': {
+      id: '/_authenticated/ai-command-center/inbox'
+      path: '/ai-command-center/inbox'
+      fullPath: '/ai-command-center/inbox'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterInboxRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/ai-command-center/audit': {
       id: '/_authenticated/ai-command-center/audit'
       path: '/ai-command-center/audit'
@@ -603,6 +623,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedTransactionsRoute: typeof AuthenticatedTransactionsRoute
   AuthenticatedAiCommandCenterAgentsRoute: typeof AuthenticatedAiCommandCenterAgentsRoute
   AuthenticatedAiCommandCenterAuditRoute: typeof AuthenticatedAiCommandCenterAuditRoute
+  AuthenticatedAiCommandCenterInboxRoute: typeof AuthenticatedAiCommandCenterInboxRoute
   AuthenticatedAiCommandCenterRunNowRoute: typeof AuthenticatedAiCommandCenterRunNowRoute
 }
 
@@ -623,6 +644,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
     AuthenticatedAiCommandCenterAgentsRoute,
   AuthenticatedAiCommandCenterAuditRoute:
     AuthenticatedAiCommandCenterAuditRoute,
+  AuthenticatedAiCommandCenterInboxRoute:
+    AuthenticatedAiCommandCenterInboxRoute,
   AuthenticatedAiCommandCenterRunNowRoute:
     AuthenticatedAiCommandCenterRunNowRoute,
 }
