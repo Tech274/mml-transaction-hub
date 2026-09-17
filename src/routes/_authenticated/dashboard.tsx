@@ -461,6 +461,11 @@ function Stat({ label, value, tone, search }: { label: string; value: string; to
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={`text-xl font-semibold mt-1 ${color}`}>{value}</div>
     </div>
-
+  );
+  if (!search) return inner;
+  return (
+    <Link to="/customers" search={search as never} className="block h-full">
+      {inner}
+    </Link>
   );
 }
