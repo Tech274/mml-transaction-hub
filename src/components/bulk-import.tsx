@@ -751,24 +751,26 @@ export function BulkImport() {
               const partial: Record<string, unknown> = {};
               for (const f of updateFields) if (f in fullPayload) partial[f] = fullPayload[f];
               if (kind === "private_cloud") partial.system_config = fullPayload.system_config;
+              // A Potential ID may cover several transactions, so this can touch more than one row.
               const { data: existing, error: updErr } = await supabase
                 .from("transactions")
                 .update(partial as never)
                 .eq("potential_id", String(fullPayload.potential_id))
-                .select("id").maybeSingle();
+                .select("id");
               if (updErr) {
                 const enriched = enrichPgConstraintError(updErr.message, (updErr as { code?: string }).code);
                 rowStatus = "error"; rowError = enriched.message;
                 updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
               }
-              else { rowStatus = "updated"; updatedCount++; txId = existing?.id ?? null; }
+              else { rowStatus = "updated"; updatedCount++; txId = existing?.[0]?.id ?? null; }
             } else { // link
-              // Link = read-only association, no fields overwritten on the existing record.
+              // Link = read-only association, no fields overwritten on the existing records.
               const { data: existing } = await supabase
-                .from("transactions").select("id").eq("potential_id", String(fullPayload.potential_id)).maybeSingle();
-              rowStatus = "linked"; linked++; txId = existing?.id ?? null;
+                .from("transactions").select("id").eq("potential_id", String(fullPayload.potential_id)).limit(1);
+              rowStatus = "linked"; linked++; txId = existing?.[0]?.id ?? null;
               updated[idx] = { ...r, errors: [`linked to existing transaction ${String(fullPayload.potential_id)} (no fields changed)`] };
             }
+
           } else {
             const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
             if (error) {
