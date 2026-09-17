@@ -139,20 +139,20 @@ function DashboardPage() {
 
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {can("chart_tx_by_month") && <ChartCard title={`Transactions by Month — ${curYear}`}>
+          {can("chart_tx_by_month") && <ChartCard title={`Transactions by Month — ${curYear}`} to="/transactions" search={{ year: curYear }}>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={byMonth}>
+              <BarChart data={byMonth} onClick={(s: any) => goMonth(s?.activeLabel)}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip />
-                <Bar dataKey="transactions" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="transactions" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_revenue_by_month") && <ChartCard title={`Revenue by Month — ${curYear}`}>
+          {can("chart_revenue_by_month") && <ChartCard title={`Revenue by Month — ${curYear}`} to="/transactions" search={{ year: curYear }}>
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={byMonth}>
+              <LineChart data={byMonth} onClick={(s: any) => goMonth(s?.activeLabel)} className="cursor-pointer">
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={12} />
                 <YAxis fontSize={12} />
@@ -167,67 +167,84 @@ function DashboardPage() {
           {can("chart_pub_priv") && <ChartCard title="Public vs Private Cloud">
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={split} dataKey="value" nameKey="name" outerRadius={80} label>
+                <Pie
+                  data={split}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={80}
+                  label
+                  className="cursor-pointer"
+                  onClick={(e: any) => navigate({ to: e?.name === "Private Cloud" ? "/private-cloud" : "/public-cloud", search: {} })}
+                >
                   {split.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
                 </Pie>
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_provider") && <ChartCard title="Public Cloud Provider Split">
+          {can("chart_provider") && <ChartCard title="Public Cloud Provider Split" to="/public-cloud" search={{}}>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={providerSplit}>
+              <BarChart data={providerSplit} onClick={(s: any) => s?.activeLabel && navigate({ to: "/transactions", search: { provider: String(s.activeLabel) } })}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="name" fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip />
-                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_top_revenue") && <ChartCard title="Top Customers by Revenue">
+          {can("chart_top_revenue") && <ChartCard title="Top Customers by Revenue" to="/customers" search={{ status: "all" as const }}>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={topRev} layout="vertical">
+              <BarChart data={topRev} layout="vertical" onClick={(s: any) => goCustomer(s?.activeLabel)}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis type="number" fontSize={11} tickFormatter={(v) => fmtCurrency(v).replace("₹", "")} />
                 <YAxis dataKey="name" type="category" fontSize={11} width={120} />
                 <Tooltip formatter={(v: number) => fmtCurrency(v)} />
-                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_top_users") && <ChartCard title="Top Customers by Users">
+          {can("chart_top_users") && <ChartCard title="Top Customers by Users" to="/customers" search={{ status: "all" as const }}>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={topUsers} layout="vertical">
+              <BarChart data={topUsers} layout="vertical" onClick={(s: any) => goCustomer(s?.activeLabel)}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis type="number" fontSize={11} />
                 <YAxis dataKey="name" type="category" fontSize={11} width={120} />
                 <Tooltip />
-                <Bar dataKey="users" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="users" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_top_profit") && <ChartCard title="Top Customers by Profit">
+          {can("chart_top_profit") && <ChartCard title="Top Customers by Profit" to="/customers" search={{ status: "all" as const }}>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={topProfit} layout="vertical">
+              <BarChart data={topProfit} layout="vertical" onClick={(s: any) => goCustomer(s?.activeLabel)}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis type="number" fontSize={11} tickFormatter={(v) => fmtCurrency(v).replace("₹", "")} />
                 <YAxis dataKey="name" type="category" fontSize={11} width={120} />
                 <Tooltip formatter={(v: number) => fmtCurrency(v)} />
-                <Bar dataKey="profit" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="profit" fill="#22c55e" radius={[0, 4, 4, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_lob") && <ChartCard title="Line of Business Split">
+          {can("chart_lob") && <ChartCard title="Line of Business Split" to="/transactions" search={{}}>
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={lobSplit} dataKey="value" nameKey="name" outerRadius={80} label>
+                <Pie
+                  data={lobSplit}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={80}
+                  label
+                  className="cursor-pointer"
+                  onClick={(e: any) => e?.name && navigate({ to: "/transactions", search: { lob: String(e.name) } })}
+                >
                   {lobSplit.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>}
+
           <div className="lg:col-span-2">
             <CustomersByAccountManager />
           </div>
