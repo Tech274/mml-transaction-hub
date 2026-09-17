@@ -49,9 +49,24 @@ const SYSTEM_CONFIG_OPTIONS = [
 ] as const;
 
 export function TransactionsTable({
-  repoFilter = "all", showProviderFilter = true,
-}: { repoFilter?: RepoFilter; showProviderFilter?: boolean }) {
-  const [filters, setFilters] = useState<Filters>(initial);
+  repoFilter = "all", showProviderFilter = true, initialFilters,
+}: {
+  repoFilter?: RepoFilter;
+  showProviderFilter?: boolean;
+  initialFilters?: {
+    q?: string; month?: number; year?: number; provider?: string; lob?: string; systemConfig?: string;
+  };
+}) {
+  const [filters, setFilters] = useState<Filters>({
+    ...initial,
+    search: initialFilters?.q ?? initial.search,
+    month: initialFilters?.month ? String(initialFilters.month) : initial.month,
+    year: initialFilters?.year ? String(initialFilters.year) : initial.year,
+    provider: initialFilters?.provider ?? initial.provider,
+    lob: initialFilters?.lob ?? initial.lob,
+    systemConfig: initialFilters?.systemConfig ?? initial.systemConfig,
+  });
+
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("recent");
