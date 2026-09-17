@@ -85,7 +85,30 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>AI Command Center</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {aiCommandCenterNav
+                .filter((i) => !i.roles || hasAnyRole(i.roles))
+                .map((item) => {
+                  const active = pathname === item.to || pathname.startsWith(item.to + "/");
+                  return (
+                    <SidebarMenuItem key={item.to}>
+                      <SidebarMenuButton asChild isActive={active}>
+                        <Link to={item.to}>
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{item.label}</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
+
       <SidebarFooter className="border-t border-sidebar-border">
         {!collapsed && user && (
           <div className="px-2 py-2 text-xs">
