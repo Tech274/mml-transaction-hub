@@ -408,9 +408,10 @@ function CustomersByAccountManager() {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-3 mb-4">
-          <Stat label={`New (last ${rangeMonths}m)`} value={fmtNumber(inRange.length)} />
-          <Stat label="Active" value={fmtNumber(active)} tone="positive" />
-          <Stat label="Deactivated" value={fmtNumber(inactive)} tone="muted" />
+          <Stat label={`New (last ${rangeMonths}m)`} value={fmtNumber(inRange.length)} search={{ status: "all" as const, range: rangeMonths }} />
+          <Stat label="Active" value={fmtNumber(active)} tone="positive" search={{ status: "active" as const, range: rangeMonths }} />
+          <Stat label="Deactivated" value={fmtNumber(inactive)} tone="muted" search={{ status: "inactive" as const, range: rangeMonths }} />
+
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
