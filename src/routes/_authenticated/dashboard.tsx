@@ -137,6 +137,10 @@ function DashboardPage() {
           }}
         />
 
+        <MyAgentTicketKpis />
+
+
+
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {can("chart_tx_by_month") && <ChartCard title={`Transactions by Month — ${curYear}`} to="/transactions" search={{ year: curYear }}>
