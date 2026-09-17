@@ -10,7 +10,7 @@ export const Route = createFileRoute("/api/public/hooks/freshdesk-sync")({
           return new Response("Unauthorized", { status: 401 });
         }
         const { runFreshdeskSync } = await import("@/lib/freshdesk.server");
-        const result = await runFreshdeskSync({ sinceDays: 30 });
+        const result = await runFreshdeskSync({ sinceDays: 7 });
         return new Response(JSON.stringify(result), {
           status: result.status === "success" ? 200 : 500,
           headers: { "Content-Type": "application/json" },
