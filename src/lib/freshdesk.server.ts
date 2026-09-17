@@ -70,20 +70,22 @@ function credentials() {
   return { domain, apiKey };
 }
 
-async function fdFetch(path: string, attempt = 0): Promise<Response> {
+async function fdFetch(path: string, init?: RequestInit, attempt = 0): Promise<Response> {
   const { domain, apiKey } = credentials();
   const auth = Buffer.from(`${apiKey}:X`).toString("base64");
   const res = await fetch(`https://${domain}/api/v2${path}`, {
-    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+    ...init,
+    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   // Freshdesk throttles per minute; wait out the advertised cool-down and retry.
   if (res.status === 429 && attempt < 3) {
     const retryAfter = Number(res.headers.get("retry-after") ?? "") || 30;
     await new Promise((r) => setTimeout(r, Math.min(retryAfter, 60) * 1000));
-    return fdFetch(path, attempt + 1);
+    return fdFetch(path, init, attempt + 1);
   }
   return res;
 }
+
 
 async function readError(res: Response, what: string): Promise<string> {
   const body = await res.text();
