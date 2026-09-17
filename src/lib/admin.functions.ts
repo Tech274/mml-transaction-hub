@@ -125,16 +125,145 @@ export const adminSetUserActive = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Shared role-sync used by adminSetUserRoles and the expanded update fn so the
+// last-admin protection can never be bypassed on any mutating path.
+async function syncRoles(sb: any, userId: string, roles: string[]) {
+  const desired = Array.from(new Set(roles));
+  const { data: currentAdmins } = await sb.from("user_roles").select("user_id").eq("role", "admin");
+  const adminIds = new Set<string>((currentAdmins ?? []).map((r: { user_id: string }) => r.user_id));
+  const wasAdmin = adminIds.has(userId);
+  const willBeAdmin = desired.includes("admin");
+  if (wasAdmin && !willBeAdmin && adminIds.size <= 1) {
+    throw new Error("Cannot remove the last Super Admin.");
+  }
+  const { data: held } = await sb.from("user_roles").select("id, role").eq("user_id", userId);
+  const heldRows = (held ?? []) as Array<{ id: string; role: string }>;
+  const heldRoles = new Set(heldRows.map((r) => r.role));
+  const toAdd = desired.filter((r) => !heldRoles.has(r));
+  const toRemove = heldRows.filter((r) => !desired.includes(r.role));
+  if (toRemove.length) {
+    const { error } = await sb.from("user_roles").delete().in("id", toRemove.map((r) => r.id));
+    if (error) throw new Error(error.message);
+  }
+  if (toAdd.length) {
+    const { error } = await sb.from("user_roles").insert(toAdd.map((role) => ({ user_id: userId, role })));
+    if (error) {
+      if (error.code === "23505") throw new Error("That role is already assigned to this user.");
+      throw new Error(error.message);
+    }
+  }
+}
+
+async function applyActive(sb: any, userId: string, active: boolean, callerId: string) {
+  if (!active && userId === callerId) throw new Error("You cannot disable your own account.");
+  if (!active) {
+    const { data: admins } = await sb.from("user_roles").select("user_id").eq("role", "admin");
+    const adminIds = new Set<string>((admins ?? []).map((r: { user_id: string }) => r.user_id));
+    if (adminIds.has(userId) && adminIds.size <= 1) {
+      throw new Error("Cannot disable the last Super Admin.");
+    }
+  }
+  const { error: pErr } = await sb.from("profiles").update({ is_active: active }).eq("id", userId);
+  if (pErr) throw new Error(pErr.message);
+  const { error: aErr } = await sb.auth.admin.updateUserById(userId, {
+    ban_duration: active ? "none" : "876000h",
+  } as any);
+  if (aErr) throw new Error(aErr.message);
+}
+
+// Expanded update: full name, email, active status and roles in one call.
+// Every field is optional; unspecified fields are left untouched.
 export const adminUpdateUserProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { userId: string; fullName: string }) =>
-    z.object({ userId: z.string().uuid(), fullName: z.string().trim().min(1).max(120) }).parse(d),
+  .inputValidator((d: { userId: string; fullName?: string; email?: string; isActive?: boolean; roles?: string[] }) =>
+    z.object({
+      userId: z.string().uuid(),
+      fullName: z.string().trim().min(1).max(120).optional(),
+      email: z.string().trim().toLowerCase().email().max(255).optional(),
+      isActive: z.boolean().optional(),
+      roles: z.array(roleEnum).min(1).optional(),
+    }).parse(d),
   )
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await supabaseAdmin
-      .from("profiles").update({ full_name: data.fullName }).eq("id", data.userId);
+
+    if (data.fullName) {
+      const { error } = await supabaseAdmin
+        .from("profiles").update({ full_name: data.fullName }).eq("id", data.userId);
+      if (error) throw new Error(error.message);
+      await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+        user_metadata: { full_name: data.fullName },
+      } as never);
+    }
+
+    if (data.email) {
+      const { data: clash } = await supabaseAdmin
+        .from("profiles").select("id").ilike("email", data.email).maybeSingle();
+      if (clash && clash.id !== data.userId) throw new Error("A user with this email already exists.");
+      const { error: aErr } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+        email: data.email,
+        email_confirm: true,
+      } as never);
+      if (aErr) throw new Error(aErr.message);
+      const { error: pErr } = await supabaseAdmin
+        .from("profiles").update({ email: data.email }).eq("id", data.userId);
+      if (pErr) throw new Error(pErr.message);
+    }
+
+    if (data.roles) await syncRoles(supabaseAdmin, data.userId, data.roles);
+    if (typeof data.isActive === "boolean") {
+      await applyActive(supabaseAdmin, data.userId, data.isActive, context.userId);
+    }
+
+    return { ok: true };
+  });
+
+// Alias with a clearer name; same behaviour as the expanded update above.
+export const adminUpdateUser = adminUpdateUserProfile;
+
+export const adminDeleteUser = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string }) => z.object({ userId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    if (data.userId === context.userId) throw new Error("You cannot delete your own account.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: admins } = await supabaseAdmin.from("user_roles").select("user_id").eq("role", "admin");
+    const adminIds = new Set((admins ?? []).map((r) => r.user_id));
+    if (adminIds.has(data.userId) && adminIds.size <= 1) {
+      throw new Error("Cannot delete the last Super Admin.");
+    }
+
+    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
     if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const adminResetPassword = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { userId: string; tempPassword: string }) =>
+    z.object({
+      userId: z.string().uuid(),
+      tempPassword: z.string().min(8).max(128),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: prof } = await supabaseAdmin
+      .from("profiles").select("full_name").eq("id", data.userId).maybeSingle();
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+      password: data.tempPassword,
+      user_metadata: {
+        must_change_password: true,
+        ...(prof?.full_name ? { full_name: prof.full_name } : {}),
+      },
+    } as never);
+    if (error) throw new Error(error.message);
+    // The temporary password is never emailed or logged — the UI shows it once.
     return { ok: true };
   });

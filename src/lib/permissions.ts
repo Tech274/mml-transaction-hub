@@ -43,7 +43,22 @@ export const PERMISSIONS: PermDef[] = [
   { key: "feature_reports_access", kind: "feature", label: "Reports page access", group: "Features" },
   { key: "feature_export_jobs_view", kind: "feature", label: "View async export jobs", group: "Features" },
   { key: "feature_export_jobs_trigger", kind: "feature", label: "Trigger async export jobs (large exports)", group: "Features" },
+  // Admin capabilities — Super Admin only; not delegated to other roles yet.
+  { key: "feature_user_manage", kind: "feature", label: "Create and edit users (email, name, roles, status)", group: "Admin" },
+  { key: "feature_user_delete", kind: "feature", label: "Delete users", group: "Admin" },
+  { key: "feature_user_reset_password", kind: "feature", label: "Reset / set temporary password", group: "Admin" },
+  { key: "feature_roles_manage", kind: "feature", label: "Assign roles", group: "Admin" },
+  { key: "feature_permissions_manage", kind: "feature", label: "Edit the permission matrix", group: "Admin" },
 ];
+
+// Keys reserved for Super Admin. Rendered as an always-on, read-only column.
+export const ADMIN_ONLY_PERM_KEYS = [
+  "feature_user_manage",
+  "feature_user_delete",
+  "feature_user_reset_password",
+  "feature_roles_manage",
+  "feature_permissions_manage",
+] as const;
 
 export const PERM_KEYS = PERMISSIONS.map((p) => p.key);
 

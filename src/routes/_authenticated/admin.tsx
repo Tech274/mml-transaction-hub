@@ -881,31 +881,57 @@ function PermissionAuditLog() {
   );
 }
 
+function randomTempPassword(len = 14): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
+  const arr = new Uint32Array(len);
+  crypto.getRandomValues(arr);
+  return Array.from(arr, (n) => chars[n % chars.length]).join("");
+}
+
 function UserRow({
-  user, isSelf, onSetRoles, onSetActive, onSaveProfile,
+  user, isSelf, isLastAdmin, canManage, canDelete, canReset,
+  onSave, onSetActive, onDelete, onResetPassword,
 }: {
   user: { id: string; email: string | null; full_name: string | null; is_active: boolean; roles: { role: AppRole; id: string }[] };
   isSelf: boolean;
-  onSetRoles: (roles: AppRole[]) => Promise<void>;
+  isLastAdmin: boolean;
+  canManage: boolean;
+  canDelete: boolean;
+  canReset: boolean;
+  onSave: (v: { fullName?: string; email?: string; isActive?: boolean; roles?: AppRole[] }) => Promise<void>;
   onSetActive: (active: boolean) => Promise<void>;
-  onSaveProfile: (fullName: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onResetPassword: (tempPassword: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<AppRole[]>(user.roles.map((r) => r.role));
   const [fullName, setFullName] = useState(user.full_name ?? "");
+  const [email, setEmail] = useState(user.email ?? "");
+  const [active, setActive] = useState(user.is_active);
   const [busy, setBusy] = useState(false);
+
+  const [resetOpen, setResetOpen] = useState(false);
+  const [tempPassword, setTempPassword] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const toggle = (r: AppRole) =>
     setSelected((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
 
   async function save() {
     if (selected.length === 0) return toast.error("Pick at least one role.");
+    if (!email.trim()) return toast.error("Email is required.");
     setBusy(true);
     try {
-      if (fullName.trim() && fullName.trim() !== (user.full_name ?? "")) await onSaveProfile(fullName.trim());
+      const payload: { fullName?: string; email?: string; isActive?: boolean; roles?: AppRole[] } = {};
+      if (fullName.trim() && fullName.trim() !== (user.full_name ?? "")) payload.fullName = fullName.trim();
+      const nextEmail = email.trim().toLowerCase();
+      if (nextEmail !== (user.email ?? "").toLowerCase()) payload.email = nextEmail;
       const before = user.roles.map((r) => r.role).sort().join(",");
       const after = [...selected].sort().join(",");
-      if (before !== after) await onSetRoles(selected);
+      if (before !== after) payload.roles = selected;
+      if (active !== user.is_active) payload.isActive = active;
+      if (Object.keys(payload).length === 0) { setEditing(false); return; }
+      await onSave(payload);
       setEditing(false);
     } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
@@ -913,6 +939,21 @@ function UserRow({
   async function toggleActive(next: boolean) {
     setBusy(true);
     try { await onSetActive(next); } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
+
+  async function doReset() {
+    if (tempPassword.length < 8) return toast.error("Temporary password must be at least 8 characters.");
+    setBusy(true);
+    try {
+      await onResetPassword(tempPassword);
+      setResetOpen(false);
+    } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
+  }
+
+  async function doDelete() {
+    setBusy(true);
+    try { await onDelete(); setDeleteOpen(false); }
+    catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
 
   return (
@@ -931,52 +972,140 @@ function UserRow({
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
-          <Switch checked={user.is_active} disabled={busy || isSelf} onCheckedChange={toggleActive} />
+          <Switch checked={user.is_active} disabled={busy || isSelf || !canManage} onCheckedChange={toggleActive} />
           <span className="text-xs text-muted-foreground">{user.is_active ? "Active" : "Disabled"}</span>
         </div>
       </TableCell>
       <TableCell className="text-right">
-        <Dialog open={editing} onOpenChange={(o) => { setEditing(o); if (o) { setSelected(user.roles.map((r) => r.role)); setFullName(user.full_name ?? ""); } }}>
-          <DialogTrigger asChild><Button size="sm" variant="outline">Edit</Button></DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Edit user</DialogTitle>
-              <DialogDescription>{user.email}</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label>Full name</Label>
-                <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Roles</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {ROLES.map((r) => (
-                    <label key={r} className="flex items-center gap-2 text-sm rounded-md border border-border p-2">
-                      <Checkbox checked={selected.includes(r)} onCheckedChange={() => toggle(r)} />
-                      <span>{ROLE_LABEL[r]}</span>
-                    </label>
-                  ))}
+        <div className="flex flex-wrap items-center gap-1 justify-end">
+          {canManage && (
+            <Dialog
+              open={editing}
+              onOpenChange={(o) => {
+                setEditing(o);
+                if (o) {
+                  setSelected(user.roles.map((r) => r.role));
+                  setFullName(user.full_name ?? "");
+                  setEmail(user.email ?? "");
+                  setActive(user.is_active);
+                }
+              }}
+            >
+              <DialogTrigger asChild><Button size="sm" variant="outline">Edit</Button></DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit user</DialogTitle>
+                  <DialogDescription>{user.email}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label>Email</Label>
+                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} data-testid="edit-user-email" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Full name</Label>
+                    <Input value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Roles</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {ROLES.map((r) => (
+                        <label key={r} className="flex items-center gap-2 text-sm rounded-md border border-border p-2">
+                          <Checkbox checked={selected.includes(r)} onCheckedChange={() => toggle(r)} />
+                          <span>{ROLE_LABEL[r]}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch checked={active} disabled={isSelf} onCheckedChange={setActive} data-testid="edit-user-status" />
+                    <span className="text-sm">{active ? "Active" : "Disabled"}</span>
+                    {isSelf && <span className="text-xs text-muted-foreground">(you cannot disable yourself)</span>}
+                  </div>
                 </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
-              <Button onClick={save} disabled={busy}>{busy ? "Saving…" : "Save"}</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button>
+                  <Button onClick={save} disabled={busy}>{busy ? "Saving…" : "Save"}</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {canReset && (
+            <Dialog
+              open={resetOpen}
+              onOpenChange={(o) => { setResetOpen(o); if (o) setTempPassword(randomTempPassword()); }}
+            >
+              <DialogTrigger asChild>
+                <Button size="sm" variant="outline" data-testid="reset-password-open">Reset password</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Set a temporary password</DialogTitle>
+                  <DialogDescription>
+                    {user.email} will sign in with this password and should change it immediately.
+                    It is never emailed — copy it now and share it securely.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-2">
+                  <Label>Temporary password</Label>
+                  <div className="flex gap-2">
+                    <Input value={tempPassword} onChange={(e) => setTempPassword(e.target.value)} data-testid="temp-password-input" />
+                    <Button variant="outline" onClick={() => setTempPassword(randomTempPassword())}>Regenerate</Button>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setResetOpen(false)}>Cancel</Button>
+                  <Button onClick={doReset} disabled={busy} data-testid="reset-password-confirm">
+                    {busy ? "Saving…" : "Set password"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {canDelete && (
+            <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={isSelf || isLastAdmin}
+                  title={isSelf ? "You cannot delete your own account" : isLastAdmin ? "Cannot delete the last Super Admin" : "Delete this user"}
+                  data-testid="delete-user-open"
+                >
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete user</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Permanently delete {user.email}? This removes their login and cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={(e) => { e.preventDefault(); void doDelete(); }} data-testid="delete-user-confirm">
+                    {busy ? "Deleting…" : "Delete permanently"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </TableCell>
     </TableRow>
   );
 }
 
-function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; password: string; fullName: string; roles: AppRole[] }) => Promise<void> }) {
+function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; password: string; fullName: string; roles: AppRole[]; isActive: boolean }) => Promise<void> }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [roles, setRoles] = useState<AppRole[]>(["viewer"]);
+  const [isActive, setIsActive] = useState(true);
   const [busy, setBusy] = useState(false);
 
   const toggle = (r: AppRole) => setRoles((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
@@ -986,8 +1115,8 @@ function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; passwor
     if (password.length < 8) return toast.error("Password must be at least 8 characters.");
     setBusy(true);
     try {
-      await onCreate({ email: email.trim().toLowerCase(), password, fullName: fullName.trim(), roles });
-      setOpen(false); setEmail(""); setPassword(""); setFullName(""); setRoles(["viewer"]);
+      await onCreate({ email: email.trim().toLowerCase(), password, fullName: fullName.trim(), roles, isActive });
+      setOpen(false); setEmail(""); setPassword(""); setFullName(""); setRoles(["viewer"]); setIsActive(true);
     } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
 
@@ -1002,7 +1131,13 @@ function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; passwor
         <div className="space-y-3">
           <div className="space-y-1.5"><Label>Full name</Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></div>
           <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></div>
-          <div className="space-y-1.5"><Label>Temporary password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+          <div className="space-y-1.5">
+            <Label>Temporary password</Label>
+            <div className="flex gap-2">
+              <Input type="text" value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Button variant="outline" onClick={() => setPassword(randomTempPassword())}>Generate</Button>
+            </div>
+          </div>
           <div className="space-y-2">
             <Label>Roles</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -1013,6 +1148,10 @@ function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; passwor
                 </label>
               ))}
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Switch checked={isActive} onCheckedChange={setIsActive} data-testid="create-user-status" />
+            <span className="text-sm">{isActive ? "Active" : "Disabled"}</span>
           </div>
         </div>
         <DialogFooter>

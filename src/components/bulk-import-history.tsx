@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Download, History, RefreshCw, FileWarning, Search, FileText, GitBranch, Trash2 } from "lucide-react";
+import { Download, History, RefreshCw, FileWarning, Search, FileText, GitBranch, Trash2, Ban } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,7 +55,7 @@ export function BulkImportHistory() {
   const [statusF, setStatusF] = useState<string>("all");
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const cleanupFn = useServerFn(runArtifactCleanup);
   const [cleanupDays, setCleanupDays] = useState<number>(90);
   const [cleanupRunning, setCleanupRunning] = useState(false);
@@ -110,6 +110,24 @@ export function BulkImportHistory() {
     });
   }, [runs, search, statusF, fromDate, toDate]);
 
+  async function markCancelled(run: Run) {
+    if (!confirm(`Mark this pending import as cancelled?\n\n${run.filename}\n\nNo transactions are changed.`)) return;
+    const { error } = await supabase
+      .from("bulk_import_runs")
+      .update({ status: "cancelled", completed_at: new Date().toISOString() })
+      .eq("id", run.id);
+    if (error) { toast.error(error.message); return; }
+    void supabase.from("bulk_import_audit_events").insert({
+      run_id: run.id,
+      event_type: "run_cancelled",
+      actor_id: user?.id ?? null,
+      actor_email: user?.email ?? null,
+      details: { filename: run.filename, kind: run.kind, reason: "marked cancelled from import history" },
+    } as never);
+    toast.success("Import marked cancelled");
+    refetch();
+  }
+
   async function downloadErrors(run: Run) {
     const { data, error } = await supabase
       .from("bulk_import_row_audit")
@@ -119,7 +137,16 @@ export function BulkImportHistory() {
       .order("line_number");
     if (error) { toast.error(error.message); return; }
     const rows = (data ?? []) as RowAudit[];
-    if (!rows.length) { toast.message("No invalid rows for this run"); return; }
+    if (!rows.length) {
+      // Fall back to the stored error artifact when per-row audit is empty.
+      if (run.error_artifact_path) {
+        toast.message("No per-row audit found — downloading the stored error artifact instead");
+        await downloadArtifact(run.error_artifact_path, `${run.filename.replace(/\.csv$/i, "")}-invalid-rows.json`);
+        return;
+      }
+      toast.message("No invalid rows for this run");
+      return;
+    }
     const keys = Array.from(new Set(rows.flatMap((r) => Object.keys(r.row_data ?? {}))));
     const header = ["line", "potential_id", "status", "error", ...keys];
     const body = rows.map((r) => [
@@ -133,7 +160,7 @@ export function BulkImportHistory() {
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `${run.filename.replace(/\.csv$/i, "")}-errors.csv`; a.click();
+    a.href = url; a.download = `${run.filename.replace(/\.csv$/i, "")}-invalid-rows.csv`; a.click();
     URL.revokeObjectURL(url);
   }
 
@@ -204,6 +231,7 @@ export function BulkImportHistory() {
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
               <SelectItem value="failed">Failed</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
           <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-9 w-[150px]" aria-label="From" />
@@ -272,9 +300,19 @@ export function BulkImportHistory() {
                           <FileText className="h-3.5 w-3.5 mr-1" />Original
                         </Button>
                       )}
-                      {r.invalid_rows > 0 && (
+                      {(r.invalid_rows > 0 || !!r.error_artifact_path) && (
                         <Button size="sm" variant="ghost" onClick={() => downloadErrors(r)} title="Download failed rows CSV">
                           <FileWarning className="h-3.5 w-3.5 mr-1" />Failed rows
+                        </Button>
+                      )}
+                      {isAdmin && r.status === "pending" && (
+                        <Button
+                          size="sm" variant="outline"
+                          onClick={() => markCancelled(r)}
+                          title="Mark this stuck pending run as cancelled"
+                          data-testid={`mark-cancelled-${r.id}`}
+                        >
+                          <Ban className="h-3.5 w-3.5 mr-1" />Mark cancelled
                         </Button>
                       )}
                     </div>

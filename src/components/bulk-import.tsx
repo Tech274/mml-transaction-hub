@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { findOrCreateCustomer, checkPotentialIdUnique } from "@/lib/transactions.functions";
+import { findOrCreateCustomer } from "@/lib/transactions.functions";
 import { useAuth } from "@/lib/auth-context";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 
@@ -270,27 +270,48 @@ export function BulkImport() {
   );
   const fileRef = useRef<HTMLInputElement>(null);
   const findOrCreate = useServerFn(findOrCreateCustomer);
-  const checkUnique = useServerFn(checkPotentialIdUnique);
+  
   const { user } = useAuth();
   const qc = useQueryClient();
 
   // Guard: block retry while a previous run for this user is still in-flight.
-  const { data: lastRun } = useQuery({
-    queryKey: ["bulk_import_runs", "latest", user?.id],
+  // Any pending run for this user blocks a retry — not just the newest one,
+  // otherwise a stale pending run further down the list leaves the user stuck.
+  const { data: pendingRuns = [] } = useQuery({
+    queryKey: ["bulk_import_runs", "pending", user?.id],
     enabled: !!user,
     queryFn: async () => {
       const { data } = await supabase
         .from("bulk_import_runs")
-        .select("id,status")
+        .select("id,status,filename,created_at")
         .eq("user_id", user!.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      return data;
+        .eq("status", "pending")
+        .order("created_at", { ascending: false });
+      return (data ?? []) as Array<{ id: string; filename: string; created_at: string }>;
     },
     refetchInterval: submitting ? 2000 : false,
   });
-  const lastRunInFlight = lastRun?.status === "pending";
+  const lastRunInFlight = pendingRuns.length > 0;
+
+  async function abandonPendingImports() {
+    if (!user || !pendingRuns.length) return;
+    if (!confirm(`Mark ${pendingRuns.length} pending import(s) as cancelled? No data is changed.`)) return;
+    for (const r of pendingRuns) {
+      await supabase
+        .from("bulk_import_runs")
+        .update({ status: "cancelled", completed_at: new Date().toISOString() })
+        .eq("id", r.id);
+      void supabase.from("bulk_import_audit_events").insert({
+        run_id: r.id,
+        event_type: "run_cancelled",
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        details: { filename: r.filename, reason: "abandoned by user from bulk import tab" },
+      } as never);
+    }
+    toast.success(`Cancelled ${pendingRuns.length} pending import(s)`);
+    qc.invalidateQueries({ queryKey: ["bulk_import_runs"] });
+  }
 
   // Retry cap: count prior retries for this user (latest "completed" chain).
   const MAX_RETRIES = 3;
@@ -612,6 +633,8 @@ export function BulkImport() {
     setProgress({ done: 0, total: valid.length, succeeded: 0, failed: 0, isRetry: isRetryRun });
     const updated = [...rows];
     let imported = 0, skipped = 0, updatedCount = 0, linked = 0;
+    // Distinct existing transactions matched by the natural key across this file.
+    const matchedIds = new Set<string>();
 
     // Create run header
     const { data: run, error: runErr } = await supabase
@@ -639,6 +662,19 @@ export function BulkImport() {
       return;
     }
     const runId = run.id;
+
+    // Audit: every import is recorded, not only retries.
+    void supabase.from("bulk_import_audit_events").insert({
+      run_id: runId,
+      parent_run_id: isRetryRun ? parentRunId : null,
+      event_type: "import_started",
+      actor_id: user.id,
+      actor_email: user.email ?? null,
+      details: {
+        kind, filename: fileName, strategy: dupStrategy,
+        valid: valid.length, invalid: rows.length - valid.length,
+      },
+    } as never);
 
     // Audit: record that a retry run started.
     if (isRetryRun) {
@@ -721,7 +757,6 @@ export function BulkImport() {
           continue;
         }
         try {
-          const uq = await checkUnique({ data: { potentialId: String(p.potential_id) } });
           const cust = await findOrCreate({ data: { customerName: String(p.customer_name) } });
           const fullPayload = {
             potential_id: String(p.potential_id),
@@ -742,35 +777,48 @@ export function BulkImport() {
             selling_cost: Number(p.selling_cost),
             created_by: user.id,
           } as Record<string, unknown>;
-          if (!uq.unique) {
+
+          // Duplicate match is the NATURAL KEY (potential_id + month + year +
+          // lab_name), never potential_id alone — one Potential ID can hold
+          // several ADR lines, and those extra lines must insert as new ADRs.
+          const { data: match } = await supabase
+            .from("transactions")
+            .select("id")
+            .eq("potential_id", String(fullPayload.potential_id))
+            .eq("month", Number(fullPayload.month))
+            .eq("year", Number(fullPayload.year))
+            .eq("lab_name", String(fullPayload.lab_name))
+            .eq("is_deleted", false)
+            .limit(1)
+            .maybeSingle();
+
+          if (match?.id) {
+            matchedIds.add(match.id);
             if (dupStrategy === "skip") {
-              updated[idx] = { ...r, errors: [`ignored: potential_id ${String(fullPayload.potential_id)} already has a transaction (allowed, nothing changed)`] };
-              rowStatus = "skipped"; skipped++;
+              updated[idx] = { ...r, errors: [`skipped: existing ADR for potential_id+month+year+lab_name (${String(fullPayload.potential_id)} · ${String(fullPayload.month)}/${String(fullPayload.year)} · ${String(fullPayload.lab_name)}) — nothing changed`] };
+              rowStatus = "skipped"; skipped++; txId = match.id;
             } else if (dupStrategy === "update") {
               // Only overwrite the fields the user opted into; preserve the rest.
+              // Update THIS matched row by id — never every txn sharing the PID.
               const partial: Record<string, unknown> = {};
               for (const f of updateFields) if (f in fullPayload) partial[f] = fullPayload[f];
               if (kind === "private_cloud") partial.system_config = fullPayload.system_config;
-              // A Potential ID may cover several transactions, so this can touch more than one row.
-              const { data: existing, error: updErr } = await supabase
+              const { error: updErr } = await supabase
                 .from("transactions")
                 .update(partial as never)
-                .eq("potential_id", String(fullPayload.potential_id))
-                .select("id");
+                .eq("id", match.id);
               if (updErr) {
                 const enriched = enrichPgConstraintError(updErr.message, (updErr as { code?: string }).code);
                 rowStatus = "error"; rowError = enriched.message;
                 updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
+              } else {
+                rowStatus = "updated"; updatedCount++; txId = match.id;
               }
-              else { rowStatus = "updated"; updatedCount++; txId = existing?.[0]?.id ?? null; }
             } else { // link
-              // Link = read-only association, no fields overwritten on the existing records.
-              const { data: existing } = await supabase
-                .from("transactions").select("id").eq("potential_id", String(fullPayload.potential_id)).limit(1);
-              rowStatus = "linked"; linked++; txId = existing?.[0]?.id ?? null;
-              updated[idx] = { ...r, errors: [`linked to existing transaction ${String(fullPayload.potential_id)} (no fields changed)`] };
+              // Link = read-only association, no fields overwritten.
+              rowStatus = "linked"; linked++; txId = match.id;
+              updated[idx] = { ...r, errors: [`linked to existing ADR ${String(fullPayload.potential_id)} (no fields changed)`] };
             }
-
           } else {
             const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
             if (error) {
@@ -827,7 +875,23 @@ export function BulkImport() {
         }
       }
       setRows(updated);
-      toast.success(`Done · ${imported} new · ${updatedCount} updated · ${linked} linked · ${skipped} skipped`);
+      void supabase.from("bulk_import_audit_events").insert({
+        run_id: runId,
+        parent_run_id: isRetryRun ? parentRunId : null,
+        event_type: "import_completed",
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        details: {
+          kind, filename: fileName, strategy: dupStrategy,
+          imported, updated: updatedCount, skipped, linked,
+          unique_matched: matchedIds.size,
+          valid: valid.length, invalid: rows.length - valid.length,
+          claimed_valid: valid.length,
+        },
+      } as never);
+      toast.success(
+        `Done · ${imported} new · ${updatedCount} updated (${matchedIds.size} existing matches of ${valid.length} valid rows) · ${skipped} skipped · ${linked} linked`,
+      );
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["bulk_import_runs"] });
@@ -836,6 +900,20 @@ export function BulkImport() {
       await supabase.from("bulk_import_runs").update({
         status: "failed", completed_at: new Date().toISOString(),
       }).eq("id", runId);
+      void supabase.from("bulk_import_audit_events").insert({
+        run_id: runId,
+        parent_run_id: isRetryRun ? parentRunId : null,
+        event_type: "import_failed",
+        actor_id: user.id,
+        actor_email: user.email ?? null,
+        details: {
+          kind, filename: fileName, strategy: dupStrategy,
+          imported, updated: updatedCount, skipped, linked,
+          unique_matched: matchedIds.size,
+          valid: valid.length, invalid: rows.length - valid.length,
+          error: (e as Error).message,
+        },
+      } as never);
       toast.error(`Import failed: ${(e as Error).message}`);
     } finally {
       setSubmitting(false);
@@ -972,6 +1050,17 @@ export function BulkImport() {
                   <RotateCw className="h-4 w-4 mr-1" />Retry invalid rows
                 </Button>
               )}
+              {lastRunInFlight && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={abandonPendingImports}
+                  title="Mark stuck pending imports as cancelled so retries are unblocked"
+                  data-testid="abandon-pending-import"
+                >
+                  <X className="h-4 w-4 mr-1" />Abandon pending import ({pendingRuns.length})
+                </Button>
+              )}
               <Button size="sm" variant="ghost" onClick={reset}><X className="h-4 w-4 mr-1" />Clear</Button>
               <Button size="sm" disabled={submitting || validCount === 0} onClick={importValid}>
                 <Upload className="h-4 w-4 mr-1" />
@@ -1066,15 +1155,20 @@ export function BulkImport() {
         {/* Duplicate handling explainer + per-field selector */}
         <div className="rounded-md border p-3 text-xs space-y-2">
           <div className="font-medium text-foreground">Duplicate handling: <span className="uppercase">{dupStrategy}</span></div>
+          <div className="text-muted-foreground">
+            Skip / Update / Link match on <span className="font-medium text-foreground">potential_id + month + year + lab_name</span>.
+            Rows that do not match insert as new ADRs — including extra lines for an existing Potential ID and brand-new Potential IDs.
+            Update only ever touches the one matched ADR; it never blasts every transaction sharing a Potential ID.
+          </div>
           {dupStrategy === "skip" && (
-            <div className="text-muted-foreground">Existing transactions with the same potential_id are left unchanged. The incoming row is ignored (not an error).</div>
+            <div className="text-muted-foreground">An existing ADR with the same potential_id + month + year + lab_name is left unchanged and the incoming row is ignored (not an error).</div>
           )}
           {dupStrategy === "link" && (
             <div className="text-muted-foreground">No fields are written. All existing fields are preserved as-is. The audit log records a link reference only.</div>
           )}
           {dupStrategy === "update" && (
             <div className="space-y-2">
-              <div className="text-muted-foreground">Pick which fields overwrite the existing record. Unchecked fields are preserved.</div>
+              <div className="text-muted-foreground">Pick which fields overwrite the matched ADR. Unchecked fields are preserved.</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
                 {UPDATABLE_FIELDS.map((f) => {
                   const disabled = (f === "cloud_provider" && kind === "private_cloud")
