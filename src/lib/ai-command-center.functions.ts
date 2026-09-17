@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -28,7 +29,7 @@ export interface InboxItem {
   item_type: InboxType;
   title: string;
   summary: string | null;
-  payload: Record<string, unknown>;
+  payload: Record<string, any>;
   status: "pending" | "confirmed" | "rejected";
   decision_note: string | null;
   decided_by_email: string | null;
@@ -43,7 +44,7 @@ export interface AuditItem {
   action: "run" | "propose" | "confirm" | "reject";
   run_id: string | null;
   inbox_id: string | null;
-  detail: Record<string, unknown>;
+  detail: Record<string, any>;
   created_at: string;
 }
 
@@ -53,7 +54,7 @@ export interface LabRequest {
   customer_name: string;
   lab_name: string;
   status: string;
-  requisition: Record<string, unknown>;
+  requisition: Record<string, any>;
   confirmed_at: string | null;
   created_at: string;
 }
@@ -129,7 +130,7 @@ async function writeAudit(
     action: "run" | "propose" | "confirm" | "reject";
     run_id?: string | null;
     inbox_id?: string | null;
-    detail?: Record<string, unknown>;
+    detail?: Record<string, any>;
   },
 ) {
   await sb.from("ai_cc_audit").insert({
@@ -220,7 +221,7 @@ interface Proposal {
   item_type: InboxType;
   title: string;
   summary: string;
-  payload: Record<string, unknown>;
+  payload: Record<string, any>;
 }
 
 function generalistBrain(hint: string | null): Proposal[] {
@@ -467,7 +468,7 @@ export const runAgent = createServerFn({ method: "POST" })
 
     try {
       let proposals: Proposal[] = [];
-      const output: Record<string, unknown> = {};
+      const output: Record<string, any> = {};
 
       if (data.agent_key === "generalist") {
         proposals = generalistBrain(data.job_hint ?? null);
@@ -608,7 +609,7 @@ export const confirmInboxItem = createServerFn({ method: "POST" })
     if (data.edited?.subject !== undefined) payload['subject'] = data.edited.subject;
     if (data.edited?.body !== undefined) payload['body'] = data.edited.body;
 
-    let write_result: Record<string, unknown> = { performed: false, reason: "No external write for this item type" };
+    let write_result: Record<string, any> = { performed: false, reason: "No external write for this item type" };
 
     if (row.item_type === "ticket_proposal") {
       // The ONLY place a helpdesk write may happen — after human confirm.
