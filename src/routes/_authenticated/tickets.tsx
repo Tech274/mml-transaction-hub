@@ -94,9 +94,11 @@ function TicketsPage() {
   const syncFn = useServerFn(syncFreshdeskNow);
   const directoryFn = useServerFn(getAgentDirectory);
 
-  const [view, setView] = useState<"all" | "mine">("all");
+  const search = Route.useSearch();
+  const [view, setView] = useState<"all" | "mine">(search.view);
   const [q, setQ] = useState("");
-  const [quick, setQuick] = useState<Quick>("all");
+  const [quick, setQuick] = useState<Quick>(search.quick);
+
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
   const [agent, setAgent] = useState("all");
