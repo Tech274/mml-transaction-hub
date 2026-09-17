@@ -454,12 +454,13 @@ function CustomersByAccountManager() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "positive" | "muted" }) {
+function Stat({ label, value, tone, search }: { label: string; value: string; tone?: "positive" | "muted"; search?: Record<string, unknown> }) {
   const color = tone === "positive" ? "text-emerald-600" : tone === "muted" ? "text-muted-foreground" : "";
-  return (
-    <div className="rounded-md border border-border p-3">
+  const inner = (
+    <div className={`rounded-md border border-border p-3 h-full ${search ? "transition hover:border-primary hover:bg-muted/50" : ""}`}>
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={`text-xl font-semibold mt-1 ${color}`}>{value}</div>
     </div>
+
   );
 }
