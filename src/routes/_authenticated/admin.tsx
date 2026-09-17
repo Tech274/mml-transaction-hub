@@ -19,10 +19,16 @@ import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  adminCreateUser, adminSetUserRoles, adminSetUserActive, adminUpdateUserProfile,
+  adminCreateUser, adminSetUserActive, adminUpdateUserProfile,
+  adminDeleteUser, adminResetPassword,
 } from "@/lib/admin.functions";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
-import { PERMISSIONS, type PermDef, setPreviewRole, usePreviewRole } from "@/lib/permissions";
+import { PERMISSIONS, ADMIN_ONLY_PERM_KEYS, type PermDef, setPreviewRole, usePreviewRole } from "@/lib/permissions";
 import { usePermissions } from "@/lib/permissions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { upsertAccountManagerFn, setAccountManagerActiveFn } from "@/lib/customers.functions";
@@ -60,9 +66,10 @@ function AdminPage() {
   const qc = useQueryClient();
   const { can } = usePermissions();
   const createUserFn = useServerFn(adminCreateUser);
-  const setRolesFn = useServerFn(adminSetUserRoles);
   const setActiveFn = useServerFn(adminSetUserActive);
   const updateProfileFn = useServerFn(adminUpdateUserProfile);
+  const deleteUserFn = useServerFn(adminDeleteUser);
+  const resetPasswordFn = useServerFn(adminResetPassword);
 
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["admin-users"],
@@ -291,6 +298,10 @@ function PermissionsMatrix() {
             <p className="text-xs text-muted-foreground">
               Super Admin always has access to everything. Items disabled for a role are hidden in that role's UI.
             </p>
+            <p className="text-xs text-muted-foreground">
+              Super Admin always has user, role, and permission management. These capabilities are not delegated
+              to other roles yet.
+            </p>
             {groups.map((g) => (
               <PermGroup
                 key={g}
@@ -326,6 +337,7 @@ function PermGroup({
           <TableHeader>
             <TableRow>
               <TableHead className="min-w-[240px]">Item</TableHead>
+              <TableHead className="text-center whitespace-nowrap">Super Admin</TableHead>
               {roles.map((r) => (
                 <TableHead key={r} className="text-center whitespace-nowrap">{ROLE_LABEL[r]}</TableHead>
               ))}
@@ -335,9 +347,17 @@ function PermGroup({
             {items.map((p) => (
               <TableRow key={p.key}>
                 <TableCell className="text-sm">{p.label}</TableCell>
+                {/* Super Admin is read-only: always granted, never delegated. */}
+                <TableCell className="text-center">
+                  <Checkbox checked disabled aria-label={`Super Admin always has ${p.label}`} />
+                </TableCell>
                 {roles.map((r) => (
                   <TableCell key={r} className="text-center">
-                    <Checkbox checked={get(r, p.key)} onCheckedChange={(v) => toggle(r, p.key, Boolean(v))} />
+                    <Checkbox
+                      checked={ADMIN_ONLY_PERM_KEYS.includes(p.key as never) ? false : get(r, p.key)}
+                      disabled={ADMIN_ONLY_PERM_KEYS.includes(p.key as never)}
+                      onCheckedChange={(v) => toggle(r, p.key, Boolean(v))}
+                    />
                   </TableCell>
                 ))}
               </TableRow>
