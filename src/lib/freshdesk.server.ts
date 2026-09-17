@@ -132,7 +132,7 @@ export async function runFreshdeskSync(opts?: { sinceDays?: number; maxPages?: n
   const maxPages = opts?.maxPages ?? 20;
 
   try {
-    const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+    
     const [agents, groups] = await Promise.all([loadLookup("/agents?per_page=100"), loadLookup("/groups?per_page=100")]);
 
     const sinceMs = Date.now() - sinceDays * 86_400_000;
