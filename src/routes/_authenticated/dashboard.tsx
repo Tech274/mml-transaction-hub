@@ -485,7 +485,25 @@ function MyAgentTicketKpis() {
     retry: false,
   });
 
-  if (isLoading || !data || !data.agent_name) return null;
+  if (isLoading || !data) return null;
+
+  if (!data.agent_name) {
+    return (
+      <Card>
+        <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-sm font-medium">See your own ticket numbers here</div>
+            <p className="text-xs text-muted-foreground">
+              Pick your helpdesk name on the Support tickets page to track tickets closed, average resolution time and tickets per month.
+            </p>
+          </div>
+          <Link to="/tickets" search={{ view: "mine" as const, quick: "all" as const }} className="text-xs text-primary hover:underline">
+            Go to my tickets →
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
 
   const avg =
     data.avg_resolution_hours === null
