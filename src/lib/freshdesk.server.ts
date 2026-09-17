@@ -114,7 +114,11 @@ async function loadLookup(path: string): Promise<Map<number, string>> {
   return map;
 }
 
-/** Pull recent tickets (updated since `sinceDays` ago) and upsert them. */
+/** Only the Cloud Labs group is synced into this app. */
+export const CLOUD_LABS_GROUP_ID = 1060000391179;
+export const CLOUD_LABS_GROUP_NAME = "Cloud Labs";
+
+/** Pull recent Cloud Labs tickets (updated since `sinceDays` ago) and upsert them. */
 export async function runFreshdeskSync(opts?: { sinceDays?: number; maxPages?: number }): Promise<FreshdeskSyncResult> {
   const startedAt = Date.now();
   const sinceDays = opts?.sinceDays ?? 180;
@@ -131,9 +135,11 @@ export async function runFreshdeskSync(opts?: { sinceDays?: number; maxPages?: n
       );
       if (!res.ok) throw new Error(await readError(res, "ticket list"));
       const batch = (await res.json()) as FreshdeskTicket[];
-      tickets.push(...batch);
+      // Cloud Labs group only — every other group is ignored.
+      tickets.push(...batch.filter((t) => t.group_id === CLOUD_LABS_GROUP_ID));
       if (batch.length < 100) break;
     }
+
 
     const rows = tickets.map((t) => ({
       id: t.id,
