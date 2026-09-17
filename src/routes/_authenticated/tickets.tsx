@@ -158,7 +158,32 @@ function TicketsPage() {
     [scoped],
   );
 
+  const charts = useMemo(() => {
+    const tally = (pick: (r: TicketRow) => string | null | undefined) => {
+      const m = new Map<string, number>();
+      for (const r of scoped) {
+        const k = pick(r) || "Unassigned";
+        m.set(k, (m.get(k) ?? 0) + 1);
+      }
+      return [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
+    };
+    const months = new Map<string, number>();
+    for (const r of scoped) {
+      if (!r.ticket_created_at) continue;
+      const dt = new Date(r.ticket_created_at);
+      const key = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
+      months.set(key, (months.get(key) ?? 0) + 1);
+    }
+    return {
+      by_status: tally((r) => r.status),
+      by_priority: tally((r) => r.priority),
+      by_agent: tally((r) => r.agent_name).slice(0, 10),
+      by_month: [...months.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-12).map(([month, value]) => ({ month, value })),
+    };
+  }, [scoped]);
+
   const pageRows = filtered.slice(page * perPage, page * perPage + perPage);
+
   const pages = Math.max(1, Math.ceil(filtered.length / perPage));
 
   const pick = (nextQuick: Quick) => {
