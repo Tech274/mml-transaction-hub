@@ -29,6 +29,9 @@ import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
 import { Route as ApiPublicBulkTemplateVersionRouteImport } from './routes/api/public/bulk-template-version'
+import { Route as AuthenticatedAiCommandCenterRunNowRouteImport } from './routes/_authenticated/ai-command-center.run-now'
+import { Route as AuthenticatedAiCommandCenterAuditRouteImport } from './routes/_authenticated/ai-command-center.audit'
+import { Route as AuthenticatedAiCommandCenterAgentsRouteImport } from './routes/_authenticated/ai-command-center.agents'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicHooksMcpSyncRouteImport } from './routes/api/public/hooks/mcp-sync'
@@ -141,6 +144,24 @@ const ApiPublicBulkTemplateVersionRoute =
     path: '/api/public/bulk-template-version',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AuthenticatedAiCommandCenterRunNowRoute =
+  AuthenticatedAiCommandCenterRunNowRouteImport.update({
+    id: '/ai-command-center/run-now',
+    path: '/ai-command-center/run-now',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAiCommandCenterAuditRoute =
+  AuthenticatedAiCommandCenterAuditRouteImport.update({
+    id: '/ai-command-center/audit',
+    path: '/ai-command-center/audit',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedAiCommandCenterAgentsRoute =
+  AuthenticatedAiCommandCenterAgentsRouteImport.update({
+    id: '/ai-command-center/agents',
+    path: '/ai-command-center/agents',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -191,6 +212,9 @@ export interface FileRoutesByFullPath {
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/ai-command-center/agents': typeof AuthenticatedAiCommandCenterAgentsRoute
+  '/ai-command-center/audit': typeof AuthenticatedAiCommandCenterAuditRoute
+  '/ai-command-center/run-now': typeof AuthenticatedAiCommandCenterRunNowRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
   '/api/public/hooks/freshdesk-sync': typeof ApiPublicHooksFreshdeskSyncRoute
@@ -217,6 +241,9 @@ export interface FileRoutesByTo {
   '/transactions': typeof AuthenticatedTransactionsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/ai-command-center/agents': typeof AuthenticatedAiCommandCenterAgentsRoute
+  '/ai-command-center/audit': typeof AuthenticatedAiCommandCenterAuditRoute
+  '/ai-command-center/run-now': typeof AuthenticatedAiCommandCenterRunNowRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
   '/api/public/hooks/freshdesk-sync': typeof ApiPublicHooksFreshdeskSyncRoute
@@ -245,6 +272,9 @@ export interface FileRoutesById {
   '/_authenticated/transactions': typeof AuthenticatedTransactionsRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/_authenticated/ai-command-center/agents': typeof AuthenticatedAiCommandCenterAgentsRoute
+  '/_authenticated/ai-command-center/audit': typeof AuthenticatedAiCommandCenterAuditRoute
+  '/_authenticated/ai-command-center/run-now': typeof AuthenticatedAiCommandCenterRunNowRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
   '/api/public/hooks/freshdesk-sync': typeof ApiPublicHooksFreshdeskSyncRoute
@@ -273,6 +303,9 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/ai-command-center/agents'
+    | '/ai-command-center/audit'
+    | '/ai-command-center/run-now'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
     | '/api/public/hooks/freshdesk-sync'
@@ -299,6 +332,9 @@ export interface FileRouteTypes {
     | '/transactions'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/ai-command-center/agents'
+    | '/ai-command-center/audit'
+    | '/ai-command-center/run-now'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
     | '/api/public/hooks/freshdesk-sync'
@@ -326,6 +362,9 @@ export interface FileRouteTypes {
     | '/_authenticated/transactions'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/_authenticated/ai-command-center/agents'
+    | '/_authenticated/ai-command-center/audit'
+    | '/_authenticated/ai-command-center/run-now'
     | '/api/public/bulk-template-version'
     | '/api/public/hooks/bulk-import-cleanup'
     | '/api/public/hooks/freshdesk-sync'
@@ -490,6 +529,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBulkTemplateVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/ai-command-center/run-now': {
+      id: '/_authenticated/ai-command-center/run-now'
+      path: '/ai-command-center/run-now'
+      fullPath: '/ai-command-center/run-now'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterRunNowRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ai-command-center/audit': {
+      id: '/_authenticated/ai-command-center/audit'
+      path: '/ai-command-center/audit'
+      fullPath: '/ai-command-center/audit'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterAuditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ai-command-center/agents': {
+      id: '/_authenticated/ai-command-center/agents'
+      path: '/ai-command-center/agents'
+      fullPath: '/ai-command-center/agents'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterAgentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
@@ -541,6 +601,9 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSyncStatusRoute: typeof AuthenticatedSyncStatusRoute
   AuthenticatedTicketsRoute: typeof AuthenticatedTicketsRoute
   AuthenticatedTransactionsRoute: typeof AuthenticatedTransactionsRoute
+  AuthenticatedAiCommandCenterAgentsRoute: typeof AuthenticatedAiCommandCenterAgentsRoute
+  AuthenticatedAiCommandCenterAuditRoute: typeof AuthenticatedAiCommandCenterAuditRoute
+  AuthenticatedAiCommandCenterRunNowRoute: typeof AuthenticatedAiCommandCenterRunNowRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -556,6 +619,12 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSyncStatusRoute: AuthenticatedSyncStatusRoute,
   AuthenticatedTicketsRoute: AuthenticatedTicketsRoute,
   AuthenticatedTransactionsRoute: AuthenticatedTransactionsRoute,
+  AuthenticatedAiCommandCenterAgentsRoute:
+    AuthenticatedAiCommandCenterAgentsRoute,
+  AuthenticatedAiCommandCenterAuditRoute:
+    AuthenticatedAiCommandCenterAuditRoute,
+  AuthenticatedAiCommandCenterRunNowRoute:
+    AuthenticatedAiCommandCenterRunNowRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
