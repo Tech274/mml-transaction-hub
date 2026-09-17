@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard, FilePlus2, ListTree, Cloud, Server, Users,
   BarChart3, Settings, LogOut, PlugZap, ScrollText, DatabaseZap, LifeBuoy,
+  Bot, Inbox, Play, History,
 } from "lucide-react";
 
 import {
@@ -13,7 +14,9 @@ import { useAuth, type AppRole } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 
-const nav: { to: string; label: string; icon: typeof LayoutDashboard; roles: AppRole[] | null; permission?: string }[] = [
+type NavItem = { to: string; label: string; icon: typeof LayoutDashboard; roles: AppRole[] | null; permission?: string };
+
+const nav: NavItem[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: null },
   { to: "/entry", label: "Master ADR Entry", icon: FilePlus2, roles: ["admin", "ops_lead", "ops_user"], permission: "feature_master_adr_entry" },
   { to: "/transactions", label: "All Transactions", icon: ListTree, roles: null },
@@ -28,6 +31,14 @@ const nav: { to: string; label: string; icon: typeof LayoutDashboard; roles: App
   { to: "/mcp-audit", label: "MCP audit log", icon: ScrollText, roles: ["admin"] },
   { to: "/admin", label: "Admin Settings", icon: Settings, roles: ["admin"] },
 ];
+
+const aiCommandCenterNav: NavItem[] = [
+  { to: "/ai-command-center/agents", label: "Agents", icon: Bot, roles: null },
+  { to: "/ai-command-center/inbox", label: "Inbox", icon: Inbox, roles: null },
+  { to: "/ai-command-center/run-now", label: "Run now", icon: Play, roles: null },
+  { to: "/ai-command-center/audit", label: "Audit", icon: History, roles: null },
+];
+
 
 export function AppSidebar() {
   const { state } = useSidebar();
@@ -74,7 +85,30 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>AI Command Center</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {aiCommandCenterNav
+                .filter((i) => !i.roles || hasAnyRole(i.roles))
+                .map((item) => {
+                  const active = pathname === item.to || pathname.startsWith(item.to + "/");
+                  return (
+                    <SidebarMenuItem key={item.to}>
+                      <SidebarMenuButton asChild isActive={active}>
+                        <Link to={item.to}>
+                          <item.icon className="h-4 w-4" />
+                          {!collapsed && <span>{item.label}</span>}
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
+
       <SidebarFooter className="border-t border-sidebar-border">
         {!collapsed && user && (
           <div className="px-2 py-2 text-xs">
