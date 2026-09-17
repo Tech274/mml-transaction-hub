@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -105,6 +105,12 @@ function TicketsPage() {
   const [open, setOpen] = useState<TicketRow | null>(null);
   const [page, setPage] = useState(0);
   const perPage = 25;
+
+  useEffect(() => {
+    setView(search.view);
+    setQuick(search.quick);
+    setPage(0);
+  }, [search.view, search.quick]);
 
   const overview = useQuery({ queryKey: ["freshdesk", "overview"], queryFn: () => overviewFn() });
   const directory = useQuery({ queryKey: ["freshdesk", "agents"], queryFn: () => directoryFn() });
