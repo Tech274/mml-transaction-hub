@@ -53,6 +53,18 @@ function DashboardPage() {
   const curProfit = curRevenue - curInputCost;
   const curUsers = curRows.reduce((s, r) => s + (r.total_users ?? 0), 0);
 
+  const navigate = useNavigate();
+  const reportsTo = can("feature_reports_access") ? "/reports" : "/transactions";
+  const curMonthSearch = { month: curMonth, year: curYear };
+  const goMonth = (name?: string) => {
+    const idx = MONTH_NAMES.indexOf(String(name));
+    navigate({ to: "/transactions", search: idx >= 0 ? { month: idx + 1, year: curYear } : { year: curYear } });
+  };
+  const goCustomer = (name?: string) => {
+    if (name) navigate({ to: "/customers", search: { q: String(name), status: "all" as const } });
+  };
+
+
   const byMonth = Array.from({ length: 12 }, (_, i) => {
     const monthRows = rows.filter((r) => r.month === i + 1 && r.year === curYear);
     const mRev = monthRows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0);
