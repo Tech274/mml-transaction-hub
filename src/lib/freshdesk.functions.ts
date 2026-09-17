@@ -124,8 +124,8 @@ export const getTicketsOverview = createServerFn({ method: "GET" })
 /** Manual sync — admins and ops leads. */
 export const syncFreshdeskNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d?: { sinceDays?: number }) =>
-    z.object({ sinceDays: z.number().int().min(1).max(730).optional() }).parse(d ?? {}),
+  .inputValidator((d?: { maxPages?: number }) =>
+    z.object({ maxPages: z.number().int().min(1).max(300).optional() }).parse(d ?? {}),
   )
   .handler(async ({ data, context }) => {
     const { data: allowed } = await context.supabase.rpc("has_any_role", {
@@ -134,5 +134,6 @@ export const syncFreshdeskNow = createServerFn({ method: "POST" })
     } as never);
     if (!allowed) throw new Error("Only admins and ops leads can sync Freshdesk tickets");
     const { runFreshdeskSync } = await import("@/lib/freshdesk.server");
-    return runFreshdeskSync({ sinceDays: data.sinceDays });
+    return runFreshdeskSync(data.maxPages ? { maxPages: data.maxPages } : undefined);
+
   });
