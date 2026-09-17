@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
@@ -52,6 +52,18 @@ function DashboardPage() {
   const curInputCost = curRows.reduce((s, r) => s + Number(r.input_cost ?? 0), 0);
   const curProfit = curRevenue - curInputCost;
   const curUsers = curRows.reduce((s, r) => s + (r.total_users ?? 0), 0);
+
+  const navigate = useNavigate();
+  const reportsTo = can("feature_reports_access") ? "/reports" : "/transactions";
+  const curMonthSearch = { month: curMonth, year: curYear };
+  const goMonth = (name?: string) => {
+    const idx = MONTH_NAMES.indexOf(String(name));
+    navigate({ to: "/transactions", search: idx >= 0 ? { month: idx + 1, year: curYear } : { year: curYear } });
+  };
+  const goCustomer = (name?: string) => {
+    if (name) navigate({ to: "/customers", search: { q: String(name), status: "all" as const } });
+  };
+
 
   const byMonth = Array.from({ length: 12 }, (_, i) => {
     const monthRows = rows.filter((r) => r.month === i + 1 && r.year === curYear);
@@ -110,36 +122,37 @@ function DashboardPage() {
           order={orderedKpis}
           can={can}
           cards={{
-            kpi_total_transactions: <KPI label="Total Transactions" value={fmtNumber(total)} />,
-            kpi_public_cloud: <KPI label="Public Cloud" value={fmtNumber(pub)} />,
-            kpi_private_cloud: <KPI label="Private Cloud" value={fmtNumber(priv)} />,
-            kpi_total_users: <KPI label="Total Users" value={fmtNumber(users)} />,
-            kpi_total_revenue: <KPI label="Total Revenue" value={fmtCurrency(revenue)} />,
-            kpi_total_input_cost: <KPI label="Total Input Cost" value={fmtCurrency(inputCostTotal)} />,
-            kpi_total_profit: <KPI label="Total Profit" value={fmtCurrency(profit)} />,
-            kpi_margin: <KPI label="Margin" value={`${margin.toFixed(1)}%`} />,
-            kpi_avg_cost: <KPI label="Avg Selling Cost" value={fmtCurrency(avgCost)} />,
-            kpi_current_month_revenue: <KPI label="Current Month Revenue" value={fmtCurrency(curRevenue)} />,
-            kpi_current_month_profit: <KPI label="Current Month Profit" value={fmtCurrency(curProfit)} />,
-            kpi_current_month_users: <KPI label="Current Month Users" value={fmtNumber(curUsers)} />,
+            kpi_total_transactions: <KPI label="Total Transactions" value={fmtNumber(total)} to="/transactions" />,
+            kpi_public_cloud: <KPI label="Public Cloud" value={fmtNumber(pub)} to="/public-cloud" />,
+            kpi_private_cloud: <KPI label="Private Cloud" value={fmtNumber(priv)} to="/private-cloud" />,
+            kpi_total_users: <KPI label="Total Users" value={fmtNumber(users)} to="/transactions" />,
+            kpi_total_revenue: <KPI label="Total Revenue" value={fmtCurrency(revenue)} to={reportsTo} />,
+            kpi_total_input_cost: <KPI label="Total Input Cost" value={fmtCurrency(inputCostTotal)} to={reportsTo} />,
+            kpi_total_profit: <KPI label="Total Profit" value={fmtCurrency(profit)} to={reportsTo} />,
+            kpi_margin: <KPI label="Margin" value={`${margin.toFixed(1)}%`} to={reportsTo} />,
+            kpi_avg_cost: <KPI label="Avg Selling Cost" value={fmtCurrency(avgCost)} to="/transactions" />,
+            kpi_current_month_revenue: <KPI label="Current Month Revenue" value={fmtCurrency(curRevenue)} to="/transactions" search={curMonthSearch} />,
+            kpi_current_month_profit: <KPI label="Current Month Profit" value={fmtCurrency(curProfit)} to="/transactions" search={curMonthSearch} />,
+            kpi_current_month_users: <KPI label="Current Month Users" value={fmtNumber(curUsers)} to="/transactions" search={curMonthSearch} />,
           }}
         />
 
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {can("chart_tx_by_month") && <ChartCard title={`Transactions by Month — ${curYear}`}>
+          {can("chart_tx_by_month") && <ChartCard title={`Transactions by Month — ${curYear}`} to="/transactions" search={{ year: curYear }}>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={byMonth}>
+              <BarChart data={byMonth} onClick={(s: any) => goMonth(s?.activeLabel)}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip />
-                <Bar dataKey="transactions" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="transactions" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_revenue_by_month") && <ChartCard title={`Revenue by Month — ${curYear}`}>
+          {can("chart_revenue_by_month") && <ChartCard title={`Revenue by Month — ${curYear}`} to="/transactions" search={{ year: curYear }}>
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={byMonth}>
+              <LineChart data={byMonth} onClick={(s: any) => goMonth(s?.activeLabel)} className="cursor-pointer">
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="month" fontSize={12} />
                 <YAxis fontSize={12} />
@@ -154,67 +167,84 @@ function DashboardPage() {
           {can("chart_pub_priv") && <ChartCard title="Public vs Private Cloud">
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={split} dataKey="value" nameKey="name" outerRadius={80} label>
+                <Pie
+                  data={split}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={80}
+                  label
+                  className="cursor-pointer"
+                  onClick={(e: any) => navigate({ to: e?.name === "Private Cloud" ? "/private-cloud" : "/public-cloud", search: {} })}
+                >
                   {split.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
                 </Pie>
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_provider") && <ChartCard title="Public Cloud Provider Split">
+          {can("chart_provider") && <ChartCard title="Public Cloud Provider Split" to="/public-cloud" search={{}}>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={providerSplit}>
+              <BarChart data={providerSplit} onClick={(s: any) => s?.activeLabel && navigate({ to: "/transactions", search: { provider: String(s.activeLabel) } })}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis dataKey="name" fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip />
-                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_top_revenue") && <ChartCard title="Top Customers by Revenue">
+          {can("chart_top_revenue") && <ChartCard title="Top Customers by Revenue" to="/customers" search={{ status: "all" as const }}>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={topRev} layout="vertical">
+              <BarChart data={topRev} layout="vertical" onClick={(s: any) => goCustomer(s?.activeLabel)}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis type="number" fontSize={11} tickFormatter={(v) => fmtCurrency(v).replace("₹", "")} />
                 <YAxis dataKey="name" type="category" fontSize={11} width={120} />
                 <Tooltip formatter={(v: number) => fmtCurrency(v)} />
-                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_top_users") && <ChartCard title="Top Customers by Users">
+          {can("chart_top_users") && <ChartCard title="Top Customers by Users" to="/customers" search={{ status: "all" as const }}>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={topUsers} layout="vertical">
+              <BarChart data={topUsers} layout="vertical" onClick={(s: any) => goCustomer(s?.activeLabel)}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis type="number" fontSize={11} />
                 <YAxis dataKey="name" type="category" fontSize={11} width={120} />
                 <Tooltip />
-                <Bar dataKey="users" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="users" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_top_profit") && <ChartCard title="Top Customers by Profit">
+          {can("chart_top_profit") && <ChartCard title="Top Customers by Profit" to="/customers" search={{ status: "all" as const }}>
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={topProfit} layout="vertical">
+              <BarChart data={topProfit} layout="vertical" onClick={(s: any) => goCustomer(s?.activeLabel)}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                 <XAxis type="number" fontSize={11} tickFormatter={(v) => fmtCurrency(v).replace("₹", "")} />
                 <YAxis dataKey="name" type="category" fontSize={11} width={120} />
                 <Tooltip formatter={(v: number) => fmtCurrency(v)} />
-                <Bar dataKey="profit" fill="#22c55e" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="profit" fill="#22c55e" radius={[0, 4, 4, 0]} className="cursor-pointer" />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>}
-          {can("chart_lob") && <ChartCard title="Line of Business Split">
+          {can("chart_lob") && <ChartCard title="Line of Business Split" to="/transactions" search={{}}>
             <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={lobSplit} dataKey="value" nameKey="name" outerRadius={80} label>
+                <Pie
+                  data={lobSplit}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={80}
+                  label
+                  className="cursor-pointer"
+                  onClick={(e: any) => e?.name && navigate({ to: "/transactions", search: { lob: String(e.name) } })}
+                >
                   {lobSplit.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
           </ChartCard>}
+
           <div className="lg:col-span-2">
             <CustomersByAccountManager />
           </div>
@@ -224,14 +254,21 @@ function DashboardPage() {
   );
 }
 
-function KPI({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
+function KPI({ label, value, to, search }: { label: string; value: string; to?: string; search?: Record<string, unknown> }) {
+  const inner = (
+    <Card className={to ? "h-full transition hover:border-primary hover:shadow-md" : undefined}>
       <CardContent className="pt-6">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
         <div className="text-2xl font-bold mt-1">{value}</div>
+        {to && <div className="mt-2 text-xs text-primary opacity-0 group-hover:opacity-100 transition">View details →</div>}
       </CardContent>
     </Card>
+  );
+  if (!to) return inner;
+  return (
+    <Link to={to as never} search={(search ?? {}) as never} className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg">
+      {inner}
+    </Link>
   );
 }
 
@@ -245,14 +282,24 @@ function KpiGrid({ order, can, cards }: { order: string[]; can: (k: string) => b
   );
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function ChartCard({ title, children, to, search }: { title: string; children: React.ReactNode; to?: string; search?: Record<string, unknown> }) {
   return (
     <Card>
-      <CardHeader><CardTitle className="text-sm">{title}</CardTitle></CardHeader>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm">{title}</CardTitle>
+          {to && (
+            <Link to={to as never} search={(search ?? {}) as never} className="text-xs text-primary hover:underline whitespace-nowrap">
+              View all →
+            </Link>
+          )}
+        </div>
+      </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
   );
 }
+
 
 function CustomersByAccountManager() {
   const { can, isPreviewing, previewRole } = usePermissions();
@@ -361,9 +408,10 @@ function CustomersByAccountManager() {
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 gap-3 mb-4">
-          <Stat label={`New (last ${rangeMonths}m)`} value={fmtNumber(inRange.length)} />
-          <Stat label="Active" value={fmtNumber(active)} tone="positive" />
-          <Stat label="Deactivated" value={fmtNumber(inactive)} tone="muted" />
+          <Stat label={`New (last ${rangeMonths}m)`} value={fmtNumber(inRange.length)} search={{ status: "all" as const, range: rangeMonths }} />
+          <Stat label="Active" value={fmtNumber(active)} tone="positive" search={{ status: "active" as const, range: rangeMonths }} />
+          <Stat label="Deactivated" value={fmtNumber(inactive)} tone="muted" search={{ status: "inactive" as const, range: rangeMonths }} />
+
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
@@ -406,12 +454,18 @@ function CustomersByAccountManager() {
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "positive" | "muted" }) {
+function Stat({ label, value, tone, search }: { label: string; value: string; tone?: "positive" | "muted"; search?: Record<string, unknown> }) {
   const color = tone === "positive" ? "text-emerald-600" : tone === "muted" ? "text-muted-foreground" : "";
-  return (
-    <div className="rounded-md border border-border p-3">
+  const inner = (
+    <div className={`rounded-md border border-border p-3 h-full ${search ? "transition hover:border-primary hover:bg-muted/50" : ""}`}>
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
       <div className={`text-xl font-semibold mt-1 ${color}`}>{value}</div>
     </div>
+  );
+  if (!search) return inner;
+  return (
+    <Link to="/customers" search={search as never} className="block h-full">
+      {inner}
+    </Link>
   );
 }
