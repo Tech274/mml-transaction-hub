@@ -105,6 +105,9 @@ function AdminPage() {
     qc.invalidateQueries({ queryKey: ["role-audit-log"] });
   };
 
+  // Last-admin protection mirrored in the UI so the destructive buttons are disabled.
+  const adminCount = users.filter((u) => u.roles.some((r) => r.role === "admin")).length;
+
   return (
     <AppShell title="Admin Settings" actions={<CreateUserDialog onCreate={async (v) => {
       await createUserFn({ data: v });
@@ -146,9 +149,22 @@ function AdminPage() {
                       key={u.id}
                       user={u}
                       isSelf={u.id === me?.id}
-                      onSetRoles={async (roles) => { await setRolesFn({ data: { userId: u.id, roles } }); toast.success("Roles updated"); refresh(); }}
+                      isLastAdmin={u.roles.some((r) => r.role === "admin") && adminCount <= 1}
+                      canManage={can("feature_user_manage")}
+                      canDelete={can("feature_user_delete")}
+                      canReset={can("feature_user_reset_password")}
+                      onSave={async (v) => { await updateProfileFn({ data: { userId: u.id, ...v } }); toast.success("User updated"); refresh(); }}
                       onSetActive={async (active) => { await setActiveFn({ data: { userId: u.id, active } }); toast.success(active ? "User enabled" : "User disabled"); refresh(); }}
-                      onSaveProfile={async (fullName) => { await updateProfileFn({ data: { userId: u.id, fullName } }); toast.success("Profile updated"); refresh(); }}
+                      onDelete={async () => { await deleteUserFn({ data: { userId: u.id } }); toast.success(`Deleted ${u.email ?? "user"}`); refresh(); }}
+                      onResetPassword={async (tempPassword) => {
+                        await resetPasswordFn({ data: { userId: u.id, tempPassword } });
+                        try { await navigator.clipboard.writeText(tempPassword); } catch { /* clipboard may be blocked */ }
+                        toast.success(
+                          `Temporary password set: ${tempPassword} — copied to clipboard. Share it securely; it will not be shown again.`,
+                          { duration: 20000 },
+                        );
+                        refresh();
+                      }}
                     />
                   ))}
                 </TableBody>
