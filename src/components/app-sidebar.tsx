@@ -64,11 +64,11 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+          <SidebarGroupLabel>AI Command Center</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {nav
-                .filter((i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)))
+              {aiCommandCenterNav
+                .filter((i) => !i.roles || hasAnyRole(i.roles))
                 .map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
@@ -86,11 +86,11 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>AI Command Center</SidebarGroupLabel>
+          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {aiCommandCenterNav
-                .filter((i) => !i.roles || hasAnyRole(i.roles))
+              {nav
+                .filter((i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)))
                 .map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
