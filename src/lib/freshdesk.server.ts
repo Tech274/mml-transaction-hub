@@ -70,20 +70,22 @@ function credentials() {
   return { domain, apiKey };
 }
 
-async function fdFetch(path: string, attempt = 0): Promise<Response> {
+async function fdFetch(path: string, init?: RequestInit, attempt = 0): Promise<Response> {
   const { domain, apiKey } = credentials();
   const auth = Buffer.from(`${apiKey}:X`).toString("base64");
   const res = await fetch(`https://${domain}/api/v2${path}`, {
-    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+    ...init,
+    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   // Freshdesk throttles per minute; wait out the advertised cool-down and retry.
   if (res.status === 429 && attempt < 3) {
     const retryAfter = Number(res.headers.get("retry-after") ?? "") || 30;
     await new Promise((r) => setTimeout(r, Math.min(retryAfter, 60) * 1000));
-    return fdFetch(path, attempt + 1);
+    return fdFetch(path, init, attempt + 1);
   }
   return res;
 }
+
 
 async function readError(res: Response, what: string): Promise<string> {
   const body = await res.text();
@@ -207,4 +209,110 @@ export async function runFreshdeskSync(opts?: { maxPages?: number }): Promise<Fr
       error_message: e instanceof Error ? e.message : String(e),
     };
   }
+}
+
+/** Agents in the helpdesk, used for assignment and identity matching. */
+export interface FreshdeskAgent {
+  id: number;
+  name: string;
+  email: string | null;
+  group_ids: number[];
+}
+
+export async function listFreshdeskAgents(): Promise<FreshdeskAgent[]> {
+  const res = await fdFetch("/agents?per_page=100");
+  if (!res.ok) throw new Error(await readError(res, "agent list"));
+  const rows = (await res.json()) as {
+    id: number;
+    contact?: { name?: string | null; email?: string | null } | null;
+    group_ids?: number[] | null;
+  }[];
+  return rows
+    .map((r) => ({
+      id: r.id,
+      name: r.contact?.name ?? `Agent ${r.id}`,
+      email: r.contact?.email ?? null,
+      group_ids: r.group_ids ?? [],
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export const STATUS_IDS: Record<string, number> = {
+  Open: 2,
+  Pending: 3,
+  Resolved: 4,
+  Closed: 5,
+  "Waiting on Customer": 6,
+  "Waiting on Third Party": 7,
+};
+
+export function statusLabel(id: number): string {
+  return STATUS_MAP[id] ?? `Status ${id}`;
+}
+
+/** Apply an update in Freshdesk, then mirror the fresh ticket back into the table. */
+export async function updateFreshdeskTicket(
+  ticketId: number,
+  payload: { status?: number; responder_id?: number | null; priority?: number },
+): Promise<{ status: string | null; agent_name: string | null; priority: string | null }> {
+  const res = await fdFetch(`/tickets/${ticketId}`, { method: "PUT", body: JSON.stringify(payload) });
+  if (!res.ok) throw new Error(await readError(res, `ticket #${ticketId} update`));
+  const t = (await res.json()) as FreshdeskTicket;
+
+  const agents = await loadLookup("/agents?per_page=100");
+  const row = {
+    status_id: t.status ?? null,
+    status: t.status ? statusLabel(t.status) : null,
+    priority_id: t.priority ?? null,
+    priority: t.priority ? (PRIORITY_MAP[t.priority] ?? `Priority ${t.priority}`) : null,
+    agent_name: t.responder_id ? (agents.get(t.responder_id) ?? null) : null,
+    ticket_updated_at: t.updated_at ?? null,
+    synced_at: new Date().toISOString(),
+  };
+
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const admin = supabaseAdmin as unknown as { from: (t: string) => any };
+  const { error } = await admin.from("freshdesk_tickets").update(row).eq("id", ticketId);
+  if (error) throw new Error(error.message);
+
+  return { status: row.status, agent_name: row.agent_name, priority: row.priority };
+}
+
+/** Private note on the ticket (used for resolution notes). */
+export async function addFreshdeskNote(ticketId: number, body: string): Promise<void> {
+  const res = await fdFetch(`/tickets/${ticketId}/notes`, {
+    method: "POST",
+    body: JSON.stringify({ body: body.replace(/\n/g, "<br/>"), private: true }),
+  });
+  if (!res.ok) throw new Error(await readError(res, `ticket #${ticketId} note`));
+}
+
+export interface TicketConversation {
+  id: number;
+  body_text: string | null;
+  private: boolean;
+  incoming: boolean;
+  from_email: string | null;
+  created_at: string | null;
+}
+
+export async function fetchTicketConversations(ticketId: number): Promise<TicketConversation[]> {
+  const res = await fdFetch(`/tickets/${ticketId}/conversations?per_page=50`);
+  if (!res.ok) throw new Error(await readError(res, `ticket #${ticketId} history`));
+  const rows = (await res.json()) as {
+    id: number;
+    body_text?: string | null;
+    private?: boolean;
+    incoming?: boolean;
+    from_email?: string | null;
+    created_at?: string | null;
+  }[];
+  return rows.map((r) => ({
+    id: r.id,
+    body_text: r.body_text ?? null,
+    private: !!r.private,
+    incoming: !!r.incoming,
+    from_email: r.from_email ?? null,
+    created_at: r.created_at ?? null,
+  }));
 }

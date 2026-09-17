@@ -47,6 +47,33 @@ export type Database = {
         }
         Relationships: []
       }
+      agent_identities: {
+        Row: {
+          agent_id: number | null
+          agent_name: string
+          auto_matched: boolean
+          created_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: number | null
+          agent_name: string
+          auto_matched?: boolean
+          created_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: number | null
+          agent_name?: string
+          auto_matched?: boolean
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       bulk_import_audit_events: {
         Row: {
           actor_email: string | null
@@ -853,6 +880,45 @@ export type Database = {
           triggered_by?: string | null
           triggered_by_email?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      ticket_action_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          field_name: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          resolution_note: string | null
+          ticket_id: number
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          resolution_note?: string | null
+          ticket_id: number
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          resolution_note?: string | null
+          ticket_id?: number
         }
         Relationships: []
       }
