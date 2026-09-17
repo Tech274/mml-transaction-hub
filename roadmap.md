@@ -8,4 +8,4 @@
 - [x] Multiple transactions may share one Potential ID — repeats are ignored, never an error (bulk import, manual entry, DB uniqueness removed)
 
 ## Support tickets sync
-- [ ] Cloud Labs group only; only tickets created on/after 2026-04-01; hourly schedule
+- [x] Cloud Labs group only; only tickets created on/after 2026-04-01; hourly schedule
