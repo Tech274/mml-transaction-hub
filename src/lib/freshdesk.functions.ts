@@ -331,3 +331,100 @@ export const resolveTicket = createServerFn({ method: "POST" })
 
     return { ok: true, status: result.status, agent_name: result.agent_name };
   });
+
+/* ---------------------------------------------------------------------------
+ * Agent-specific KPIs for the dashboard
+ * ------------------------------------------------------------------------- */
+
+export interface AgentKpis {
+  agent_name: string | null;
+  closed: number;
+  open_queue: number;
+  overdue: number;
+  avg_resolution_hours: number | null;
+  resolved_sample: number;
+  by_month: { month: string; total: number; closed: number }[];
+  this_month: number;
+}
+
+/**
+ * Tickets closed, average resolution time and tickets-per-month for the
+ * signed-in user's helpdesk agent identity. Returns agent_name = null when the
+ * user is not mapped to a helpdesk agent yet.
+ */
+export const getMyAgentKpis = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<AgentKpis> => {
+    const sb = context.supabase as unknown as { from: (t: string) => any };
+    const empty: AgentKpis = {
+      agent_name: null, closed: 0, open_queue: 0, overdue: 0,
+      avg_resolution_hours: null, resolved_sample: 0, by_month: [], this_month: 0,
+    };
+
+    const { data: saved } = await sb
+      .from("agent_identities")
+      .select("agent_name")
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    const agentName = (saved as { agent_name?: string } | null)?.agent_name ?? null;
+    if (!agentName) return empty;
+
+    const PAGE = 1000;
+    const rows: TicketRow[] = [];
+    for (let from = 0; from < 5000; from += PAGE) {
+      const { data, error } = await sb
+        .from("freshdesk_tickets")
+        .select("id, status, priority, due_by, ticket_created_at, ticket_updated_at")
+        .eq("agent_name", agentName)
+        .order("ticket_created_at", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+      const page = (data ?? []) as TicketRow[];
+      rows.push(...page);
+      if (page.length < PAGE) break;
+    }
+
+    const now = Date.now();
+    const doneStatuses = ["Resolved", "Closed"];
+    const done = rows.filter((r) => doneStatuses.includes(r.status ?? ""));
+
+    let hoursSum = 0;
+    let sample = 0;
+    for (const r of done) {
+      if (!r.ticket_created_at || !r.ticket_updated_at) continue;
+      const start = new Date(r.ticket_created_at).getTime();
+      const end = new Date(r.ticket_updated_at).getTime();
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) continue;
+      hoursSum += (end - start) / 3_600_000;
+      sample += 1;
+    }
+
+    const months = new Map<string, { total: number; closed: number }>();
+    for (const r of rows) {
+      if (!r.ticket_created_at) continue;
+      const d = new Date(r.ticket_created_at);
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+      const e = months.get(key) ?? { total: 0, closed: 0 };
+      e.total += 1;
+      if (doneStatuses.includes(r.status ?? "")) e.closed += 1;
+      months.set(key, e);
+    }
+    const nowD = new Date();
+    const thisKey = `${nowD.getUTCFullYear()}-${String(nowD.getUTCMonth() + 1).padStart(2, "0")}`;
+
+    return {
+      agent_name: agentName,
+      closed: done.length,
+      open_queue: rows.filter((r) => !doneStatuses.includes(r.status ?? "")).length,
+      overdue: rows.filter(
+        (r) => r.due_by && new Date(r.due_by).getTime() < now && !doneStatuses.includes(r.status ?? ""),
+      ).length,
+      avg_resolution_hours: sample > 0 ? hoursSum / sample : null,
+      resolved_sample: sample,
+      by_month: [...months.entries()]
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .slice(-12)
+        .map(([month, v]) => ({ month, ...v })),
+      this_month: months.get(thisKey)?.total ?? 0,
+    };
+  });
