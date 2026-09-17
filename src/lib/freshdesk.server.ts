@@ -135,17 +135,21 @@ export async function runFreshdeskSync(opts?: { sinceDays?: number; maxPages?: n
     const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
     const [agents, groups] = await Promise.all([loadLookup("/agents?per_page=100"), loadLookup("/groups?per_page=100")]);
 
+    const sinceMs = Date.now() - sinceDays * 86_400_000;
     const tickets: FreshdeskTicket[] = [];
+    // Newest first, so an hourly run touches only the first page or two.
     for (let page = 1; page <= maxPages; page++) {
       const res = await fdFetch(
-        `/tickets?updated_since=${encodeURIComponent(since)}&include=requester,company&order_by=updated_at&order_type=asc&per_page=100&page=${page}`,
+        `/tickets?updated_since=${encodeURIComponent(new Date(sinceMs).toISOString())}&include=requester,company&order_by=updated_at&order_type=desc&per_page=100&page=${page}`,
       );
       if (!res.ok) throw new Error(await readError(res, "ticket list"));
       const batch = (await res.json()) as FreshdeskTicket[];
       // Cloud Labs group only — every other group is ignored.
       tickets.push(...batch.filter((t) => t.group_id === CLOUD_LABS_GROUP_ID));
-      if (batch.length < 100) break;
+      const oldest = batch.at(-1)?.updated_at;
+      if (batch.length < 100 || (oldest && new Date(oldest).getTime() < sinceMs)) break;
     }
+
 
 
     const rows = tickets.map((t) => ({
