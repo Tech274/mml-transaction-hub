@@ -382,7 +382,6 @@ export function BulkImport() {
       return;
     }
     const { body, colIdx } = mapping;
-    const seen = new Set<string>();
     const parsed: ParsedRow[] = body.map((cols, idx) => {
       const raw: Record<string, string> = {};
       for (const h of headers) raw[h] = (cols[colIdx[h]] ?? "").trim();
@@ -392,11 +391,10 @@ export function BulkImport() {
         for (const issue of res.error.issues) {
           errors.push(`${issue.path.join(".") || "row"}: ${issue.message}`);
         }
-      } else {
-        const pid = res.data.potential_id;
-        if (seen.has(pid)) errors.push(`duplicate potential_id in file: ${pid}`);
-        seen.add(pid);
       }
+      // A Potential ID may legitimately cover several transactions, so repeats
+      // within the file are allowed and never reported as errors.
+
       return { line: idx + 2, raw, parsed: res.success ? (res.data as Record<string, unknown>) : undefined, errors };
     });
     setRows(parsed);
@@ -515,7 +513,6 @@ export function BulkImport() {
     }
     const invalid = rows.filter((r) => r.errors.length > 0);
     if (!invalid.length) { toast.message("No invalid rows to retry"); return; }
-    const seen = new Set<string>();
     const next: ParsedRow[] = invalid.map((r) => {
       const raw = correctedRawFor(r);
       const errors: string[] = [];
@@ -524,11 +521,9 @@ export function BulkImport() {
         for (const issue of res.error.issues) {
           errors.push(`${issue.path.join(".") || "row"}: ${issue.message}`);
         }
-      } else {
-        const pid = res.data.potential_id;
-        if (seen.has(pid)) errors.push(`duplicate potential_id in file: ${pid}`);
-        seen.add(pid);
       }
+      // Repeated Potential IDs are allowed — never an error.
+
       return { line: r.line, raw, parsed: res.success ? (res.data as Record<string, unknown>) : undefined, errors };
     });
     setRows(next);
