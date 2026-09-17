@@ -461,6 +461,81 @@ export type Database = {
         }
         Relationships: []
       }
+      freshdesk_tickets: {
+        Row: {
+          agent_name: string | null
+          company_name: string | null
+          description_text: string | null
+          due_by: string | null
+          fr_due_by: string | null
+          group_name: string | null
+          id: number
+          is_escalated: boolean
+          priority: string | null
+          priority_id: number | null
+          requester_email: string | null
+          requester_name: string | null
+          satisfaction_rating: string | null
+          source: string | null
+          status: string | null
+          status_id: number | null
+          subject: string | null
+          synced_at: string
+          tags: string[]
+          ticket_created_at: string | null
+          ticket_updated_at: string | null
+          type: string | null
+        }
+        Insert: {
+          agent_name?: string | null
+          company_name?: string | null
+          description_text?: string | null
+          due_by?: string | null
+          fr_due_by?: string | null
+          group_name?: string | null
+          id: number
+          is_escalated?: boolean
+          priority?: string | null
+          priority_id?: number | null
+          requester_email?: string | null
+          requester_name?: string | null
+          satisfaction_rating?: string | null
+          source?: string | null
+          status?: string | null
+          status_id?: number | null
+          subject?: string | null
+          synced_at?: string
+          tags?: string[]
+          ticket_created_at?: string | null
+          ticket_updated_at?: string | null
+          type?: string | null
+        }
+        Update: {
+          agent_name?: string | null
+          company_name?: string | null
+          description_text?: string | null
+          due_by?: string | null
+          fr_due_by?: string | null
+          group_name?: string | null
+          id?: number
+          is_escalated?: boolean
+          priority?: string | null
+          priority_id?: number | null
+          requester_email?: string | null
+          requester_name?: string | null
+          satisfaction_rating?: string | null
+          source?: string | null
+          status?: string | null
+          status_id?: number | null
+          subject?: string | null
+          synced_at?: string
+          tags?: string[]
+          ticket_created_at?: string | null
+          ticket_updated_at?: string | null
+          type?: string | null
+        }
+        Relationships: []
+      }
       mcp_revoked_clients: {
         Row: {
           client_id: string
