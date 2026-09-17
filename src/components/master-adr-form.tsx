@@ -120,12 +120,13 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
   async function onSubmit(values: FormValues) {
     setSubmitting(true);
     try {
+      // A Potential ID can cover several transactions, so an existing one is
+      // informational only — never a blocking error.
       const { unique } = await checkUnique({ data: { potentialId: values.potential_id } });
       if (!unique) {
-        form.setError("potential_id", { message: "This Potential ID already exists" });
-        setSubmitting(false);
-        return;
+        toast.message(`Potential ID ${values.potential_id} already has transactions — adding another one.`);
       }
+
       const { error } = await supabase.from("transactions").insert({
         potential_id: values.potential_id,
         month: values.month,
