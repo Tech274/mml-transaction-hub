@@ -343,8 +343,8 @@ function TicketsPage() {
             <ChartCard title="Tickets by status">
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
-                  <Pie data={d.by_status} dataKey="value" nameKey="name" outerRadius={90} label>
-                    {d.by_status.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                  <Pie data={charts.by_status} dataKey="value" nameKey="name" outerRadius={90} label>
+                    {charts.by_status.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip />
                   <Legend />
@@ -354,7 +354,7 @@ function TicketsPage() {
             <ChartCard title="Tickets by priority">
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart
-                  data={d.by_priority}
+                  data={charts.by_priority}
                   onClick={(e: { activeLabel?: string }) => {
                     if (e?.activeLabel) { setQuick("all"); setPriority(e.activeLabel); setPage(0); }
                   }}
@@ -370,7 +370,7 @@ function TicketsPage() {
             <ChartCard title="Top agents by ticket volume">
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart
-                  data={d.by_agent}
+                  data={charts.by_agent}
                   layout="vertical"
                   onClick={(e: { activeLabel?: string }) => {
                     if (e?.activeLabel) { setQuick("all"); setAgent(e.activeLabel); setPage(0); }
@@ -386,7 +386,7 @@ function TicketsPage() {
             </ChartCard>
             <ChartCard title="Tickets created per month">
               <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={d.by_month}>
+                <LineChart data={charts.by_month}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="month" fontSize={12} />
                   <YAxis fontSize={12} allowDecimals={false} />
