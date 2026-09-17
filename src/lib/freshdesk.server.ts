@@ -70,12 +70,19 @@ function credentials() {
   return { domain, apiKey };
 }
 
-async function fdFetch(path: string): Promise<Response> {
+async function fdFetch(path: string, attempt = 0): Promise<Response> {
   const { domain, apiKey } = credentials();
   const auth = Buffer.from(`${apiKey}:X`).toString("base64");
-  return fetch(`https://${domain}/api/v2${path}`, {
+  const res = await fetch(`https://${domain}/api/v2${path}`, {
     headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
   });
+  // Freshdesk throttles per minute; wait out the advertised cool-down and retry.
+  if (res.status === 429 && attempt < 3) {
+    const retryAfter = Number(res.headers.get("retry-after") ?? "") || 30;
+    await new Promise((r) => setTimeout(r, Math.min(retryAfter, 60) * 1000));
+    return fdFetch(path, attempt + 1);
+  }
+  return res;
 }
 
 async function readError(res: Response, what: string): Promise<string> {
@@ -114,26 +121,41 @@ async function loadLookup(path: string): Promise<Map<number, string>> {
   return map;
 }
 
-/** Pull recent tickets (updated since `sinceDays` ago) and upsert them. */
-export async function runFreshdeskSync(opts?: { sinceDays?: number; maxPages?: number }): Promise<FreshdeskSyncResult> {
+/** Only the Cloud Labs group is synced into this app. */
+export const CLOUD_LABS_GROUP_ID = 1060000391179;
+export const CLOUD_LABS_GROUP_NAME = "Cloud Labs";
+/** Nothing created before this date is synced. */
+export const TICKETS_FROM = "2026-04-01T00:00:00Z";
+
+/** Pull Cloud Labs tickets created on/after TICKETS_FROM and upsert them. */
+export async function runFreshdeskSync(opts?: { maxPages?: number }): Promise<FreshdeskSyncResult> {
   const startedAt = Date.now();
-  const sinceDays = opts?.sinceDays ?? 180;
-  const maxPages = opts?.maxPages ?? 20;
+  const maxPages = opts?.maxPages ?? 60;
 
   try {
-    const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
     const [agents, groups] = await Promise.all([loadLookup("/agents?per_page=100"), loadLookup("/groups?per_page=100")]);
 
+    const cutoffMs = new Date(TICKETS_FROM).getTime();
     const tickets: FreshdeskTicket[] = [];
+    // Newest first, so an hourly run touches only the first page or two.
     for (let page = 1; page <= maxPages; page++) {
       const res = await fdFetch(
-        `/tickets?updated_since=${encodeURIComponent(since)}&include=requester,company&order_by=updated_at&order_type=asc&per_page=100&page=${page}`,
+        `/tickets?updated_since=${encodeURIComponent(TICKETS_FROM)}&include=requester,company&order_by=updated_at&order_type=desc&per_page=100&page=${page}`,
       );
       if (!res.ok) throw new Error(await readError(res, "ticket list"));
       const batch = (await res.json()) as FreshdeskTicket[];
-      tickets.push(...batch);
-      if (batch.length < 100) break;
+      // Cloud Labs group only, created on/after the cutoff — everything else is ignored.
+      tickets.push(
+        ...batch.filter(
+          (t) => t.group_id === CLOUD_LABS_GROUP_ID && !!t.created_at && new Date(t.created_at).getTime() >= cutoffMs,
+        ),
+      );
+      const oldest = batch.at(-1)?.updated_at;
+      if (batch.length < 100 || (oldest && new Date(oldest).getTime() < cutoffMs)) break;
     }
+
+
+
 
     const rows = tickets.map((t) => ({
       id: t.id,
