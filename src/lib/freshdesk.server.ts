@@ -1,0 +1,188 @@
+// Freshdesk sync: pulls tickets from the Freshdesk API into public.freshdesk_tickets.
+// Server-only (service-role client + API credentials) — never import from a component.
+
+export interface FreshdeskSyncResult {
+  status: "success" | "error";
+  fetched: number;
+  upserted: number;
+  duration_ms: number;
+  error_message?: string;
+}
+
+const STATUS_MAP: Record<number, string> = {
+  2: "Open",
+  3: "Pending",
+  4: "Resolved",
+  5: "Closed",
+  6: "Waiting on Customer",
+  7: "Waiting on Third Party",
+};
+
+const PRIORITY_MAP: Record<number, string> = {
+  1: "Low",
+  2: "Medium",
+  3: "High",
+  4: "Urgent",
+};
+
+const SOURCE_MAP: Record<number, string> = {
+  1: "Email",
+  2: "Portal",
+  3: "Phone",
+  7: "Chat",
+  9: "Feedback widget",
+  10: "Outbound email",
+};
+
+interface FreshdeskTicket {
+  id: number;
+  subject?: string | null;
+  description_text?: string | null;
+  status?: number | null;
+  priority?: number | null;
+  type?: string | null;
+  source?: number | null;
+  tags?: string[] | null;
+  due_by?: string | null;
+  fr_due_by?: string | null;
+  is_escalated?: boolean | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  requester?: { name?: string | null; email?: string | null } | null;
+  company?: { name?: string | null } | null;
+  stats?: unknown;
+  responder_id?: number | null;
+  group_id?: number | null;
+}
+
+function credentials() {
+  const rawDomain = process.env.FRESHDESK_DOMAIN;
+  const apiKey = process.env.FRESHDESK_API_KEY;
+  if (!rawDomain || !apiKey) {
+    throw new Error(
+      "Freshdesk is not configured yet. The helpdesk address and API key still need to be saved.",
+    );
+  }
+  const domain = rawDomain
+    .trim()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/+$/, "");
+  return { domain, apiKey };
+}
+
+async function fdFetch(path: string): Promise<Response> {
+  const { domain, apiKey } = credentials();
+  const auth = Buffer.from(`${apiKey}:X`).toString("base64");
+  return fetch(`https://${domain}/api/v2${path}`, {
+    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/json" },
+  });
+}
+
+async function readError(res: Response, what: string): Promise<string> {
+  const body = await res.text();
+  if (res.status === 401 || res.status === 403) {
+    return `Freshdesk rejected the credentials (${res.status}). Check the API key and helpdesk address.`;
+  }
+  return `Freshdesk ${what} failed [${res.status}]: ${body.slice(0, 500)}`;
+}
+
+/** Lightweight credential check used by the settings card. */
+export async function checkFreshdeskConnection(): Promise<{ ok: boolean; message: string; domain?: string }> {
+  try {
+    const { domain } = credentials();
+    const res = await fdFetch("/tickets?per_page=1");
+    if (!res.ok) return { ok: false, message: await readError(res, "connection test"), domain };
+    return { ok: true, message: "Connected", domain };
+  } catch (e) {
+    return { ok: false, message: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+async function loadLookup(path: string): Promise<Map<number, string>> {
+  const map = new Map<number, string>();
+  try {
+    const res = await fdFetch(path);
+    if (!res.ok) return map;
+    const rows = (await res.json()) as { id: number; name?: string; contact?: { name?: string } }[];
+    for (const r of rows) {
+      const name = r.name ?? r.contact?.name;
+      if (name) map.set(r.id, name);
+    }
+  } catch {
+    /* lookups are best-effort */
+  }
+  return map;
+}
+
+/** Pull recent tickets (updated since `sinceDays` ago) and upsert them. */
+export async function runFreshdeskSync(opts?: { sinceDays?: number; maxPages?: number }): Promise<FreshdeskSyncResult> {
+  const startedAt = Date.now();
+  const sinceDays = opts?.sinceDays ?? 180;
+  const maxPages = opts?.maxPages ?? 20;
+
+  try {
+    const since = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+    const [agents, groups] = await Promise.all([loadLookup("/agents?per_page=100"), loadLookup("/groups?per_page=100")]);
+
+    const tickets: FreshdeskTicket[] = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const res = await fdFetch(
+        `/tickets?updated_since=${encodeURIComponent(since)}&include=requester,company&order_by=updated_at&order_type=asc&per_page=100&page=${page}`,
+      );
+      if (!res.ok) throw new Error(await readError(res, "ticket list"));
+      const batch = (await res.json()) as FreshdeskTicket[];
+      tickets.push(...batch);
+      if (batch.length < 100) break;
+    }
+
+    const rows = tickets.map((t) => ({
+      id: t.id,
+      subject: t.subject ?? null,
+      description_text: t.description_text ?? null,
+      status_id: t.status ?? null,
+      status: t.status ? (STATUS_MAP[t.status] ?? `Status ${t.status}`) : null,
+      priority_id: t.priority ?? null,
+      priority: t.priority ? (PRIORITY_MAP[t.priority] ?? `Priority ${t.priority}`) : null,
+      type: t.type ?? null,
+      source: t.source ? (SOURCE_MAP[t.source] ?? `Source ${t.source}`) : null,
+      requester_name: t.requester?.name ?? null,
+      requester_email: t.requester?.email ?? null,
+      company_name: t.company?.name ?? null,
+      agent_name: t.responder_id ? (agents.get(t.responder_id) ?? null) : null,
+      group_name: t.group_id ? (groups.get(t.group_id) ?? null) : null,
+      tags: t.tags ?? [],
+      due_by: t.due_by ?? null,
+      fr_due_by: t.fr_due_by ?? null,
+      is_escalated: !!t.is_escalated,
+      ticket_created_at: t.created_at ?? null,
+      ticket_updated_at: t.updated_at ?? null,
+      synced_at: new Date().toISOString(),
+    }));
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const admin = supabaseAdmin as unknown as { from: (t: string) => any };
+
+    let upserted = 0;
+    for (let i = 0; i < rows.length; i += 500) {
+      const chunk = rows.slice(i, i + 500);
+      const { error } = await admin.from("freshdesk_tickets").upsert(chunk, { onConflict: "id" });
+      if (error) throw new Error(error.message);
+      upserted += chunk.length;
+    }
+
+    return {
+      status: "success",
+      fetched: tickets.length,
+      upserted,
+      duration_ms: Date.now() - startedAt,
+    };
+  } catch (e) {
+    return {
+      status: "error",
+      fetched: 0,
+      upserted: 0,
+      duration_ms: Date.now() - startedAt,
+      error_message: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
