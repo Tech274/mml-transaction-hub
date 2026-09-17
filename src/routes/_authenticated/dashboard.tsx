@@ -254,14 +254,21 @@ function DashboardPage() {
   );
 }
 
-function KPI({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
+function KPI({ label, value, to, search }: { label: string; value: string; to?: string; search?: Record<string, unknown> }) {
+  const inner = (
+    <Card className={to ? "h-full transition hover:border-primary hover:shadow-md" : undefined}>
       <CardContent className="pt-6">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
         <div className="text-2xl font-bold mt-1">{value}</div>
+        {to && <div className="mt-2 text-xs text-primary opacity-0 group-hover:opacity-100 transition">View details →</div>}
       </CardContent>
     </Card>
+  );
+  if (!to) return inner;
+  return (
+    <Link to={to as never} search={(search ?? {}) as never} className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg">
+      {inner}
+    </Link>
   );
 }
 
@@ -275,14 +282,24 @@ function KpiGrid({ order, can, cards }: { order: string[]; can: (k: string) => b
   );
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function ChartCard({ title, children, to, search }: { title: string; children: React.ReactNode; to?: string; search?: Record<string, unknown> }) {
   return (
     <Card>
-      <CardHeader><CardTitle className="text-sm">{title}</CardTitle></CardHeader>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm">{title}</CardTitle>
+          {to && (
+            <Link to={to as never} search={(search ?? {}) as never} className="text-xs text-primary hover:underline whitespace-nowrap">
+              View all →
+            </Link>
+          )}
+        </div>
+      </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
   );
 }
+
 
 function CustomersByAccountManager() {
   const { can, isPreviewing, previewRole } = usePermissions();
