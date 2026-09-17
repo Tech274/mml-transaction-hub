@@ -27,7 +27,14 @@ interface AuditRow {
   created_at: string;
 }
 
-const EVENT_TYPES = ["apply_suggestions", "retry_started"] as const;
+const EVENT_TYPES = [
+  "import_started",
+  "import_completed",
+  "import_failed",
+  "run_cancelled",
+  "apply_suggestions",
+  "retry_started",
+] as const;
 
 export function BulkImportAuditLog() {
   const [runId, setRunId] = useState("");
