@@ -49,6 +49,12 @@ export const adminCreateUser = createServerFn({ method: "POST" })
     const { error: rErr } = await supabaseAdmin.from("user_roles").insert(rows);
     if (rErr) throw new Error(rErr.message);
 
+    // Optionally create the account disabled (profile flag + auth ban).
+    if (data.isActive === false) {
+      await supabaseAdmin.from("profiles").update({ is_active: false }).eq("id", newUserId);
+      await supabaseAdmin.auth.admin.updateUserById(newUserId, { ban_duration: "876000h" } as never);
+    }
+
     return { id: newUserId };
   });
 
