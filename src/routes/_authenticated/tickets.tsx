@@ -29,7 +29,16 @@ import {
 } from "@/lib/freshdesk.functions";
 
 export const Route = createFileRoute("/_authenticated/tickets")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    view: search.view === "mine" ? ("mine" as const) : ("all" as const),
+    quick: (["all", "open", "pending", "resolved", "closed", "overdue", "escalated"] as const).includes(
+      search.quick as never,
+    )
+      ? (search.quick as Quick)
+      : ("all" as const),
+  }),
   component: TicketsPage,
+
   head: () => ({
     meta: [
       { title: "Support Tickets Dashboard | MakeMyLabs" },
