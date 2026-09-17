@@ -74,6 +74,185 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_cc_audit: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          agent_key: string | null
+          created_at: string
+          detail: Json
+          id: string
+          inbox_id: string | null
+          run_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          agent_key?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          inbox_id?: string | null
+          run_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          agent_key?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          inbox_id?: string | null
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_cc_audit_inbox_id_fkey"
+            columns: ["inbox_id"]
+            isOneToOne: false
+            referencedRelation: "ai_cc_inbox"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_cc_audit_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_cc_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_cc_inbox: {
+        Row: {
+          agent_key: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decided_by_email: string | null
+          decision_note: string | null
+          id: string
+          item_type: string
+          payload: Json
+          run_id: string | null
+          status: string
+          summary: string | null
+          title: string
+        }
+        Insert: {
+          agent_key: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_email?: string | null
+          decision_note?: string | null
+          id?: string
+          item_type: string
+          payload?: Json
+          run_id?: string | null
+          status?: string
+          summary?: string | null
+          title: string
+        }
+        Update: {
+          agent_key?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_email?: string | null
+          decision_note?: string | null
+          id?: string
+          item_type?: string
+          payload?: Json
+          run_id?: string | null
+          status?: string
+          summary?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_cc_inbox_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_cc_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_cc_lab_requests: {
+        Row: {
+          confirmed_at: string | null
+          created_at: string
+          customer_name: string
+          id: string
+          lab_name: string
+          request_code: string
+          requisition: Json
+          status: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          created_at?: string
+          customer_name: string
+          id?: string
+          lab_name: string
+          request_code: string
+          requisition?: Json
+          status?: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          created_at?: string
+          customer_name?: string
+          id?: string
+          lab_name?: string
+          request_code?: string
+          requisition?: Json
+          status?: string
+        }
+        Relationships: []
+      }
+      ai_cc_runs: {
+        Row: {
+          actor_email: string | null
+          actor_id: string | null
+          agent_key: string
+          created_at: string
+          finished_at: string | null
+          id: string
+          input_json: Json
+          job_hint: string | null
+          output_json: Json
+          status: string
+        }
+        Insert: {
+          actor_email?: string | null
+          actor_id?: string | null
+          agent_key: string
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          input_json?: Json
+          job_hint?: string | null
+          output_json?: Json
+          status?: string
+        }
+        Update: {
+          actor_email?: string | null
+          actor_id?: string | null
+          agent_key?: string
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          input_json?: Json
+          job_hint?: string | null
+          output_json?: Json
+          status?: string
+        }
+        Relationships: []
+      }
       bulk_import_audit_events: {
         Row: {
           actor_email: string | null
