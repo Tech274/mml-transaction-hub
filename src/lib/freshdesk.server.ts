@@ -124,31 +124,36 @@ async function loadLookup(path: string): Promise<Map<number, string>> {
 /** Only the Cloud Labs group is synced into this app. */
 export const CLOUD_LABS_GROUP_ID = 1060000391179;
 export const CLOUD_LABS_GROUP_NAME = "Cloud Labs";
+/** Nothing created before this date is synced. */
+export const TICKETS_FROM = "2026-04-01T00:00:00Z";
 
-/** Pull recent Cloud Labs tickets (updated since `sinceDays` ago) and upsert them. */
-export async function runFreshdeskSync(opts?: { sinceDays?: number; maxPages?: number }): Promise<FreshdeskSyncResult> {
+/** Pull Cloud Labs tickets created on/after TICKETS_FROM and upsert them. */
+export async function runFreshdeskSync(opts?: { maxPages?: number }): Promise<FreshdeskSyncResult> {
   const startedAt = Date.now();
-  const sinceDays = opts?.sinceDays ?? 180;
-  const maxPages = opts?.maxPages ?? 20;
+  const maxPages = opts?.maxPages ?? 60;
 
   try {
-    
     const [agents, groups] = await Promise.all([loadLookup("/agents?per_page=100"), loadLookup("/groups?per_page=100")]);
 
-    const sinceMs = Date.now() - sinceDays * 86_400_000;
+    const cutoffMs = new Date(TICKETS_FROM).getTime();
     const tickets: FreshdeskTicket[] = [];
     // Newest first, so an hourly run touches only the first page or two.
     for (let page = 1; page <= maxPages; page++) {
       const res = await fdFetch(
-        `/tickets?updated_since=${encodeURIComponent(new Date(sinceMs).toISOString())}&include=requester,company&order_by=updated_at&order_type=desc&per_page=100&page=${page}`,
+        `/tickets?updated_since=${encodeURIComponent(TICKETS_FROM)}&include=requester,company&order_by=updated_at&order_type=desc&per_page=100&page=${page}`,
       );
       if (!res.ok) throw new Error(await readError(res, "ticket list"));
       const batch = (await res.json()) as FreshdeskTicket[];
-      // Cloud Labs group only — every other group is ignored.
-      tickets.push(...batch.filter((t) => t.group_id === CLOUD_LABS_GROUP_ID));
+      // Cloud Labs group only, created on/after the cutoff — everything else is ignored.
+      tickets.push(
+        ...batch.filter(
+          (t) => t.group_id === CLOUD_LABS_GROUP_ID && !!t.created_at && new Date(t.created_at).getTime() >= cutoffMs,
+        ),
+      );
       const oldest = batch.at(-1)?.updated_at;
-      if (batch.length < 100 || (oldest && new Date(oldest).getTime() < sinceMs)) break;
+      if (batch.length < 100 || (oldest && new Date(oldest).getTime() < cutoffMs)) break;
     }
+
 
 
 
