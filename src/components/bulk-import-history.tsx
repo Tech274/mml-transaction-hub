@@ -398,7 +398,7 @@ function RunDetails({ run, onDownload }: { run: Run; onDownload: () => void }) {
             )}
           </div>
         )}
-        {run.invalid_rows > 0 && (
+        {(run.invalid_rows > 0 || !!run.error_artifact_path) && (
           <Button size="sm" variant="outline" onClick={onDownload}>
             <FileWarning className="h-4 w-4 mr-1" />Download error CSV
           </Button>
