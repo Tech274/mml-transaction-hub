@@ -58,13 +58,22 @@ export const getTicketsOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<TicketsOverview> => {
     const sb = context.supabase as unknown as { from: (t: string) => any };
-    const { data, error } = await sb
-      .from("freshdesk_tickets")
-      .select("*")
-      .order("ticket_created_at", { ascending: false })
-      .limit(2000);
-    if (error) throw new Error(error.message);
-    const rows = ((data ?? []) as TicketRow[]).map((r) => ({ ...r, tags: r.tags ?? [] }));
+    // PostgREST caps a single response at 1000 rows, so page through.
+    const PAGE = 1000;
+    const all: TicketRow[] = [];
+    for (let from = 0; from < 5000; from += PAGE) {
+      const { data, error } = await sb
+        .from("freshdesk_tickets")
+        .select("*")
+        .order("ticket_created_at", { ascending: false })
+        .range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+      const page = (data ?? []) as TicketRow[];
+      all.push(...page);
+      if (page.length < PAGE) break;
+    }
+    const rows = all.map((r) => ({ ...r, tags: r.tags ?? [] }));
+
 
     const now = Date.now();
     const counts = {
