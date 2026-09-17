@@ -382,7 +382,6 @@ export function BulkImport() {
       return;
     }
     const { body, colIdx } = mapping;
-    const seen = new Set<string>();
     const parsed: ParsedRow[] = body.map((cols, idx) => {
       const raw: Record<string, string> = {};
       for (const h of headers) raw[h] = (cols[colIdx[h]] ?? "").trim();
@@ -392,11 +391,10 @@ export function BulkImport() {
         for (const issue of res.error.issues) {
           errors.push(`${issue.path.join(".") || "row"}: ${issue.message}`);
         }
-      } else {
-        const pid = res.data.potential_id;
-        if (seen.has(pid)) errors.push(`duplicate potential_id in file: ${pid}`);
-        seen.add(pid);
       }
+      // A Potential ID may legitimately cover several transactions, so repeats
+      // within the file are allowed and never reported as errors.
+
       return { line: idx + 2, raw, parsed: res.success ? (res.data as Record<string, unknown>) : undefined, errors };
     });
     setRows(parsed);
@@ -515,7 +513,6 @@ export function BulkImport() {
     }
     const invalid = rows.filter((r) => r.errors.length > 0);
     if (!invalid.length) { toast.message("No invalid rows to retry"); return; }
-    const seen = new Set<string>();
     const next: ParsedRow[] = invalid.map((r) => {
       const raw = correctedRawFor(r);
       const errors: string[] = [];
@@ -524,11 +521,9 @@ export function BulkImport() {
         for (const issue of res.error.issues) {
           errors.push(`${issue.path.join(".") || "row"}: ${issue.message}`);
         }
-      } else {
-        const pid = res.data.potential_id;
-        if (seen.has(pid)) errors.push(`duplicate potential_id in file: ${pid}`);
-        seen.add(pid);
       }
+      // Repeated Potential IDs are allowed — never an error.
+
       return { line: r.line, raw, parsed: res.success ? (res.data as Record<string, unknown>) : undefined, errors };
     });
     setRows(next);
@@ -749,31 +744,33 @@ export function BulkImport() {
           } as Record<string, unknown>;
           if (!uq.unique) {
             if (dupStrategy === "skip") {
-              updated[idx] = { ...r, errors: [`skipped: potential_id ${String(fullPayload.potential_id)} already exists`] };
+              updated[idx] = { ...r, errors: [`ignored: potential_id ${String(fullPayload.potential_id)} already has a transaction (allowed, nothing changed)`] };
               rowStatus = "skipped"; skipped++;
             } else if (dupStrategy === "update") {
               // Only overwrite the fields the user opted into; preserve the rest.
               const partial: Record<string, unknown> = {};
               for (const f of updateFields) if (f in fullPayload) partial[f] = fullPayload[f];
               if (kind === "private_cloud") partial.system_config = fullPayload.system_config;
+              // A Potential ID may cover several transactions, so this can touch more than one row.
               const { data: existing, error: updErr } = await supabase
                 .from("transactions")
                 .update(partial as never)
                 .eq("potential_id", String(fullPayload.potential_id))
-                .select("id").maybeSingle();
+                .select("id");
               if (updErr) {
                 const enriched = enrichPgConstraintError(updErr.message, (updErr as { code?: string }).code);
                 rowStatus = "error"; rowError = enriched.message;
                 updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
               }
-              else { rowStatus = "updated"; updatedCount++; txId = existing?.id ?? null; }
+              else { rowStatus = "updated"; updatedCount++; txId = existing?.[0]?.id ?? null; }
             } else { // link
-              // Link = read-only association, no fields overwritten on the existing record.
+              // Link = read-only association, no fields overwritten on the existing records.
               const { data: existing } = await supabase
-                .from("transactions").select("id").eq("potential_id", String(fullPayload.potential_id)).maybeSingle();
-              rowStatus = "linked"; linked++; txId = existing?.id ?? null;
+                .from("transactions").select("id").eq("potential_id", String(fullPayload.potential_id)).limit(1);
+              rowStatus = "linked"; linked++; txId = existing?.[0]?.id ?? null;
               updated[idx] = { ...r, errors: [`linked to existing transaction ${String(fullPayload.potential_id)} (no fields changed)`] };
             }
+
           } else {
             const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
             if (error) {
@@ -1070,7 +1067,7 @@ export function BulkImport() {
         <div className="rounded-md border p-3 text-xs space-y-2">
           <div className="font-medium text-foreground">Duplicate handling: <span className="uppercase">{dupStrategy}</span></div>
           {dupStrategy === "skip" && (
-            <div className="text-muted-foreground">Existing rows with the same potential_id are left unchanged. Incoming row is reported as skipped.</div>
+            <div className="text-muted-foreground">Existing transactions with the same potential_id are left unchanged. The incoming row is ignored (not an error).</div>
           )}
           {dupStrategy === "link" && (
             <div className="text-muted-foreground">No fields are written. All existing fields are preserved as-is. The audit log records a link reference only.</div>
@@ -1112,7 +1109,7 @@ export function BulkImport() {
           ) : (
             <div className="mt-1">system_config must be one of: {SYSTEM_CONFIG_OPTIONS.join(", ")}.</div>
           )}
-          <div>Dates use ISO format YYYY-MM-DD. potential_id must be unique within the file. Column order is flexible.</div>
+          <div>Dates use ISO format YYYY-MM-DD. A potential_id may repeat — several transactions can belong to one Potential ID. Column order is flexible.</div>
         </div>
 
         {rows.length > 0 && (
