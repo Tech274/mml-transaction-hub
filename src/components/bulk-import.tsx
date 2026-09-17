@@ -744,7 +744,7 @@ export function BulkImport() {
           } as Record<string, unknown>;
           if (!uq.unique) {
             if (dupStrategy === "skip") {
-              updated[idx] = { ...r, errors: [`skipped: potential_id ${String(fullPayload.potential_id)} already exists`] };
+              updated[idx] = { ...r, errors: [`ignored: potential_id ${String(fullPayload.potential_id)} already has a transaction (allowed, nothing changed)`] };
               rowStatus = "skipped"; skipped++;
             } else if (dupStrategy === "update") {
               // Only overwrite the fields the user opted into; preserve the rest.
@@ -1065,7 +1065,7 @@ export function BulkImport() {
         <div className="rounded-md border p-3 text-xs space-y-2">
           <div className="font-medium text-foreground">Duplicate handling: <span className="uppercase">{dupStrategy}</span></div>
           {dupStrategy === "skip" && (
-            <div className="text-muted-foreground">Existing rows with the same potential_id are left unchanged. Incoming row is reported as skipped.</div>
+            <div className="text-muted-foreground">Existing transactions with the same potential_id are left unchanged. The incoming row is ignored (not an error).</div>
           )}
           {dupStrategy === "link" && (
             <div className="text-muted-foreground">No fields are written. All existing fields are preserved as-is. The audit log records a link reference only.</div>
@@ -1107,7 +1107,7 @@ export function BulkImport() {
           ) : (
             <div className="mt-1">system_config must be one of: {SYSTEM_CONFIG_OPTIONS.join(", ")}.</div>
           )}
-          <div>Dates use ISO format YYYY-MM-DD. potential_id must be unique within the file. Column order is flexible.</div>
+          <div>Dates use ISO format YYYY-MM-DD. A potential_id may repeat — several transactions can belong to one Potential ID. Column order is flexible.</div>
         </div>
 
         {rows.length > 0 && (
