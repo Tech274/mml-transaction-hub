@@ -110,20 +110,21 @@ function DashboardPage() {
           order={orderedKpis}
           can={can}
           cards={{
-            kpi_total_transactions: <KPI label="Total Transactions" value={fmtNumber(total)} />,
-            kpi_public_cloud: <KPI label="Public Cloud" value={fmtNumber(pub)} />,
-            kpi_private_cloud: <KPI label="Private Cloud" value={fmtNumber(priv)} />,
-            kpi_total_users: <KPI label="Total Users" value={fmtNumber(users)} />,
-            kpi_total_revenue: <KPI label="Total Revenue" value={fmtCurrency(revenue)} />,
-            kpi_total_input_cost: <KPI label="Total Input Cost" value={fmtCurrency(inputCostTotal)} />,
-            kpi_total_profit: <KPI label="Total Profit" value={fmtCurrency(profit)} />,
-            kpi_margin: <KPI label="Margin" value={`${margin.toFixed(1)}%`} />,
-            kpi_avg_cost: <KPI label="Avg Selling Cost" value={fmtCurrency(avgCost)} />,
-            kpi_current_month_revenue: <KPI label="Current Month Revenue" value={fmtCurrency(curRevenue)} />,
-            kpi_current_month_profit: <KPI label="Current Month Profit" value={fmtCurrency(curProfit)} />,
-            kpi_current_month_users: <KPI label="Current Month Users" value={fmtNumber(curUsers)} />,
+            kpi_total_transactions: <KPI label="Total Transactions" value={fmtNumber(total)} to="/transactions" />,
+            kpi_public_cloud: <KPI label="Public Cloud" value={fmtNumber(pub)} to="/public-cloud" />,
+            kpi_private_cloud: <KPI label="Private Cloud" value={fmtNumber(priv)} to="/private-cloud" />,
+            kpi_total_users: <KPI label="Total Users" value={fmtNumber(users)} to="/transactions" />,
+            kpi_total_revenue: <KPI label="Total Revenue" value={fmtCurrency(revenue)} to={reportsTo} />,
+            kpi_total_input_cost: <KPI label="Total Input Cost" value={fmtCurrency(inputCostTotal)} to={reportsTo} />,
+            kpi_total_profit: <KPI label="Total Profit" value={fmtCurrency(profit)} to={reportsTo} />,
+            kpi_margin: <KPI label="Margin" value={`${margin.toFixed(1)}%`} to={reportsTo} />,
+            kpi_avg_cost: <KPI label="Avg Selling Cost" value={fmtCurrency(avgCost)} to="/transactions" />,
+            kpi_current_month_revenue: <KPI label="Current Month Revenue" value={fmtCurrency(curRevenue)} to="/transactions" search={curMonthSearch} />,
+            kpi_current_month_profit: <KPI label="Current Month Profit" value={fmtCurrency(curProfit)} to="/transactions" search={curMonthSearch} />,
+            kpi_current_month_users: <KPI label="Current Month Users" value={fmtNumber(curUsers)} to="/transactions" search={curMonthSearch} />,
           }}
         />
+
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {can("chart_tx_by_month") && <ChartCard title={`Transactions by Month — ${curYear}`}>
