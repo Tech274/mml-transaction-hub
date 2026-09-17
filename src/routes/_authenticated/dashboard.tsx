@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { getMyAgentKpis } from "@/lib/freshdesk.functions";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,6 +138,10 @@ function DashboardPage() {
             kpi_current_month_users: <KPI label="Current Month Users" value={fmtNumber(curUsers)} to="/transactions" search={curMonthSearch} />,
           }}
         />
+
+        <MyAgentTicketKpis />
+
+
 
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -467,5 +473,81 @@ function Stat({ label, value, tone, search }: { label: string; value: string; to
     <Link to="/customers" search={search as never} className="block h-full">
       {inner}
     </Link>
+  );
+}
+
+/** Agent-specific support KPIs, linked straight into the agent's ticket queue. */
+function MyAgentTicketKpis() {
+  const kpisFn = useServerFn(getMyAgentKpis);
+  const { data, isLoading } = useQuery({
+    queryKey: ["freshdesk", "my-agent-kpis"],
+    queryFn: () => kpisFn(),
+    retry: false,
+  });
+
+  if (isLoading || !data) return null;
+
+  if (!data.agent_name) {
+    return (
+      <Card>
+        <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-sm font-medium">See your own ticket numbers here</div>
+            <p className="text-xs text-muted-foreground">
+              Pick your helpdesk name on the Support tickets page to track tickets closed, average resolution time and tickets per month.
+            </p>
+          </div>
+          <Link to="/tickets" search={{ view: "mine" as const, quick: "all" as const }} className="text-xs text-primary hover:underline">
+            Go to my tickets →
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const avg =
+    data.avg_resolution_hours === null
+      ? "—"
+      : data.avg_resolution_hours < 48
+        ? `${data.avg_resolution_hours.toFixed(1)} h`
+        : `${(data.avg_resolution_hours / 24).toFixed(1)} d`;
+  const mine = { view: "mine" as const, quick: "all" as const };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm">My support tickets — {data.agent_name}</CardTitle>
+          <Link to="/tickets" search={mine} className="text-xs text-primary hover:underline whitespace-nowrap">
+            Open my queue →
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KPI label="Tickets Closed" value={fmtNumber(data.closed)} to="/tickets" search={{ view: "mine", quick: "closed" }} />
+          <KPI label="Avg Resolution Time" value={avg} to="/tickets" search={{ view: "mine", quick: "resolved" }} />
+          <KPI label="Tickets This Month" value={fmtNumber(data.this_month)} to="/tickets" search={mine} />
+          <KPI label="In My Queue" value={fmtNumber(data.open_queue)} to="/tickets" search={{ view: "mine", quick: "open" }} />
+        </div>
+        {data.by_month.length > 0 && (
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={data.by_month}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+              <XAxis dataKey="month" fontSize={12} />
+              <YAxis fontSize={12} />
+              <Tooltip />
+              <Legend />
+              <Bar dataKey="total" name="Assigned" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="closed" name="Closed" fill="#22c55e" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+        <p className="text-xs text-muted-foreground">
+          Average resolution time is measured across {fmtNumber(data.resolved_sample)} resolved or closed tickets.
+          {data.overdue > 0 && ` ${data.overdue} of your open tickets are overdue.`}
+        </p>
+      </CardContent>
+    </Card>
   );
 }

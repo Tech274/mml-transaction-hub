@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -29,7 +29,16 @@ import {
 } from "@/lib/freshdesk.functions";
 
 export const Route = createFileRoute("/_authenticated/tickets")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    view: search.view === "mine" ? ("mine" as const) : ("all" as const),
+    quick: (["all", "open", "pending", "resolved", "closed", "overdue", "escalated"] as const).includes(
+      search.quick as never,
+    )
+      ? (search.quick as Quick)
+      : ("all" as const),
+  }),
   component: TicketsPage,
+
   head: () => ({
     meta: [
       { title: "Support Tickets Dashboard | MakeMyLabs" },
@@ -85,15 +94,23 @@ function TicketsPage() {
   const syncFn = useServerFn(syncFreshdeskNow);
   const directoryFn = useServerFn(getAgentDirectory);
 
-  const [view, setView] = useState<"all" | "mine">("all");
+  const search = Route.useSearch();
+  const [view, setView] = useState<"all" | "mine">(search.view);
   const [q, setQ] = useState("");
-  const [quick, setQuick] = useState<Quick>("all");
+  const [quick, setQuick] = useState<Quick>(search.quick);
+
   const [status, setStatus] = useState("all");
   const [priority, setPriority] = useState("all");
   const [agent, setAgent] = useState("all");
   const [open, setOpen] = useState<TicketRow | null>(null);
   const [page, setPage] = useState(0);
   const perPage = 25;
+
+  useEffect(() => {
+    setView(search.view);
+    setQuick(search.quick);
+    setPage(0);
+  }, [search.view, search.quick]);
 
   const overview = useQuery({ queryKey: ["freshdesk", "overview"], queryFn: () => overviewFn() });
   const directory = useQuery({ queryKey: ["freshdesk", "agents"], queryFn: () => directoryFn() });
