@@ -50,14 +50,22 @@ export function fullSyncHourFromEnv(env: Record<string, string | undefined>): nu
  * What a run that read `complete` (true = reached the end) should record.
  * Incremental + incomplete = failure (the cursor must not move past unread pages).
  * Full + incomplete = success with a visible note (same coverage as before SCRUM-92).
+ * `stoppedBy` (SCRUM-72): whether the page limit or the run's time budget stopped it.
  */
-export function runOutcome(mode: SyncMode, complete: boolean, maxPages: number, saved: number): { failure: string | null; note: string | null } {
+export function runOutcome(
+  mode: SyncMode,
+  complete: boolean,
+  maxPages: number,
+  saved: number,
+  stoppedBy: "page_limit" | "time_limit" = "page_limit",
+): { failure: string | null; note: string | null } {
   if (complete) return { failure: null, note: null };
+  const limit = stoppedBy === "time_limit" ? "the time limit (HOOK_TIMEOUT_SECONDS)" : `the page limit (${maxPages} pages)`;
   if (mode === "incremental") {
     return {
-      failure: `Stopped at the page limit (${maxPages} pages) before reaching the end; saved ${saved} tickets. The next run starts again from the last successful run.`,
+      failure: `Stopped at ${limit} before reaching the end; saved ${saved} tickets. The next run starts again from the last successful run.`,
       note: null,
     };
   }
-  return { failure: null, note: `Warning: full pass stopped at the page limit (${maxPages} pages); older updates were not re-read.` };
+  return { failure: null, note: `Warning: full pass stopped at ${limit}; older updates were not re-read.` };
 }
