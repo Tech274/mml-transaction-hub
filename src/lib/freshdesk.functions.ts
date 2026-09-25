@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { TICKET_OPS_ROLES, canClaimAgent } from "@/lib/ticket-access";
+import { fetchAllPages, ttlCache } from "@/lib/paging";
 
 export interface TicketRow {
   id: number;
@@ -18,7 +19,8 @@ export interface TicketRow {
   tags: string[];
   due_by: string | null;
   is_escalated: boolean;
-  description_text: string | null;
+  /** SCRUM-94: not sent with the list any more; load it with getTicketDescription. */
+  description_text?: string | null;
   ticket_created_at: string | null;
   ticket_updated_at: string | null;
   synced_at: string;
@@ -42,7 +44,20 @@ export interface TicketsOverview {
   by_month: { month: string; value: number }[];
   last_synced_at: string | null;
   connection: { ok: boolean; message: string; domain?: string };
+  /** SCRUM-94: true if there were more than MAX_TICKETS rows (shown as a warning, never silent). */
+  truncated: boolean;
 }
+
+/** Columns the list needs (no description text: that is loaded per ticket). */
+const LIST_COLUMNS =
+  "id, subject, status, priority, type, source, requester_name, requester_email, company_name, agent_name, group_name, tags, due_by, is_escalated, ticket_created_at, ticket_updated_at, synced_at";
+const MAX_TICKETS = 20_000;
+
+/** The Freshdesk connection check is a live API call; cache it for 5 minutes per server instance. */
+const cachedConnection = ttlCache(5 * 60_000, async () => {
+  const { checkFreshdeskConnection } = await import("@/lib/freshdesk.server");
+  return checkFreshdeskConnection();
+});
 
 const OPEN_LIKE = ["Open", "Waiting on Customer", "Waiting on Third Party"];
 
@@ -60,21 +75,23 @@ export const getTicketsOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<TicketsOverview> => {
     const sb = context.supabase as unknown as { from: (t: string) => any };
     // PostgREST caps a single response at 1000 rows, so page through.
-    const PAGE = 1000;
-    const all: TicketRow[] = [];
-    for (let from = 0; from < 5000; from += PAGE) {
-      const { data, error } = await sb
-        .from("freshdesk_tickets")
-        .select("*")
-        .order("ticket_created_at", { ascending: false })
-        .range(from, from + PAGE - 1);
-      if (error) throw new Error(error.message);
-      const page = (data ?? []) as TicketRow[];
-      all.push(...page);
-      if (page.length < PAGE) break;
-    }
+    // SCRUM-94 (G-14): no silent 5,000 cap any more (up to MAX_TICKETS, then a visible
+    // warning), stable order (id tie-break) and no description text in the list.
+    const { rows: all, truncated } = await fetchAllPages<TicketRow>(
+      async (from, to) => {
+        const { data, error } = await sb
+          .from("freshdesk_tickets")
+          .select(LIST_COLUMNS)
+          .order("ticket_created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to);
+        if (error) throw new Error(error.message);
+        return (data ?? []) as TicketRow[];
+      },
+      1000,
+      MAX_TICKETS,
+    );
     const rows = all.map((r) => ({ ...r, tags: r.tags ?? [] }));
-
 
     const now = Date.now();
     const counts = {
@@ -99,8 +116,7 @@ export const getTicketsOverview = createServerFn({ method: "GET" })
       monthMap.set(key, (monthMap.get(key) ?? 0) + 1);
     }
 
-    const { checkFreshdeskConnection } = await import("@/lib/freshdesk.server");
-    const connection = await checkFreshdeskConnection();
+    const connection = await cachedConnection();
 
     return {
       tickets: rows,
@@ -119,7 +135,23 @@ export const getTicketsOverview = createServerFn({ method: "GET" })
         null,
       ),
       connection,
+      truncated,
     };
+  });
+
+/** SCRUM-94: description text for one ticket (same table and access rules as the list). */
+export const getTicketDescription = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { ticketId: number }) => z.object({ ticketId: z.number().int().positive() }).parse(d))
+  .handler(async ({ data, context }): Promise<{ description_text: string | null }> => {
+    const sb = context.supabase as unknown as { from: (t: string) => any };
+    const { data: row, error } = await sb
+      .from("freshdesk_tickets")
+      .select("description_text")
+      .eq("id", data.ticketId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return { description_text: (row?.description_text as string | null | undefined) ?? null };
   });
 
 /** Manual sync — admins and ops leads. */

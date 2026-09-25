@@ -25,7 +25,7 @@ import { RefreshCw, LifeBuoy, AlertTriangle, Eye, Loader2, CheckCircle2, X, User
 import { useAuth } from "@/lib/auth-context";
 import {
   getTicketsOverview, syncFreshdeskNow, getAgentDirectory, setMyAgentIdentity,
-  getTicketHistory, resolveTicket, type TicketRow,
+  getTicketHistory, resolveTicket, getTicketDescription, type TicketRow,
 } from "@/lib/freshdesk.functions";
 
 export const Route = createFileRoute("/_authenticated/tickets")({
@@ -277,6 +277,13 @@ function TicketsPage() {
                   <p>{overview.error instanceof Error ? overview.error.message : "Unknown error"}</p>
                   <Button size="sm" variant="outline" onClick={() => overview.refetch()}>Retry</Button>
                 </AlertDescription>
+              </Alert>
+            )}
+            {d?.truncated && (
+              <Alert variant="destructive" className="mb-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Showing the newest 20,000 tickets only</AlertTitle>
+                <AlertDescription>Totals on this page cover those tickets. Server-side totals are the next SCRUM-94 step.</AlertDescription>
               </Alert>
             )}
             {d && !d.connection.ok && (
@@ -571,6 +578,15 @@ function TicketDetailSheet({
   const [nextStatus, setNextStatus] = useState<string>("");
   const [note, setNote] = useState("");
 
+  const descriptionFn = useServerFn(getTicketDescription);
+  // SCRUM-94: description is loaded only when a ticket is opened.
+  const description = useQuery({
+    queryKey: ["freshdesk", "description", ticket?.id],
+    queryFn: () => descriptionFn({ data: { ticketId: ticket!.id } }),
+    enabled: !!ticket,
+    staleTime: 60_000,
+  });
+
   const history = useQuery({
     queryKey: ["freshdesk", "history", ticket?.id],
     queryFn: () => historyFn({ data: { ticketId: ticket!.id } }),
@@ -637,10 +653,18 @@ function TicketDetailSheet({
                   {ticket.tags.map((t) => <Badge key={t} variant="secondary">{t}</Badge>)}
                 </div>
               )}
-              {ticket.description_text && (
+              {description.isLoading && (
+                <p className="text-xs text-muted-foreground">Loading description…</p>
+              )}
+              {description.isError && (
+                <p className="text-xs text-destructive">
+                  Could not load the description: {description.error instanceof Error ? description.error.message : "unknown error"}
+                </p>
+              )}
+              {description.data?.description_text && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Description</p>
-                  <p className="whitespace-pre-wrap rounded-md border p-3 text-sm">{ticket.description_text}</p>
+                  <p className="whitespace-pre-wrap rounded-md border p-3 text-sm">{description.data.description_text}</p>
                 </div>
               )}
             </TabsContent>
