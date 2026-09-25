@@ -1,23 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Scheduled Freshdesk ticket sync. Called by the scheduler with the `apikey` header.
+// Scheduled Freshdesk ticket sync. Called by pg_cron.
+// Auth (SCRUM-89 / G-03): the `x-cron-secret` header must match the Vault
+// secret `cron_secret`. The public `apikey` header is no longer accepted.
+// The request body is ignored: callers can no longer choose `maxPages`.
 export const Route = createFileRoute("/api/public/hooks/freshdesk-sync")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey") ?? request.headers.get("Apikey");
-        if (!apikey || apikey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
-          return new Response("Unauthorized", { status: 401 });
-        }
-        let maxPages: number | undefined;
-        try {
-          const body = (await request.json()) as { maxPages?: number };
-          if (typeof body?.maxPages === "number") maxPages = body.maxPages;
-        } catch {
-          /* empty body is fine */
-        }
+        const { isAuthorizedCronRequest, unauthorizedResponse } = await import(
+          "@/lib/cron-auth.server"
+        );
+        if (!(await isAuthorizedCronRequest(request))) return unauthorizedResponse();
+
         const { runFreshdeskSync } = await import("@/lib/freshdesk.server");
-        const result = await runFreshdeskSync(maxPages ? { maxPages } : undefined);
+        const result = await runFreshdeskSync();
 
         return new Response(JSON.stringify(result), {
           status: result.status === "success" ? 200 : 500,
