@@ -6,10 +6,12 @@ import { BulkImportHistory } from "@/components/bulk-import-history";
 import { BulkImportAuditLog } from "@/components/bulk-import-audit-log";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/lib/auth-context";
+import { requireRouteRoles } from "@/lib/route-guard";
 import { usePermissions } from "@/lib/permissions";
 import { Card, CardContent } from "@/components/ui/card";
 
 export const Route = createFileRoute("/_authenticated/entry")({
+  beforeLoad: requireRouteRoles("/entry"),
   component: EntryPage,
 });
 
