@@ -1,5 +1,6 @@
 // Freshdesk sync: pulls tickets from the Freshdesk API into public.freshdesk_tickets.
 // Server-only (service-role client + API credentials) — never import from a component.
+import { DEFAULT_FRESHDESK_SCOPE, freshdeskScopeFromEnv } from "@/lib/app-config";
 
 export interface FreshdeskSyncResult {
   /** sync_runs row for this run (SCRUM-74); null if the run could not be recorded. */
@@ -125,14 +126,16 @@ async function loadLookup(path: string): Promise<Map<number, string>> {
   return map;
 }
 
-/** Only the Cloud Labs group is synced into this app. */
-export const CLOUD_LABS_GROUP_ID = 1060000391179;
-export const CLOUD_LABS_GROUP_NAME = "Cloud Labs";
-/** Nothing created before this date is synced. */
-export const TICKETS_FROM = "2026-04-01T00:00:00Z";
+/**
+ * SCRUM-101 (G-24): scope now comes from env (FRESHDESK_GROUP_ID, FRESHDESK_GROUP_NAME,
+ * FRESHDESK_TICKETS_FROM). These exports keep the previous defaults for existing imports.
+ */
+export const CLOUD_LABS_GROUP_ID = DEFAULT_FRESHDESK_SCOPE.groupId;
+export const CLOUD_LABS_GROUP_NAME = DEFAULT_FRESHDESK_SCOPE.groupName;
+export const TICKETS_FROM = DEFAULT_FRESHDESK_SCOPE.ticketsFrom;
 
 /**
- * Pull Cloud Labs tickets created on/after TICKETS_FROM and upsert them.
+ * Pull tickets of the configured group (default Cloud Labs) created on/after the configured date and upsert them.
  * SCRUM-74 (G-07): every run (cron or manual) is recorded in sync_runs with kind = 'freshdesk'.
  */
 export async function runFreshdeskSync(opts?: {
@@ -163,19 +166,21 @@ export async function runFreshdeskSync(opts?: {
   try {
     const [agents, groups] = await Promise.all([loadLookup("/agents?per_page=100"), loadLookup("/groups?per_page=100")]);
 
-    const cutoffMs = new Date(TICKETS_FROM).getTime();
+    // Read inside the try: an invalid setting fails (and is recorded as) this run.
+    const scope = freshdeskScopeFromEnv(process.env);
+    const cutoffMs = new Date(scope.ticketsFrom).getTime();
     const tickets: FreshdeskTicket[] = [];
     // Newest first, so an hourly run touches only the first page or two.
     for (let page = 1; page <= maxPages; page++) {
       const res = await fdFetch(
-        `/tickets?updated_since=${encodeURIComponent(TICKETS_FROM)}&include=requester,company&order_by=updated_at&order_type=desc&per_page=100&page=${page}`,
+        `/tickets?updated_since=${encodeURIComponent(scope.ticketsFrom)}&include=requester,company&order_by=updated_at&order_type=desc&per_page=100&page=${page}`,
       );
       if (!res.ok) throw new Error(await readError(res, "ticket list"));
       const batch = (await res.json()) as FreshdeskTicket[];
       // Cloud Labs group only, created on/after the cutoff — everything else is ignored.
       tickets.push(
         ...batch.filter(
-          (t) => t.group_id === CLOUD_LABS_GROUP_ID && !!t.created_at && new Date(t.created_at).getTime() >= cutoffMs,
+          (t) => t.group_id === scope.groupId && !!t.created_at && new Date(t.created_at).getTime() >= cutoffMs,
         ),
       );
       const oldest = batch.at(-1)?.updated_at;
