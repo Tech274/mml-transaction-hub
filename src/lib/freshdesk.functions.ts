@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { TICKET_OPS_ROLES, canClaimAgent } from "@/lib/ticket-access";
 
 export interface TicketRow {
   id: number;
@@ -166,18 +167,42 @@ export interface TicketActionEntry {
   created_at: string;
 }
 
-async function assertTicketActor(context: { supabase: any; userId: string }) {
-  const { data: allowed } = await context.supabase.rpc("has_any_role", {
+async function isTicketOps(context: { supabase: any; userId: string }): Promise<boolean> {
+  const { data: allowed, error } = await context.supabase.rpc("has_any_role", {
     _user_id: context.userId,
-    _roles: ["admin", "ops_lead", "ops_user"],
+    _roles: [...TICKET_OPS_ROLES],
   } as never);
-  if (!allowed) throw new Error("You do not have permission to update support tickets");
+  if (error) throw new Error("Could not check your permissions. Please try again.");
+  return allowed === true;
+}
+
+async function isAdmin(context: { supabase: any; userId: string }): Promise<boolean> {
+  const { data, error } = await context.supabase.rpc("has_role", {
+    _user_id: context.userId,
+    _role: "admin",
+  } as never);
+  if (error) throw new Error("Could not check your permissions. Please try again.");
+  return data === true;
+}
+
+async function assertTicketActor(context: { supabase: any; userId: string }) {
+  if (!(await isTicketOps(context))) throw new Error("You do not have permission to update support tickets");
 }
 
 /** Helpdesk agents plus the caller's saved (or auto-matched) identity. */
 export const getAgentDirectory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ agents: AgentOption[]; identity: AgentIdentity | null }> => {
+    const sbUser = context.supabase as unknown as { from: (t: string) => any };
+    // SCRUM-91 (G-06): the Freshdesk agent directory (names + emails) is for ops roles only.
+    if (!(await isTicketOps(context as never))) {
+      const { data: savedOnly } = await sbUser
+        .from("agent_identities")
+        .select("agent_name, agent_id, auto_matched")
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      return { agents: [], identity: (savedOnly as AgentIdentity | null) ?? null };
+    }
     const { listFreshdeskAgents } = await import("@/lib/freshdesk.server");
     let agents: AgentOption[] = [];
     try {
@@ -206,21 +231,43 @@ export const getAgentDirectory = createServerFn({ method: "GET" })
     return { agents, identity: { agent_name: match.name, agent_id: match.id, auto_matched: true } };
   });
 
-/** Manually choose which helpdesk agent the signed-in user is. */
+/**
+ * Manually choose which helpdesk agent the signed-in user is.
+ * SCRUM-102 (G-25): the agent must exist in Freshdesk and its email must match
+ * the caller's sign-in email (admins may choose any existing agent). The stored
+ * name always comes from Freshdesk, never from the caller.
+ */
 export const setMyAgentIdentity = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { agentName: string; agentId?: number | null }) =>
     z.object({ agentName: z.string().min(1), agentId: z.number().int().nullable().optional() }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    if (!(await isTicketOps(context as never))) {
+      throw new Error("Only ops roles can link a helpdesk agent identity");
+    }
+    if (data.agentId == null) throw new Error("Pick an agent from the Freshdesk list");
+
+    const { listFreshdeskAgents } = await import("@/lib/freshdesk.server");
+    let agents: AgentOption[];
+    try {
+      agents = (await listFreshdeskAgents()).map((a) => ({ id: a.id, name: a.name, email: a.email }));
+    } catch {
+      throw new Error("The Freshdesk agent list is unavailable right now. Please try again later.");
+    }
+    const agent = agents.find((a) => a.id === data.agentId);
+    const callerEmail = (context.claims as { email?: string } | undefined)?.email ?? null;
+    const verdict = canClaimAgent({ callerEmail, isAdmin: await isAdmin(context as never), agent });
+    if (!verdict.ok) throw new Error(verdict.reason);
+
     const sb = context.supabase as unknown as { from: (t: string) => any };
     const { error } = await sb.from("agent_identities").upsert({
       user_id: context.userId,
-      agent_name: data.agentName,
-      agent_id: data.agentId ?? null,
+      agent_name: agent!.name,
+      agent_id: agent!.id,
       auto_matched: false,
     });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error("Could not save your agent identity. Please try again.");
     return { ok: true };
   });
 
@@ -230,12 +277,33 @@ export const getTicketHistory = createServerFn({ method: "GET" })
   .inputValidator((d: { ticketId: number }) => z.object({ ticketId: z.number().int().positive() }).parse(d))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as { from: (t: string) => any };
+
+    // SCRUM-91 (G-06): only tickets that were synced into this app (the Cloud Labs
+    // group) can be looked up. The check uses the caller's own client, so the
+    // tickets RLS policy applies too.
+    const { data: known, error: knownErr } = await sb
+      .from("freshdesk_tickets")
+      .select("id")
+      .eq("id", data.ticketId)
+      .maybeSingle();
+    if (knownErr) throw new Error("Could not load this ticket. Please try again.");
+    if (!known) throw new Error(`Ticket #${data.ticketId} is not in this app`);
+
     const { data: actions, error } = await sb
       .from("ticket_action_log")
       .select("*")
       .eq("ticket_id", data.ticketId)
       .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error("Could not load the ticket history. Please try again.");
+
+    // Freshdesk conversation text (customer emails, internal notes) is for ops roles only.
+    if (!(await isTicketOps(context as never))) {
+      return {
+        actions: (actions ?? []) as TicketActionEntry[],
+        conversations: [] as Awaited<ReturnType<typeof import("@/lib/freshdesk.server").fetchTicketConversations>>,
+        conversations_error: "Conversation history is available to ops roles only." as string | null,
+      };
+    }
 
     const { fetchTicketConversations } = await import("@/lib/freshdesk.server");
     let conversations: Awaited<ReturnType<typeof fetchTicketConversations>> = [];
