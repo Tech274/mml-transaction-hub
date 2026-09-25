@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { FRESHDESK_HEALTH, summarizeSyncHealth, type SyncHealth } from "@/lib/sync-health";
+import { formatDailyTimeUtc, nextDailyRunAt, snapshotCronFromEnv } from "@/lib/app-config";
 
 export interface SyncRunRow {
   id: string;
@@ -43,18 +44,16 @@ export interface SyncOverview {
   live_counts: { customers: number; transactions: number };
   snapshot_rows: number;
   next_cron_at: string;
+  /** e.g. "02:00 UTC" */
+  snapshot_schedule_utc: string;
   /** SCRUM-74: hourly Freshdesk sync, recorded in sync_runs with kind = 'freshdesk'. */
   freshdesk: { runs: SyncRunRow[]; health: SyncHealth };
 }
 
-/** Daily schedule: 02:00 UTC. */
-function nextCronAt(): string {
-  const now = new Date();
-  const next = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 2, 0, 0),
-  );
-  if (next.getTime() <= now.getTime()) next.setUTCDate(next.getUTCDate() + 1);
-  return next.toISOString();
+/** SCRUM-101: daily schedule (display only) from SNAPSHOT_CRON_UTC, default 02:00 UTC. */
+function snapshotSchedule() {
+  const t = snapshotCronFromEnv(process.env);
+  return { next: nextDailyRunAt(new Date(), t), label: formatDailyTimeUtc(t) };
 }
 
 export const getSyncOverview = createServerFn({ method: "GET" })
@@ -70,6 +69,7 @@ export const getSyncOverview = createServerFn({ method: "GET" })
     ]);
     if (runsErr) throw new Error(runsErr.message);
     if (fdErr) throw new Error(fdErr.message);
+    const schedule = snapshotSchedule();
     const list = (runs ?? []) as SyncRunRow[];
     const fdList = (fdRuns ?? []) as SyncRunRow[];
     return {
@@ -80,7 +80,8 @@ export const getSyncOverview = createServerFn({ method: "GET" })
         transactions: Number(transactions.count ?? 0),
       },
       snapshot_rows: Number(snaps.count ?? 0),
-      next_cron_at: nextCronAt(),
+      next_cron_at: schedule.next,
+      snapshot_schedule_utc: schedule.label,
       freshdesk: { runs: fdList, health: summarizeSyncHealth(fdList, new Date(), FRESHDESK_HEALTH) },
     };
   });

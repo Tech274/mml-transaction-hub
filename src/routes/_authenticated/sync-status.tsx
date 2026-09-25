@@ -69,7 +69,7 @@ function SyncStatusPage() {
               </CardTitle>
               <CardDescription>
                 Captures monthly revenue, cost, profit and margin per customer, lab, provider and line of business.
-                Runs automatically every day at 02:00 UTC.
+                Runs automatically every day at {d?.snapshot_schedule_utc ?? "02:00 UTC"}.
               </CardDescription>
             </div>
             <div className="flex gap-2">
