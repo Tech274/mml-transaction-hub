@@ -135,7 +135,12 @@ export const syncFreshdeskNow = createServerFn({ method: "POST" })
     } as never);
     if (!allowed) throw new Error("Only admins and ops leads can sync Freshdesk tickets");
     const { runFreshdeskSync } = await import("@/lib/freshdesk.server");
-    return runFreshdeskSync(data.maxPages ? { maxPages: data.maxPages } : undefined);
+    return runFreshdeskSync({
+      ...(data.maxPages ? { maxPages: data.maxPages } : {}),
+      trigger_source: "manual",
+      triggered_by: context.userId,
+      triggered_by_email: (context.claims as { email?: string } | null)?.email ?? null,
+    });
 
   });
 

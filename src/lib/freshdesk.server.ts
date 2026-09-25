@@ -2,6 +2,8 @@
 // Server-only (service-role client + API credentials) — never import from a component.
 
 export interface FreshdeskSyncResult {
+  /** sync_runs row for this run (SCRUM-74); null if the run could not be recorded. */
+  run_id: string | null;
   status: "success" | "error";
   fetched: number;
   upserted: number;
@@ -129,10 +131,34 @@ export const CLOUD_LABS_GROUP_NAME = "Cloud Labs";
 /** Nothing created before this date is synced. */
 export const TICKETS_FROM = "2026-04-01T00:00:00Z";
 
-/** Pull Cloud Labs tickets created on/after TICKETS_FROM and upsert them. */
-export async function runFreshdeskSync(opts?: { maxPages?: number }): Promise<FreshdeskSyncResult> {
+/**
+ * Pull Cloud Labs tickets created on/after TICKETS_FROM and upsert them.
+ * SCRUM-74 (G-07): every run (cron or manual) is recorded in sync_runs with kind = 'freshdesk'.
+ */
+export async function runFreshdeskSync(opts?: {
+  maxPages?: number;
+  trigger_source?: "cron" | "manual";
+  triggered_by?: string | null;
+  triggered_by_email?: string | null;
+}): Promise<FreshdeskSyncResult> {
   const startedAt = Date.now();
   const maxPages = opts?.maxPages ?? 60;
+  const { startRun, finishRun } = await import("@/lib/sync-run-log");
+  type Db = { from: (t: string) => any };
+  let logDb: Db | null = null;
+  let runId: string | null = null;
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    logDb = supabaseAdmin as unknown as Db;
+    runId = await startRun(logDb, {
+      kind: "freshdesk",
+      trigger_source: opts?.trigger_source ?? "cron",
+      triggered_by: opts?.triggered_by ?? null,
+      triggered_by_email: opts?.triggered_by_email ?? null,
+    });
+  } catch (e) {
+    console.error("[freshdesk-sync] could not record run start:", e instanceof Error ? e.message : String(e));
+  }
 
   try {
     const [agents, groups] = await Promise.all([loadLookup("/agents?per_page=100"), loadLookup("/groups?per_page=100")]);
@@ -183,8 +209,8 @@ export async function runFreshdeskSync(opts?: { maxPages?: number }): Promise<Fr
       synced_at: new Date().toISOString(),
     }));
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const admin = supabaseAdmin as unknown as { from: (t: string) => any };
+    const admin: Db =
+      logDb ?? ((await import("@/integrations/supabase/client.server")).supabaseAdmin as unknown as Db);
 
     let upserted = 0;
     for (let i = 0; i < rows.length; i += 500) {
@@ -194,19 +220,27 @@ export async function runFreshdeskSync(opts?: { maxPages?: number }): Promise<Fr
       upserted += chunk.length;
     }
 
+    const duration_ms = Date.now() - startedAt;
+    if (logDb) await finishRun(logDb, runId, { status: "success", duration_ms, fetched_count: tickets.length, upserted_count: upserted });
     return {
+      run_id: runId,
       status: "success",
       fetched: tickets.length,
       upserted,
-      duration_ms: Date.now() - startedAt,
+      duration_ms,
     };
   } catch (e) {
+    const duration_ms = Date.now() - startedAt;
+    const error_message = e instanceof Error ? e.message : String(e);
+    console.error("[freshdesk-sync] run failed:", error_message);
+    if (logDb) await finishRun(logDb, runId, { status: "error", duration_ms, error_message, fetched_count: 0, upserted_count: 0 });
     return {
+      run_id: runId,
       status: "error",
       fetched: 0,
       upserted: 0,
-      duration_ms: Date.now() - startedAt,
-      error_message: e instanceof Error ? e.message : String(e),
+      duration_ms,
+      error_message,
     };
   }
 }
