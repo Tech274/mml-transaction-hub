@@ -80,7 +80,7 @@ function credentials() {
   return { domain, apiKey };
 }
 
-async function fdFetch(path: string, init?: RequestInit, attempt = 0): Promise<Response> {
+async function fdFetch(path: string, init?: RequestInit, attempt = 0, deadline?: number): Promise<Response> {
   const { domain, apiKey } = credentials();
   const auth = Buffer.from(`${apiKey}:X`).toString("base64");
   const res = await fetch(`https://${domain}/api/v2${path}`, {
@@ -90,15 +90,25 @@ async function fdFetch(path: string, init?: RequestInit, attempt = 0): Promise<R
   // Freshdesk throttles per minute; wait out the advertised cool-down and retry.
   if (res.status === 429 && attempt < 3) {
     const retryAfter = Number(res.headers.get("retry-after") ?? "") || 30;
-    await new Promise((r) => setTimeout(r, Math.min(retryAfter, 60) * 1000));
-    return fdFetch(path, init, attempt + 1);
+    const waitMs = Math.min(retryAfter, 60) * 1000;
+    // SCRUM-72: a scheduled run has a time budget. If the cool-down does not fit,
+    // give up now; the next run starts again from the last successful run.
+    if (deadline !== undefined && Date.now() + waitMs > deadline - TIME_SAFETY_MS) return res;
+    await new Promise((r) => setTimeout(r, waitMs));
+    return fdFetch(path, init, attempt + 1, deadline);
   }
   return res;
 }
 
 
+/** SCRUM-72: time kept back from the deadline to save tickets and record the run. */
+const TIME_SAFETY_MS = 4000;
+
 async function readError(res: Response, what: string): Promise<string> {
   const body = await res.text();
+  if (res.status === 429) {
+    return `Freshdesk rate limit reached (429) and the wait did not fit this run's time budget. The next run retries from the last successful run.`;
+  }
   if (res.status === 401 || res.status === 403) {
     return `Freshdesk rejected the credentials (${res.status}). Check the API key and helpdesk address.`;
   }
@@ -117,10 +127,10 @@ export async function checkFreshdeskConnection(): Promise<{ ok: boolean; message
   }
 }
 
-async function loadLookup(path: string): Promise<Map<number, string>> {
+async function loadLookup(path: string, deadline?: number): Promise<Map<number, string>> {
   const map = new Map<number, string>();
   try {
-    const res = await fdFetch(path);
+    const res = await fdFetch(path, undefined, 0, deadline);
     if (!res.ok) return map;
     const rows = (await res.json()) as { id: number; name?: string; contact?: { name?: string } }[];
     for (const r of rows) {
@@ -168,6 +178,8 @@ export async function runFreshdeskSync(opts?: {
   trigger_source?: "cron" | "manual";
   triggered_by?: string | null;
   triggered_by_email?: string | null;
+  /** SCRUM-72: epoch ms to finish by (scheduled runs). Paging stops early and the run is recorded. */
+  deadline?: number;
 }): Promise<FreshdeskSyncResult> {
   const startedAt = Date.now();
   const maxPages = opts?.maxPages ?? 60;
@@ -190,7 +202,11 @@ export async function runFreshdeskSync(opts?: {
   let syncWindow: CursorDecision | null = null;
 
   try {
-    const [agents, groups] = await Promise.all([loadLookup("/agents?per_page=100"), loadLookup("/groups?per_page=100")]);
+    const deadline = opts?.deadline;
+    const [agents, groups] = await Promise.all([
+      loadLookup("/agents?per_page=100", deadline),
+      loadLookup("/groups?per_page=100", deadline),
+    ]);
 
     // Read inside the try: an invalid setting fails (and is recorded as) this run.
     const scope = freshdeskScopeFromEnv(process.env);
@@ -208,9 +224,18 @@ export async function runFreshdeskSync(opts?: {
     const tickets: FreshdeskTicket[] = [];
     // Newest first. Incremental runs usually need one page; the daily full pass walks all pages.
     let complete = false;
+    let stoppedBy: "page_limit" | "time_limit" = "page_limit";
     for (let page = 1; page <= maxPages; page++) {
+      // SCRUM-72: stop paging in time to save what was read and record the run.
+      if (deadline !== undefined && page > 1 && Date.now() > deadline - TIME_SAFETY_MS) {
+        stoppedBy = "time_limit";
+        break;
+      }
       const res = await fdFetch(
         `/tickets?updated_since=${encodeURIComponent(syncWindow.updatedSince)}&include=requester,company&order_by=updated_at&order_type=desc&per_page=100&page=${page}`,
+        undefined,
+        0,
+        deadline,
       );
       if (!res.ok) throw new Error(await readError(res, "ticket list"));
       const batch = (await res.json()) as FreshdeskTicket[];
@@ -267,7 +292,7 @@ export async function runFreshdeskSync(opts?: {
 
     // SCRUM-92: an incomplete incremental run fails (cursor must not skip unread pages);
     // an incomplete full pass stays a success with a visible note.
-    const outcome = runOutcome(syncWindow.mode, complete, maxPages, upserted);
+    const outcome = runOutcome(syncWindow.mode, complete, maxPages, upserted, stoppedBy);
     if (outcome.failure) throw new Error(outcome.failure);
     // SCRUM-92: after a complete full pass, mark rows it did not return (never deletes).
     let staleMarked = 0;

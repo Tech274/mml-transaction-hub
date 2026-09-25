@@ -52,3 +52,21 @@ describe("runOutcome", () => {
     expect(o.note).toMatch(/^Warning: full pass stopped/);
   });
 });
+
+describe("runOutcome stopped by the time budget (SCRUM-72)", () => {
+  it("incremental run that ran out of time fails and names the time limit", () => {
+    const o = runOutcome("incremental", false, 60, 100, "time_limit");
+    expect(o.failure).toBe(
+      "Stopped at the time limit (HOOK_TIMEOUT_SECONDS) before reaching the end; saved 100 tickets. The next run starts again from the last successful run.",
+    );
+  });
+  it("full pass that ran out of time is a success with a note", () => {
+    expect(runOutcome("full", false, 60, 900, "time_limit")).toEqual({
+      failure: null,
+      note: "Warning: full pass stopped at the time limit (HOOK_TIMEOUT_SECONDS); older updates were not re-read.",
+    });
+  });
+  it("defaults to the page-limit wording", () => {
+    expect(runOutcome("full", false, 60, 900).note).toMatch(/page limit \(60 pages\)/);
+  });
+});
