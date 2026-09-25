@@ -14,7 +14,8 @@ export const Route = createFileRoute("/api/public/hooks/freshdesk-sync")({
         if (!(await isAuthorizedCronRequest(request))) return unauthorizedResponse();
 
         const { runFreshdeskSync } = await import("@/lib/freshdesk.server");
-        const result = await runFreshdeskSync();
+        // SCRUM-74: recorded in sync_runs (kind = 'freshdesk', trigger_source = 'cron').
+        const result = await runFreshdeskSync({ trigger_source: "cron" });
 
         return new Response(JSON.stringify(result), {
           status: result.status === "success" ? 200 : 500,

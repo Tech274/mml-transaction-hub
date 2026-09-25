@@ -1056,6 +1056,7 @@ export type Database = {
           customers_count: number
           duration_ms: number | null
           error_message: string | null
+          fetched_count: number | null
           finished_at: string | null
           id: string
           kind: string
@@ -1067,12 +1068,14 @@ export type Database = {
           triggered_by: string | null
           triggered_by_email: string | null
           updated_at: string
+          upserted_count: number | null
         }
         Insert: {
           created_at?: string
           customers_count?: number
           duration_ms?: number | null
           error_message?: string | null
+          fetched_count?: number | null
           finished_at?: string | null
           id?: string
           kind?: string
@@ -1084,12 +1087,14 @@ export type Database = {
           triggered_by?: string | null
           triggered_by_email?: string | null
           updated_at?: string
+          upserted_count?: number | null
         }
         Update: {
           created_at?: string
           customers_count?: number
           duration_ms?: number | null
           error_message?: string | null
+          fetched_count?: number | null
           finished_at?: string | null
           id?: string
           kind?: string
@@ -1101,6 +1106,7 @@ export type Database = {
           triggered_by?: string | null
           triggered_by_email?: string | null
           updated_at?: string
+          upserted_count?: number | null
         }
         Relationships: []
       }
