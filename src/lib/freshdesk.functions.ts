@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { TICKET_OPS_ROLES, canClaimAgent } from "@/lib/ticket-access";
 import { fetchAllPages, ttlCache } from "@/lib/paging";
 import { dbError } from "@/lib/app-error";
+import { hasAnyRole, requireRole, type RoleContext } from "@/lib/require-role";
 
 export interface TicketRow {
   id: number;
@@ -162,11 +163,7 @@ export const syncFreshdeskNow = createServerFn({ method: "POST" })
     z.object({ maxPages: z.number().int().min(1).max(300).optional(), full: z.boolean().optional() }).parse(d ?? {}),
   )
   .handler(async ({ data, context }) => {
-    const { data: allowed } = await context.supabase.rpc("has_any_role", {
-      _user_id: context.userId,
-      _roles: ["admin", "ops_lead"],
-    } as never);
-    if (!allowed) throw new Error("Only admins and ops leads can sync Freshdesk tickets");
+    await requireRole(context, ["admin", "ops_lead"], "Only admins and ops leads can sync Freshdesk tickets");
     const { runFreshdeskSync } = await import("@/lib/freshdesk.server");
     return runFreshdeskSync({
       ...(data.maxPages ? { maxPages: data.maxPages } : {}),
@@ -207,23 +204,8 @@ export interface TicketActionEntry {
   created_at: string;
 }
 
-async function isTicketOps(context: { supabase: any; userId: string }): Promise<boolean> {
-  const { data: allowed, error } = await context.supabase.rpc("has_any_role", {
-    _user_id: context.userId,
-    _roles: [...TICKET_OPS_ROLES],
-  } as never);
-  if (error) throw new Error("Could not check your permissions. Please try again.");
-  return allowed === true;
-}
-
-async function isAdmin(context: { supabase: any; userId: string }): Promise<boolean> {
-  const { data, error } = await context.supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "admin",
-  } as never);
-  if (error) throw new Error("Could not check your permissions. Please try again.");
-  return data === true;
-}
+const isTicketOps = (context: RoleContext) => hasAnyRole(context, TICKET_OPS_ROLES);
+const isAdmin = (context: RoleContext) => hasAnyRole(context, ["admin"]);
 
 async function assertTicketActor(context: { supabase: any; userId: string }) {
   if (!(await isTicketOps(context))) throw new Error("You do not have permission to update support tickets");

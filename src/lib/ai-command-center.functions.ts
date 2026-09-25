@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { dbError, logIfError } from "@/lib/app-error";
+import { requireRole } from "@/lib/require-role";
 
 /* ---------------------------------------------------------------------------
  * Types
@@ -115,11 +116,8 @@ async function admin() {
 }
 
 async function assertActor(context: Ctx) {
-  const { data: allowed } = await context.supabase.rpc("has_any_role", {
-    _user_id: context.userId,
-    _roles: ["admin", "ops_lead", "ops_user", "leadership", "finance"],
-  } as never);
-  if (!allowed) throw new Error("You do not have permission to run agents or decide on proposals");
+  // SCRUM-100: a failed permission lookup used to be treated like "not allowed" silently.
+  await requireRole(context, ["admin", "ops_lead", "ops_user", "leadership", "finance"], "You do not have permission to run agents or decide on proposals");
 }
 
 async function writeAudit(
