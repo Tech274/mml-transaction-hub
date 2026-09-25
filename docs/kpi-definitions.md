@@ -58,6 +58,20 @@ synthetic data.
    IST sees a different "this month" around month end.
 5. **Margin when revenue is 0.** Currently shown as 0%. Finance may prefer "—".
 
+## Reconciling against the database
+
+`supabase/tests/reconciliation/kpi_reconciliation.sql` recomputes the numbers in
+SQL, independently of the app code. It runs read-only and rolls back. It gives:
+
+1. headline totals (the Dashboard cards),
+2. totals per `year`/`month`,
+3. how many rows fall in a different year under the MCP `start_date` rule (open question 1),
+4. the latest successful snapshot run against live data,
+5. data-quality counts (NULL or negative amounts, bad periods).
+
+Compare section 1 with the Dashboard and Reports totals (no filters), and section 2
+with the Reports month view. Run it on sandbox first. Running it on live needs approval.
+
 ## Changing a definition
 
 Change `src/lib/reports-metrics.ts` (and the MCP tool if it has its own copy),
