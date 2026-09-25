@@ -4,32 +4,33 @@ import { createFileRoute } from "@tanstack/react-router";
 // private "bulk-imports" bucket for runs older than the retention window,
 // then clear their path columns on bulk_import_runs.
 //
-// Called by pg_cron. Auth is by the `apikey` header (Supabase publishable
-// key). This route lives under /api/public/* which bypasses site auth on
-// the published deployment.
-
-const DEFAULT_RETENTION_DAYS = 90;
+// Called by pg_cron (job currently PAUSED, and the 17 Sep evidence is under a
+// database legal hold, see SCRUM-98).
+// Auth (SCRUM-89 / G-03): the `x-cron-secret` header must match the Vault
+// secret `cron_secret`. The public `apikey` header is no longer accepted.
+// Retention is fixed at CLEANUP_RETENTION_DAYS; the request body is ignored.
 
 export const Route = createFileRoute("/api/public/hooks/bulk-import-cleanup")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey") ?? request.headers.get("Apikey");
-        if (!apikey || apikey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
-          return new Response("Unauthorized", { status: 401 });
-        }
-        let days = DEFAULT_RETENTION_DAYS;
-        try {
-          const body = (await request.json().catch(() => null)) as { days?: number } | null;
-          if (body?.days && Number.isFinite(body.days) && body.days > 0) days = Math.floor(body.days);
-        } catch { /* ignore */ }
+        const { isAuthorizedCronRequest, unauthorizedResponse } = await import(
+          "@/lib/cron-auth.server"
+        );
+        if (!(await isAuthorizedCronRequest(request))) return unauthorizedResponse();
+
+        const { CLEANUP_RETENTION_DAYS } = await import("@/lib/cron-auth");
+        const days = CLEANUP_RETENTION_DAYS;
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: expired, error: fnErr } = await supabaseAdmin.rpc(
           "expired_bulk_import_artifacts",
           { _days: days } as never,
         );
-        if (fnErr) return json({ ok: false, error: fnErr.message }, 500);
+        if (fnErr) {
+          console.error("[bulk-import-cleanup] expired_bulk_import_artifacts failed:", fnErr.message);
+          return json({ ok: false, error: "cleanup lookup failed" }, 500);
+        }
 
         const list = (expired ?? []) as Array<{ run_id: string; original_csv_path: string | null; error_artifact_path: string | null }>;
         const paths = list.flatMap((r) => [r.original_csv_path, r.error_artifact_path].filter((p): p is string => !!p));
