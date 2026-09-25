@@ -1,0 +1,4 @@
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.report_snapshots FROM authenticated;
+REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON public.sync_runs FROM authenticated;
+REVOKE TRUNCATE ON ALL TABLES IN SCHEMA public FROM authenticated;
