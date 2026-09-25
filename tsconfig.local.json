@@ -1,0 +1,1 @@
+{ "extends": "./tsconfig.json", "include": ["src/lib/app-error.ts", "src/lib/__tests__/app-error.test.ts", "src/lib/*.functions.ts", "src/lib/mcp/audit.ts"] }

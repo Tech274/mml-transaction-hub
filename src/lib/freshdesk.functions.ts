@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { TICKET_OPS_ROLES, canClaimAgent } from "@/lib/ticket-access";
 import { fetchAllPages, ttlCache } from "@/lib/paging";
+import { dbError } from "@/lib/app-error";
 
 export interface TicketRow {
   id: number;
@@ -85,7 +86,7 @@ export const getTicketsOverview = createServerFn({ method: "GET" })
           .order("ticket_created_at", { ascending: false })
           .order("id", { ascending: false })
           .range(from, to);
-        if (error) throw new Error(error.message);
+        if (error) throw dbError(error, "freshdesk.getTicketsOverview");
         return (data ?? []) as TicketRow[];
       },
       1000,
@@ -150,7 +151,7 @@ export const getTicketDescription = createServerFn({ method: "GET" })
       .select("description_text")
       .eq("id", data.ticketId)
       .maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "freshdesk.getTicketDescription");
     return { description_text: (row?.description_text as string | null | undefined) ?? null };
   });
 
@@ -385,7 +386,7 @@ export const resolveTicket = createServerFn({ method: "POST" })
       .select("id, status, agent_name")
       .eq("id", data.ticketId)
       .maybeSingle();
-    if (beforeErr) throw new Error(beforeErr.message);
+    if (beforeErr) throw dbError(beforeErr, "freshdesk.resolveTicket");
     if (!before) throw new Error(`Ticket #${data.ticketId} is not in this app yet`);
 
     const { STATUS_IDS, updateFreshdeskTicket, addFreshdeskNote } = await import("@/lib/freshdesk.server");
@@ -433,7 +434,7 @@ export const resolveTicket = createServerFn({ method: "POST" })
     }
     if (entries.length > 0) {
       const { error: logErr } = await sb.from("ticket_action_log").insert(entries);
-      if (logErr) throw new Error(logErr.message);
+      if (logErr) throw dbError(logErr, "freshdesk.resolveTicket");
     }
 
     return { ok: true, status: result.status, agent_name: result.agent_name };
@@ -485,7 +486,7 @@ export const getMyAgentKpis = createServerFn({ method: "GET" })
         .eq("agent_name", agentName)
         .order("ticket_created_at", { ascending: false })
         .range(from, from + PAGE - 1);
-      if (error) throw new Error(error.message);
+      if (error) throw dbError(error, "freshdesk.getMyAgentKpis");
       const page = (data ?? []) as TicketRow[];
       rows.push(...page);
       if (page.length < PAGE) break;

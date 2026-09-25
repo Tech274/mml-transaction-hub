@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeName as normalize, normalizeEmail, normalizePhone } from "./customer-normalize";
+import { dbError } from "@/lib/app-error";
 
 const emailSchema = z.string().trim().email().max(255).optional().or(z.literal("")).transform((v) => (v ? v : null));
 // Permissive international phone: digits, spaces, dashes, parentheses, plus. 7-20 chars.
@@ -52,7 +53,7 @@ async function resolveAccountManagerName(
   if (amId) {
     const { data, error } = await supabase
       .from("account_managers").select("name, is_active").eq("id", amId).maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "customers.resolveAccountManagerName");
     if (!data) throw new Error("Selected account manager not found");
     if (!data.is_active) throw new Error("Selected account manager is inactive");
     return data.name;
@@ -81,7 +82,7 @@ export const createCustomerFn = createServerFn({ method: "POST" })
       notes: data.notes,
       created_by: context.userId,
     }).select("id").single();
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "customers.createCustomerFn");
     return created;
   });
 
@@ -108,7 +109,7 @@ export const updateCustomerFn = createServerFn({ method: "POST" })
       contact_phone: data.contact_phone,
       notes: data.notes,
     }).eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "customers.updateCustomerFn");
     return { ok: true };
   });
 
@@ -136,7 +137,7 @@ export const setCustomerActiveFn = createServerFn({ method: "POST" })
       is_active: data.active,
       deactivation_reason: reason,
     }).eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "customers.setCustomerActiveFn");
     return { ok: true };
   });
 
@@ -157,7 +158,7 @@ export const upsertAccountManagerFn = createServerFn({ method: "POST" })
       .from("account_managers")
       .insert({ name: data.name.trim(), normalized_name: normalized, email: data.email, created_by: context.userId })
       .select("id, name, is_active").single();
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "customers.upsertAccountManagerFn");
     return created;
   });
 
@@ -168,6 +169,6 @@ export const setAccountManagerActiveFn = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("account_managers").update({ is_active: data.active }).eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "customers.setAccountManagerActiveFn");
     return { ok: true };
   });

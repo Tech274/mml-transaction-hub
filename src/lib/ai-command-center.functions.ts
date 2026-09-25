@@ -2,6 +2,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { dbError, logIfError } from "@/lib/app-error";
 
 /* ---------------------------------------------------------------------------
  * Types
@@ -133,7 +134,7 @@ async function writeAudit(
     detail?: Record<string, any>;
   },
 ) {
-  await sb.from("ai_cc_audit").insert({
+  const res = await sb.from("ai_cc_audit").insert({
     actor_id: row.actor_id,
     actor_email: row.actor_email,
     agent_key: row.agent_key,
@@ -142,6 +143,8 @@ async function writeAudit(
     inbox_id: row.inbox_id ?? null,
     detail: row.detail ?? {},
   });
+  // SCRUM-96: never silent. The user action already happened, so log instead of failing it.
+  logIfError(res, `ai-command-center.audit:${row.action}`);
 }
 
 const inr = (n: number) => `INR ${n.toLocaleString("en-IN")}`;
@@ -183,7 +186,7 @@ export const listInbox = createServerFn({ method: "GET" })
     if (data.status && data.status !== "all") q = q.eq("status", data.status);
     if (data.agent_key && data.agent_key !== "all") q = q.eq("agent_key", data.agent_key);
     const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "ai-command-center.listInbox");
     return (rows ?? []) as InboxItem[];
   });
 
@@ -195,7 +198,7 @@ export const listAudit = createServerFn({ method: "GET" })
     let q = sb.from("ai_cc_audit").select("*").order("created_at", { ascending: false }).limit(300);
     if (data.agent_key && data.agent_key !== "all") q = q.eq("agent_key", data.agent_key);
     const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "ai-command-center.listAudit");
     return (rows ?? []) as AuditItem[];
   });
 
@@ -208,7 +211,7 @@ export const listLabRequests = createServerFn({ method: "GET" })
       .select("*")
       .order("created_at", { ascending: false })
       .limit(50);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "ai-command-center.listLabRequests");
     return (data ?? []) as LabRequest[];
   });
 
@@ -454,7 +457,7 @@ export const runAgent = createServerFn({ method: "POST" })
       })
       .select("id")
       .single();
-    if (runErr) throw new Error(runErr.message);
+    if (runErr) throw dbError(runErr, "ai-command-center.runAgent");
     const runId = (run as { id: string }).id;
 
     await writeAudit(sb, {
@@ -482,7 +485,7 @@ export const runAgent = createServerFn({ method: "POST" })
           .in("status", ["Open", "Pending", "Waiting on Customer"])
           .order("ticket_created_at", { ascending: false })
           .limit(25);
-        if (error) throw new Error(error.message);
+        if (error) throw dbError(error, "ai-command-center.runAgent");
         const hint = data.job_hint?.trim().toLowerCase();
         const list = (tickets ?? []) as Parameters<typeof supportBrain>[0][];
         const picked =
@@ -497,7 +500,7 @@ export const runAgent = createServerFn({ method: "POST" })
           .eq("status", "CONFIRMED")
           .order("confirmed_at", { ascending: false })
           .limit(5);
-        if (error) throw new Error(error.message);
+        if (error) throw dbError(error, "ai-command-center.runAgent");
         let confirmed = ((reqs ?? []) as LabRequest[])[0];
         if (!confirmed) {
           // Seed a demo CONFIRMED request so the trigger is always demoable.
@@ -525,7 +528,7 @@ export const runAgent = createServerFn({ method: "POST" })
             })
             .select("*")
             .single();
-          if (seedErr) throw new Error(seedErr.message);
+          if (seedErr) throw dbError(seedErr, "ai-command-center.runAgent");
           confirmed = seeded as LabRequest;
           output['seeded_lab_request'] = confirmed.request_code;
         }
@@ -547,7 +550,7 @@ export const runAgent = createServerFn({ method: "POST" })
           })),
         )
         .select("id, item_type, title");
-      if (inboxErr) throw new Error(inboxErr.message);
+      if (inboxErr) throw dbError(inboxErr, "ai-command-center.runAgent");
 
       for (const item of (inserted ?? []) as { id: string; item_type: string; title: string }[]) {
         await writeAudit(sb, {
@@ -600,7 +603,7 @@ export const confirmInboxItem = createServerFn({ method: "POST" })
     const sb = await admin();
 
     const { data: item, error } = await sb.from("ai_cc_inbox").select("*").eq("id", data.id).maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "ai-command-center.confirmInboxItem");
     if (!item) throw new Error("This proposal no longer exists");
     const row = item as InboxItem;
     if (row.status !== "pending") throw new Error(`This proposal is already ${row.status}`);
@@ -621,7 +624,7 @@ export const confirmInboxItem = createServerFn({ method: "POST" })
         if (payload['resolution_note']) await addFreshdeskNote(ticketId, String(payload['resolution_note']));
         if (statusId) await updateFreshdeskTicket(ticketId, { status: statusId });
         write_result = { performed: true, target: "freshdesk", ticket_id: ticketId, status };
-        await sb.from("ticket_action_log").insert({
+        const logRes = await sb.from("ticket_action_log").insert({
           ticket_id: ticketId,
           action: "status_change",
           field_name: "status",
@@ -631,6 +634,7 @@ export const confirmInboxItem = createServerFn({ method: "POST" })
           actor_id: ctx.userId,
           actor_email: email,
         });
+        logIfError(logRes, "ai-command-center.confirmInboxItem:ticket_action_log");
       } catch (e) {
         write_result = {
           performed: false,
@@ -657,7 +661,7 @@ export const confirmInboxItem = createServerFn({ method: "POST" })
         payload: { ...payload, write_result },
       })
       .eq("id", data.id);
-    if (upErr) throw new Error(upErr.message);
+    if (upErr) throw dbError(upErr, "ai-command-center.confirmInboxItem");
 
     await writeAudit(sb, {
       actor_id: ctx.userId,
@@ -684,7 +688,7 @@ export const rejectInboxItem = createServerFn({ method: "POST" })
     const sb = await admin();
 
     const { data: item, error } = await sb.from("ai_cc_inbox").select("*").eq("id", data.id).maybeSingle();
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "ai-command-center.rejectInboxItem");
     if (!item) throw new Error("This proposal no longer exists");
     const row = item as InboxItem;
     if (row.status !== "pending") throw new Error(`This proposal is already ${row.status}`);
@@ -699,7 +703,7 @@ export const rejectInboxItem = createServerFn({ method: "POST" })
         decided_at: new Date().toISOString(),
       })
       .eq("id", data.id);
-    if (upErr) throw new Error(upErr.message);
+    if (upErr) throw dbError(upErr, "ai-command-center.rejectInboxItem");
 
     await writeAudit(sb, {
       actor_id: ctx.userId,
