@@ -1,11 +1,15 @@
 // Freshdesk sync: pulls tickets from the Freshdesk API into public.freshdesk_tickets.
 // Server-only (service-role client + API credentials) — never import from a component.
 import { DEFAULT_FRESHDESK_SCOPE, freshdeskScopeFromEnv } from "@/lib/app-config";
+import { decideSyncWindow, fullSyncHourFromEnv, runOutcome, type CursorDecision, type SyncMode } from "@/lib/freshdesk-cursor";
 
 export interface FreshdeskSyncResult {
   /** sync_runs row for this run (SCRUM-74); null if the run could not be recorded. */
   run_id: string | null;
   status: "success" | "error";
+  /** SCRUM-92: "incremental" (since last success) or "full" (from FRESHDESK_TICKETS_FROM). */
+  mode?: SyncMode;
+  updated_since?: string;
   fetched: number;
   upserted: number;
   duration_ms: number;
@@ -134,12 +138,30 @@ export const CLOUD_LABS_GROUP_ID = DEFAULT_FRESHDESK_SCOPE.groupId;
 export const CLOUD_LABS_GROUP_NAME = DEFAULT_FRESHDESK_SCOPE.groupName;
 export const TICKETS_FROM = DEFAULT_FRESHDESK_SCOPE.ticketsFrom;
 
+/** started_at of the newest successful freshdesk run (null if none or unreadable → full pass). */
+async function lastSuccessfulFreshdeskStart(db: { from: (t: string) => any }): Promise<string | null> {
+  const { data, error } = await db
+    .from("sync_runs")
+    .select("started_at")
+    .eq("kind", "freshdesk")
+    .eq("status", "success")
+    .order("started_at", { ascending: false })
+    .limit(1);
+  if (error) {
+    console.error("[freshdesk-sync] could not read last successful run, doing a full pass:", error.message);
+    return null;
+  }
+  return (data?.[0]?.started_at as string | undefined) ?? null;
+}
+
 /**
  * Pull tickets of the configured group (default Cloud Labs) created on/after the configured date and upsert them.
  * SCRUM-74 (G-07): every run (cron or manual) is recorded in sync_runs with kind = 'freshdesk'.
  */
 export async function runFreshdeskSync(opts?: {
   maxPages?: number;
+  /** SCRUM-92: force a full pass instead of the incremental window. */
+  full?: boolean;
   trigger_source?: "cron" | "manual";
   triggered_by?: string | null;
   triggered_by_email?: string | null;
@@ -162,6 +184,7 @@ export async function runFreshdeskSync(opts?: {
   } catch (e) {
     console.error("[freshdesk-sync] could not record run start:", e instanceof Error ? e.message : String(e));
   }
+  let syncWindow: CursorDecision | null = null;
 
   try {
     const [agents, groups] = await Promise.all([loadLookup("/agents?per_page=100"), loadLookup("/groups?per_page=100")]);
@@ -169,11 +192,21 @@ export async function runFreshdeskSync(opts?: {
     // Read inside the try: an invalid setting fails (and is recorded as) this run.
     const scope = freshdeskScopeFromEnv(process.env);
     const cutoffMs = new Date(scope.ticketsFrom).getTime();
+    // SCRUM-92: only ask for tickets updated since the last successful run (daily full pass).
+    syncWindow = decideSyncWindow({
+      now: new Date(startedAt),
+      lastSuccessStartedAt: logDb ? await lastSuccessfulFreshdeskStart(logDb) : null,
+      ticketsFrom: scope.ticketsFrom,
+      fullSyncHourUtc: fullSyncHourFromEnv(process.env),
+      forceFull: opts?.full === true,
+    });
+    console.log(`[freshdesk-sync] ${syncWindow.mode} sync, updated_since=${syncWindow.updatedSince} (${syncWindow.reason})`);
     const tickets: FreshdeskTicket[] = [];
-    // Newest first, so an hourly run touches only the first page or two.
+    // Newest first. Incremental runs usually need one page; the daily full pass walks all pages.
+    let complete = false;
     for (let page = 1; page <= maxPages; page++) {
       const res = await fdFetch(
-        `/tickets?updated_since=${encodeURIComponent(scope.ticketsFrom)}&include=requester,company&order_by=updated_at&order_type=desc&per_page=100&page=${page}`,
+        `/tickets?updated_since=${encodeURIComponent(syncWindow.updatedSince)}&include=requester,company&order_by=updated_at&order_type=desc&per_page=100&page=${page}`,
       );
       if (!res.ok) throw new Error(await readError(res, "ticket list"));
       const batch = (await res.json()) as FreshdeskTicket[];
@@ -184,11 +217,11 @@ export async function runFreshdeskSync(opts?: {
         ),
       );
       const oldest = batch.at(-1)?.updated_at;
-      if (batch.length < 100 || (oldest && new Date(oldest).getTime() < cutoffMs)) break;
+      if (batch.length < 100 || (oldest && new Date(oldest).getTime() < cutoffMs)) {
+        complete = true;
+        break;
+      }
     }
-
-
-
 
     const rows = tickets.map((t) => ({
       id: t.id,
@@ -225,11 +258,20 @@ export async function runFreshdeskSync(opts?: {
       upserted += chunk.length;
     }
 
+    // SCRUM-92: an incomplete incremental run fails (cursor must not skip unread pages);
+    // an incomplete full pass stays a success with a visible note.
+    const outcome = runOutcome(syncWindow.mode, complete, maxPages, upserted);
+    if (outcome.failure) throw new Error(outcome.failure);
+    const note = outcome.note;
+    if (note) console.warn(`[freshdesk-sync] ${note}`);
+
     const duration_ms = Date.now() - startedAt;
-    if (logDb) await finishRun(logDb, runId, { status: "success", duration_ms, fetched_count: tickets.length, upserted_count: upserted });
+    if (logDb) await finishRun(logDb, runId, { status: "success", duration_ms, error_message: note, fetched_count: tickets.length, upserted_count: upserted });
     return {
       run_id: runId,
       status: "success",
+      mode: syncWindow.mode,
+      updated_since: syncWindow.updatedSince,
       fetched: tickets.length,
       upserted,
       duration_ms,
@@ -242,6 +284,7 @@ export async function runFreshdeskSync(opts?: {
     return {
       run_id: runId,
       status: "error",
+      ...(syncWindow ? { mode: syncWindow.mode, updated_since: syncWindow.updatedSince } : {}),
       fetched: 0,
       upserted: 0,
       duration_ms,

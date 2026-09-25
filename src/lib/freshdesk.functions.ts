@@ -125,8 +125,8 @@ export const getTicketsOverview = createServerFn({ method: "GET" })
 /** Manual sync — admins and ops leads. */
 export const syncFreshdeskNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d?: { maxPages?: number }) =>
-    z.object({ maxPages: z.number().int().min(1).max(300).optional() }).parse(d ?? {}),
+  .inputValidator((d?: { maxPages?: number; full?: boolean }) =>
+    z.object({ maxPages: z.number().int().min(1).max(300).optional(), full: z.boolean().optional() }).parse(d ?? {}),
   )
   .handler(async ({ data, context }) => {
     const { data: allowed } = await context.supabase.rpc("has_any_role", {
@@ -137,6 +137,8 @@ export const syncFreshdeskNow = createServerFn({ method: "POST" })
     const { runFreshdeskSync } = await import("@/lib/freshdesk.server");
     return runFreshdeskSync({
       ...(data.maxPages ? { maxPages: data.maxPages } : {}),
+      // SCRUM-92: manual runs are incremental unless a full pass is asked for.
+      full: data.full === true,
       trigger_source: "manual",
       triggered_by: context.userId,
       triggered_by_email: (context.claims as { email?: string } | null)?.email ?? null,
