@@ -742,6 +742,48 @@ export type Database = {
         }
         Relationships: []
       }
+      import_batches: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          file_sha256: string
+          filename: string
+          id: string
+          kind: string
+          row_count: number
+          status: string
+          template_version: string
+          total_input: number
+          total_selling: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          file_sha256: string
+          filename: string
+          id?: string
+          kind: string
+          row_count: number
+          status?: string
+          template_version: string
+          total_input: number
+          total_selling: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          file_sha256?: string
+          filename?: string
+          id?: string
+          kind?: string
+          row_count?: number
+          status?: string
+          template_version?: string
+          total_input?: number
+          total_selling?: number
+        }
+        Relationships: []
+      }
       mcp_revoked_clients: {
         Row: {
           client_id: string
@@ -1151,6 +1193,7 @@ export type Database = {
           customer_name: string
           end_date: string
           id: string
+          import_batch_id: string | null
           input_cost: number
           is_deleted: boolean
           lab_name: string
@@ -1160,6 +1203,7 @@ export type Database = {
           potential_id: string
           repository_type: string
           selling_cost: number
+          source_line: number | null
           start_date: string
           system_config: string | null
           total_users: number
@@ -1175,6 +1219,7 @@ export type Database = {
           customer_name: string
           end_date: string
           id?: string
+          import_batch_id?: string | null
           input_cost?: number
           is_deleted?: boolean
           lab_name: string
@@ -1184,6 +1229,7 @@ export type Database = {
           potential_id: string
           repository_type: string
           selling_cost: number
+          source_line?: number | null
           start_date: string
           system_config?: string | null
           total_users: number
@@ -1199,6 +1245,7 @@ export type Database = {
           customer_name?: string
           end_date?: string
           id?: string
+          import_batch_id?: string | null
           input_cost?: number
           is_deleted?: boolean
           lab_name?: string
@@ -1208,6 +1255,7 @@ export type Database = {
           potential_id?: string
           repository_type?: string
           selling_cost?: number
+          source_line?: number | null
           start_date?: string
           system_config?: string | null
           total_users?: number
@@ -1221,6 +1269,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
             referencedColumns: ["id"]
           },
         ]
@@ -1283,6 +1338,17 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      import_transactions_batch: {
+        Args: {
+          p_customer_names: Json
+          p_file_sha256: string
+          p_filename: string
+          p_kind: string
+          p_rows: Json
+          p_template_version: string
+        }
+        Returns: Json
       }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }

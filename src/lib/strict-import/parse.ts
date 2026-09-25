@@ -168,13 +168,35 @@ function toRawCell(cell: XlsxCell | undefined, date1904: boolean, XLSX: XlsxLike
   }
 }
 
+export const MAX_STRICT_FILE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Parses exact file bytes by extension. Used by the server (commit re-validation)
+ * and the browser. CSV must be valid UTF-8; invalid bytes are an error, never guessed.
+ */
+export async function parseStrictBytes(
+  filename: string,
+  bytes: Uint8Array,
+  loadXlsx: () => Promise<XlsxLike>,
+): Promise<ParsedSheet> {
+  const name = filename.toLowerCase();
+  if (bytes.length > MAX_STRICT_FILE_BYTES) throw new Error("File is larger than 5 MB");
+  if (name.endsWith(".csv")) {
+    let text: string;
+    try {
+      text = new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    } catch {
+      throw new Error("CSV file is not valid UTF-8. Save it as 'CSV UTF-8' and upload again.");
+    }
+    return parseCsvText(text);
+  }
+  if (name.endsWith(".xlsx")) return parseXlsxBuffer(bytes, await loadXlsx());
+  throw new Error("Only .xlsx and .csv files are accepted");
+}
+
+export const loadSheetJs = async (): Promise<XlsxLike> => (await import("xlsx")) as unknown as XlsxLike;
+
 /** Browser entry point: picks the parser by file extension. */
 export async function parseStrictFile(file: File): Promise<ParsedSheet> {
-  const name = file.name.toLowerCase();
-  if (name.endsWith(".csv")) return parseCsvText(await file.text());
-  if (name.endsWith(".xlsx")) {
-    const XLSX = (await import("xlsx")) as unknown as XlsxLike;
-    return parseXlsxBuffer(new Uint8Array(await file.arrayBuffer()), XLSX);
-  }
-  throw new Error("Only .xlsx and .csv files are accepted");
+  return parseStrictBytes(file.name, new Uint8Array(await file.arrayBuffer()), loadSheetJs);
 }
