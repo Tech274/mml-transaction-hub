@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { FRESHDESK_HEALTH, summarizeSyncHealth, type SyncHealth } from "@/lib/sync-health";
 import { formatDailyTimeUtc, nextDailyRunAt, snapshotCronFromEnv } from "@/lib/app-config";
 import { dbError } from "@/lib/app-error";
+import { requireRole } from "@/lib/require-role";
 
 export interface SyncRunRow {
   id: string;
@@ -91,11 +92,7 @@ export const getSyncOverview = createServerFn({ method: "GET" })
 export const triggerSyncNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    } as never);
-    if (!isAdmin) throw new Error("Only admins can trigger a snapshot run");
+    await requireRole(context, ["admin"], "Only admins can trigger a snapshot run");
     const { runSnapshotSync } = await import("@/lib/sync.server");
     return runSnapshotSync({
       trigger_source: "manual",

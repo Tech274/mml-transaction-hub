@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { dbError } from "@/lib/app-error";
+import { requireRole } from "@/lib/require-role";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
 
@@ -64,12 +65,7 @@ export const listAllMcpAudit = createServerFn({ method: "GET" })
   .inputValidator((data: unknown) => filterSchema.parse(data ?? {}) ?? {})
   .handler(async ({ data, context }): Promise<McpAuditRow[]> => {
     // SCRUM-61 (G-21): explicit server-side check (RLS also limits rows).
-    const { data: isAdmin, error: roleErr } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (roleErr) throw new Error("Could not check your permissions. Please try again.");
-    if (!isAdmin) throw new Error("Forbidden: admin role required");
+    await requireRole(context, ["admin"], "Forbidden: admin role required");
     const filter = data ?? {};
     let q = context.supabase
       .from("mcp_tool_audit_log")

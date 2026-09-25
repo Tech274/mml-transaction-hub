@@ -20,6 +20,7 @@ import {
   type StrictImportDeps,
 } from "@/lib/strict-import/service";
 import { dbError } from "@/lib/app-error";
+import { hasAnyRole } from "@/lib/require-role";
 
 const IMPORT_ROLES = ["admin", "ops_lead", "ops_user"] as const;
 // base64 is 4/3 of the byte size; allow a little slack.
@@ -34,11 +35,7 @@ function depsFor(context: AuthedContext): StrictImportDeps {
   const { supabase, userId } = context;
   return {
     enabled: isStrictImportEnabled(process.env),
-    hasImportRole: async () => {
-      const { data, error } = await supabase.rpc("has_any_role", { _user_id: userId, _roles: [...IMPORT_ROLES] });
-      if (error) throw dbError(error, "strict-import.depsFor");
-      return data === true;
-    },
+    hasImportRole: () => hasAnyRole(context, IMPORT_ROLES),
     findCustomers: async (norms) => {
       const out: { customer_name: string; normalized_name: string }[] = [];
       for (let i = 0; i < norms.length; i += 200) {

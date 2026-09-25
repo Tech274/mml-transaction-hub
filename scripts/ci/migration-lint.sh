@@ -2,6 +2,7 @@
 # Migration discipline (SCRUM-64): new migration files may not contain
 # destructive DDL unless the file carries an explicit approval marker:
 #   -- approved-destructive: <ticket> <who approved>
+# SCRUM-100: DROP INDEX / DROP VIEW and EXECUTE 'drop …' inside DO blocks also count.
 set -euo pipefail
 BASE_REF="${GITHUB_BASE_REF:-main}"
 if git rev-parse --verify -q "origin/${BASE_REF}" >/dev/null; then
@@ -19,7 +20,7 @@ while IFS= read -r f; do
     echo "::error file=$f::New migration must name its Jira ticket in a header comment (e.g. -- SCRUM-89: ...)."
     FAIL=1
   fi
-  if grep -qiE '^\s*(DROP\s+(TABLE|COLUMN|SCHEMA|TYPE|FUNCTION)|TRUNCATE\s|DELETE\s+FROM|ALTER\s+TABLE\s+\S+\s+(DROP|ALTER\s+COLUMN\s+\S+\s+TYPE))' "$f" \
+  if grep -qiE '^\s*(execute\s+.drop\s|DROP\s+(TABLE|COLUMN|SCHEMA|TYPE|FUNCTION|INDEX|VIEW)|TRUNCATE\s|DELETE\s+FROM|ALTER\s+TABLE\s+\S+\s+(DROP|ALTER\s+COLUMN\s+\S+\s+TYPE))' "$f" \
      && ! grep -qiE -- '-- *approved-destructive:' "$f"; then
     echo "::error file=$f::Destructive statement without an '-- approved-destructive:' marker."
     FAIL=1

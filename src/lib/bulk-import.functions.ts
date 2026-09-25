@@ -9,6 +9,7 @@ import {
   getBulkTemplateSchema,
 } from "@/lib/bulk-template";
 import { dbError } from "@/lib/app-error";
+import { requireRole } from "@/lib/require-role";
 
 // Public schema descriptor — read by the UI (and the E2E template-sync test)
 // to guarantee the downloadable template and the server validator stay in
@@ -101,12 +102,7 @@ export const runArtifactCleanup = createServerFn({ method: "POST" })
       .parse(raw),
   )
   .handler(async ({ data, context }) => {
-    const { data: isAdmin, error: rErr } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (rErr) throw dbError(rErr, "bulk-import.runArtifactCleanup");
-    if (!isAdmin) throw new Error("Forbidden: admin role required");
+    await requireRole(context, ["admin"], "Forbidden: admin role required");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: expired, error: fnErr } = await supabaseAdmin.rpc(
