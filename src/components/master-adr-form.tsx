@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,72 +8,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomerCombobox, type CustomerOption } from "./customer-combobox";
 import { useConfig } from "@/hooks/use-config";
-import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
-import { checkPotentialIdUnique } from "@/lib/transactions.functions";
+import { checkPotentialIdUnique, createAdrTransaction } from "@/lib/transactions.functions";
+import { adrEntrySchema, SYSTEM_CONFIG_OPTIONS, type AdrEntry } from "@/lib/adr-entry";
 import { toast } from "sonner";
-import { useAuth } from "@/lib/auth-context";
 import { useQueryClient } from "@tanstack/react-query";
 import { MONTH_NAMES, YEARS } from "@/lib/format";
 
-const schema = z.object({
-  potential_id: z.string().trim().min(1, "Required").max(50),
-  month: z.coerce.number().int().min(1).max(12),
-  year: z.coerce.number().int().min(2000).max(2100),
-  customer_id: z.string().uuid("Select a customer"),
-  customer_name: z.string().min(1),
-  lab_name: z.string().trim().min(1, "Required").max(200),
-  lab_type: z.enum(["public_cloud", "private_cloud"]),
-  cloud_provider: z.string().optional(),
-  system_config: z.string().optional(),
-  line_of_business: z.string().min(1, "Required"),
-  start_date: z.string().min(1, "Required"),
-  end_date: z.string().min(1, "Required"),
-  total_users: z.coerce.number().int().positive("Must be greater than zero"),
-  input_cost: z.coerce
-    .number({ invalid_type_error: "Input cost is required" })
-    .finite("Enter a valid number")
-    .nonnegative("Input cost cannot be negative")
-    .max(1_000_000_000, "Input cost is unrealistically high"),
-  selling_cost: z.coerce
-    .number({ invalid_type_error: "Selling cost is required" })
-    .finite("Enter a valid number")
-    .nonnegative("Selling cost cannot be negative")
-    .max(1_000_000_000, "Selling cost is unrealistically high"),
-}).superRefine((v, ctx) => {
-  if (v.end_date < v.start_date) {
-    ctx.addIssue({ code: "custom", path: ["end_date"], message: "End date cannot be before start date" });
-  }
-  if (v.lab_type === "public_cloud") {
-    if (!v.cloud_provider || !["AWS", "Azure", "GCP"].includes(v.cloud_provider)) {
-      ctx.addIssue({ code: "custom", path: ["cloud_provider"], message: "Required for Public Cloud (AWS, Azure, GCP)" });
-    }
-  }
-  if (v.lab_type === "private_cloud") {
-    if (!v.system_config || !(SYSTEM_CONFIG_OPTIONS as readonly string[]).includes(v.system_config)) {
-      ctx.addIssue({ code: "custom", path: ["system_config"], message: "Required for Private Cloud" });
-    }
-  }
-  if (v.input_cost > v.selling_cost) {
-    ctx.addIssue({ code: "custom", path: ["input_cost"], message: "Input cost should not exceed selling cost (negative margin)" });
-  }
-});
-
-type FormValues = z.infer<typeof schema>;
-
-const SYSTEM_CONFIG_OPTIONS = [
-  "8GB 2vCPUs",
-  "8GB 4vCPUs",
-  "12GB 4vCPUs",
-  "16GB 4vCPUs",
-  "24GB 6vCPUs",
-  "32GB 8vCPUs",
-] as const;
+// SCRUM-66: rules live in src/lib/adr-entry.ts and are re-checked on the server.
+const schema = adrEntrySchema;
+type FormValues = AdrEntry;
 
 export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
-  const { user } = useAuth();
   const qc = useQueryClient();
   const checkUnique = useServerFn(checkPotentialIdUnique);
+  const createTx = useServerFn(createAdrTransaction);
   const { data: labTypes = [] } = useConfig("lab_type");
   const { data: providers = [] } = useConfig("cloud_provider");
   const { data: lobs = [] } = useConfig("line_of_business");
@@ -127,26 +75,8 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
         toast.message(`Potential ID ${values.potential_id} already has transactions — adding another one.`);
       }
 
-      const { error } = await supabase.from("transactions").insert({
-        potential_id: values.potential_id,
-        month: values.month,
-        year: values.year,
-        customer_id: values.customer_id,
-        customer_name: values.customer_name,
-        lab_name: values.lab_name,
-        lab_type: values.lab_type,
-        repository_type: values.lab_type, // trigger normalizes
-        cloud_provider: values.lab_type === "private_cloud" ? "MakeMyLabs Private Cloud" : (values.cloud_provider ?? ""),
-        system_config: values.lab_type === "private_cloud" ? (values.system_config ?? null) : null,
-        line_of_business: values.line_of_business,
-        start_date: values.start_date,
-        end_date: values.end_date,
-        total_users: values.total_users,
-        input_cost: values.input_cost,
-        selling_cost: values.selling_cost,
-        created_by: user!.id,
-      });
-      if (error) throw error;
+      // SCRUM-66: saved by the server, which re-validates with the same schema.
+      await createTx({ data: values });
       toast.success("Transaction saved");
       form.reset({
         ...form.getValues(),
