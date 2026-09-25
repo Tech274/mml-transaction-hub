@@ -1,0 +1,59 @@
+# CI for MML Transaction Hub (SCRUM-83 / G-16).
+# Runs on every pull request and on pushes to main. It never deploys and never
+# talks to Supabase: no secrets are used, the build runs with placeholder env.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: typecheck · test · build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install (frozen lockfile)
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck (tsc --noEmit)
+        run: bunx tsc --noEmit
+
+      - name: Unit tests (vitest)
+        run: bun run test
+
+      - name: Build (vite build)
+        run: bun run build
+
+      - name: Secret scan (added lines only)
+        run: bash scripts/ci/secret-scan.sh
+
+      - name: Migration lint (new migrations only)
+        run: bash scripts/ci/migration-lint.sh
+
+      # Informational until the existing lint debt is paid down (SCRUM-95/SCRUM-100).
+      - name: Lint (non-blocking)
+        continue-on-error: true
+        run: bun run lint
+
+      # Informational until xlsx is upgraded (SCRUM-97 / G-18).
+      - name: Dependency audit (non-blocking)
+        continue-on-error: true
+        run: bun audit --audit-level=high
