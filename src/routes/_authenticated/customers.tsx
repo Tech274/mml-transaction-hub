@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { readAllRows } from "@/lib/read-all";
 import { AppShell } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -74,14 +75,25 @@ function CustomersPage() {
   const { data: rows = [] } = useQuery({
     queryKey: ["customers-summary"],
     queryFn: async () => {
-      const { data: customers } = await supabase
-        .from("customers")
-        .select("id, customer_name, is_active, account_manager_name, contact_email, contact_phone, industry, notes, created_at, deactivation_reason")
-        .order("customer_name");
-      const { data: tx } = await supabase
-        .from("transactions")
-        .select("customer_id, total_users, input_cost, selling_cost")
-        .eq("is_deleted", false);
+      // SCRUM-70: all rows, not just the first 1,000; errors are shown instead of empty totals.
+      const customers = await readAllRows(
+        () =>
+          supabase
+            .from("customers")
+            .select("id, customer_name, is_active, account_manager_name, contact_email, contact_phone, industry, notes, created_at, deactivation_reason")
+            .order("customer_name")
+            .order("id"),
+        "Customers",
+      );
+      const tx = await readAllRows(
+        () =>
+          supabase
+            .from("transactions")
+            .select("customer_id, total_users, input_cost, selling_cost")
+            .eq("is_deleted", false)
+            .order("id"),
+        "Customer transactions",
+      );
       const map = new Map<string, { count: number; users: number; revenue: number; cost: number }>();
       for (const t of tx ?? []) {
         const e = map.get(t.customer_id) ?? { count: 0, users: 0, revenue: 0, cost: 0 };

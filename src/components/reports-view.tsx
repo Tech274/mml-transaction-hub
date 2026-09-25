@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { readAllRows } from "@/lib/read-all";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -31,12 +32,17 @@ export function ReportsView() {
   const { data, isLoading, error, isError, refetch, isFetching } = useQuery({
     queryKey: ["reports", "transactions"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("transactions")
-        .select("month,year,repository_type,cloud_provider,line_of_business,customer_name,lab_name,total_users,input_cost,selling_cost,start_date,end_date,is_deleted")
-        .eq("is_deleted", false);
-      if (error) throw error;
-      return (data ?? []) as Row[];
+      // SCRUM-70: all rows, not just the first 1,000 (PostgREST default limit).
+      const data = await readAllRows(
+        () =>
+          supabase
+            .from("transactions")
+            .select("month,year,repository_type,cloud_provider,line_of_business,customer_name,lab_name,total_users,input_cost,selling_cost,start_date,end_date,is_deleted")
+            .eq("is_deleted", false)
+            .order("id"),
+        "Reports transactions",
+      );
+      return data as Row[];
     },
   });
   const errMsg = error instanceof Error ? error.message : error ? String(error) : "";
