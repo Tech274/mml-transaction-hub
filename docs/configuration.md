@@ -1,0 +1,50 @@
+# Configuration reference (SCRUM-82)
+
+Every setting the app reads, where it is read, and whether it is secret.
+Values live in the hosting platform's secret/env settings (Lovable Cloud project
+secrets today) and, for local development, in an uncommitted `.env.local`.
+`.env.example` lists the names. **Never commit real values.** CI rejects added
+`.env` files and secret-looking strings (`scripts/ci/secret-scan.sh`).
+
+## Environment variables
+
+| Name | Secret? | Where read | Default when unset | Purpose |
+|---|---|---|---|---|
+| `VITE_SUPABASE_URL` | no (public) | `src/integrations/supabase/client.ts` | none | Supabase URL for the browser client |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | no (public by design; RLS protects data) | `client.ts` | none | anon/publishable key for the browser |
+| `VITE_SUPABASE_PROJECT_ID` | no | `src/lib/mcp/index.ts` | `project-ref-unset` | project ref used in MCP metadata |
+| `SUPABASE_URL` | no | `client.server.ts`, `auth-middleware.ts`, `mcp/supabase-for-user.ts`, SSR fallback in `client.ts` | none | server-side Supabase URL |
+| `SUPABASE_PUBLISHABLE_KEY` | no | `auth-middleware.ts`, `mcp/supabase-for-user.ts` | none | per-user (RLS) server clients |
+| `SUPABASE_SERVICE_ROLE_KEY` | **yes** | `src/integrations/supabase/client.server.ts` only | none (server admin calls fail) | bypasses RLS; server-only admin client |
+| `FRESHDESK_DOMAIN` | no | `src/lib/freshdesk.server.ts` | none (sync fails with "Freshdesk is not configured yet") | e.g. `yourco.freshdesk.com` |
+| `FRESHDESK_API_KEY` | **yes** | `src/lib/freshdesk.server.ts` only | none | Freshdesk API (Basic auth) |
+| `FRESHDESK_GROUP_ID` | no | `src/lib/app-config.ts` (SCRUM-101) | current production group | which Freshdesk group is synced |
+| `FRESHDESK_GROUP_NAME` | no | `app-config.ts` | current production group name | display / fallback match |
+| `FRESHDESK_TICKETS_FROM` | no | `app-config.ts` | current cut-off date | oldest ticket date to sync |
+| `FRESHDESK_FULL_SYNC_HOUR_UTC` | no | `src/lib/freshdesk-cursor.ts` (SCRUM-92) | `21` | hour (UTC) of the daily full pass; other runs are incremental |
+| `SNAPSHOT_CRON_UTC` | no | `app-config.ts`, shown on Sync Status | current schedule | label for the snapshot job time |
+| `STRICT_IMPORT_ENABLED` | no | `src/lib/strict-import/flag.ts` | off | `strict_import_enabled` flag; only the exact string `true` turns it on |
+
+Rules:
+- Anything prefixed `VITE_` is copied into the JavaScript sent to every browser. **Never** give a secret a `VITE_` name. The unit test `src/lib/__tests__/no-secrets-in-client.test.ts` fails if one appears.
+- Secret values are read only in `*.server.ts` modules.
+
+## Secrets that are not environment variables
+
+| Secret | Where it lives | Used by |
+|---|---|---|
+| `cron_secret` | Supabase **Vault** (created by migration `…scrum89_cron_secret.sql`) | pg_cron jobs send it as `x-cron-secret`; the app checks it with `verify_cron_secret()` (SCRUM-89). See `docs/runbooks/scrum-89-cron-secret.md` |
+
+See `docs/secrets-inventory.md` for the rotation plan.
+
+## Sandbox vs live
+
+| | Sandbox | Live |
+|---|---|---|
+| Supabase project | separate sandbox project | production project |
+| Who changes it | engineers, for testing migrations and the app | only through the agreed release order (migrations first, then publish), with Atlas + Vivek approval |
+| Data | synthetic only | real customer and finance data |
+| Freshdesk | leave `FRESHDESK_*` unset, or use a test group, so sandbox never writes to real tickets | production group |
+| Feature flags | may be turned on for testing | off until approved (for example `STRICT_IMPORT_ENABLED`) |
+
+Local development must point at the **sandbox** project. Do not copy live keys to a laptop.
