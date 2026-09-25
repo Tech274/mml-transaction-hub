@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { dbError } from "@/lib/app-error";
 
 const ROLE_VALUES = ["admin", "leadership", "finance", "ops_lead", "ops_user", "viewer"] as const;
 const roleEnum = z.enum(ROLE_VALUES);
@@ -10,7 +11,7 @@ async function assertAdmin(context: { supabase: any; userId: string }) {
     _user_id: context.userId,
     _role: "admin",
   });
-  if (error) throw new Error(error.message);
+  if (error) throw dbError(error, "admin.assertAdmin");
   if (!data) throw new Error("Forbidden: admin only");
 }
 
@@ -40,19 +41,24 @@ export const adminCreateUser = createServerFn({ method: "POST" })
       email_confirm: true,
       user_metadata: { full_name: data.fullName },
     });
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "admin.adminCreateUser");
     const newUserId = created.user!.id;
 
     // handle_new_user trigger inserts default viewer role + profile. Sync requested roles.
-    await supabaseAdmin.from("user_roles").delete().eq("user_id", newUserId);
+    const { error: clearErr } = await supabaseAdmin.from("user_roles").delete().eq("user_id", newUserId);
+    if (clearErr) throw dbError(clearErr, "admin.adminCreateUser:clearDefaultRoles");
     const rows = Array.from(new Set(data.roles)).map((role) => ({ user_id: newUserId, role }));
     const { error: rErr } = await supabaseAdmin.from("user_roles").insert(rows);
-    if (rErr) throw new Error(rErr.message);
+    if (rErr) throw dbError(rErr, "admin.adminCreateUser");
 
     // Optionally create the account disabled (profile flag + auth ban).
     if (data.isActive === false) {
-      await supabaseAdmin.from("profiles").update({ is_active: false }).eq("id", newUserId);
-      await supabaseAdmin.auth.admin.updateUserById(newUserId, { ban_duration: "876000h" } as never);
+      // SCRUM-96: these used to be unchecked, so a failure left the new account ACTIVE
+      // although the admin asked for it to be disabled.
+      const { error: deactErr } = await supabaseAdmin.from("profiles").update({ is_active: false }).eq("id", newUserId);
+      if (deactErr) throw dbError(deactErr, "admin.adminCreateUser:deactivate");
+      const { error: banErr } = await supabaseAdmin.auth.admin.updateUserById(newUserId, { ban_duration: "876000h" } as never);
+      if (banErr) throw dbError(banErr, "admin.adminCreateUser:ban");
     }
 
     return { id: newUserId };
@@ -86,7 +92,7 @@ export const adminSetUserRoles = createServerFn({ method: "POST" })
 
     if (toRemove.length) {
       const { error } = await supabaseAdmin.from("user_roles").delete().in("id", toRemove.map((r) => r.id));
-      if (error) throw new Error(error.message);
+      if (error) throw dbError(error, "admin.adminSetUserRoles");
     }
     if (toAdd.length) {
       const { error } = await supabaseAdmin
@@ -94,7 +100,7 @@ export const adminSetUserRoles = createServerFn({ method: "POST" })
         .insert(toAdd.map((role) => ({ user_id: data.userId, role })));
       if (error) {
         if (error.code === "23505") throw new Error("That role is already assigned to this user.");
-        throw new Error(error.message);
+        throw dbError(error, "admin.adminSetUserRoles");
       }
     }
     return { ok: true };
@@ -123,12 +129,12 @@ export const adminSetUserActive = createServerFn({ method: "POST" })
 
     const { error: pErr } = await supabaseAdmin
       .from("profiles").update({ is_active: data.active }).eq("id", data.userId);
-    if (pErr) throw new Error(pErr.message);
+    if (pErr) throw dbError(pErr, "admin.adminSetUserActive");
 
     const { error: aErr } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
       ban_duration: data.active ? "none" : "876000h",
     } as any);
-    if (aErr) throw new Error(aErr.message);
+    if (aErr) throw dbError(aErr, "admin.adminSetUserActive");
     return { ok: true };
   });
 
@@ -150,13 +156,13 @@ async function syncRoles(sb: any, userId: string, roles: string[]) {
   const toRemove = heldRows.filter((r) => !desired.includes(r.role));
   if (toRemove.length) {
     const { error } = await sb.from("user_roles").delete().in("id", toRemove.map((r) => r.id));
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "admin.syncRoles");
   }
   if (toAdd.length) {
     const { error } = await sb.from("user_roles").insert(toAdd.map((role) => ({ user_id: userId, role })));
     if (error) {
       if (error.code === "23505") throw new Error("That role is already assigned to this user.");
-      throw new Error(error.message);
+      throw dbError(error, "admin.syncRoles");
     }
   }
 }
@@ -171,11 +177,11 @@ async function applyActive(sb: any, userId: string, active: boolean, callerId: s
     }
   }
   const { error: pErr } = await sb.from("profiles").update({ is_active: active }).eq("id", userId);
-  if (pErr) throw new Error(pErr.message);
+  if (pErr) throw dbError(pErr, "admin.applyActive");
   const { error: aErr } = await sb.auth.admin.updateUserById(userId, {
     ban_duration: active ? "none" : "876000h",
   } as any);
-  if (aErr) throw new Error(aErr.message);
+  if (aErr) throw dbError(aErr, "admin.applyActive");
 }
 
 // Expanded update: full name, email, active status and roles in one call.
@@ -198,7 +204,7 @@ export const adminUpdateUserProfile = createServerFn({ method: "POST" })
     if (data.fullName) {
       const { error } = await supabaseAdmin
         .from("profiles").update({ full_name: data.fullName }).eq("id", data.userId);
-      if (error) throw new Error(error.message);
+      if (error) throw dbError(error, "admin.adminUpdateUserProfile");
       await supabaseAdmin.auth.admin.updateUserById(data.userId, {
         user_metadata: { full_name: data.fullName },
       } as never);
@@ -212,10 +218,10 @@ export const adminUpdateUserProfile = createServerFn({ method: "POST" })
         email: data.email,
         email_confirm: true,
       } as never);
-      if (aErr) throw new Error(aErr.message);
+      if (aErr) throw dbError(aErr, "admin.adminUpdateUserProfile");
       const { error: pErr } = await supabaseAdmin
         .from("profiles").update({ email: data.email }).eq("id", data.userId);
-      if (pErr) throw new Error(pErr.message);
+      if (pErr) throw dbError(pErr, "admin.adminUpdateUserProfile");
     }
 
     if (data.roles) await syncRoles(supabaseAdmin, data.userId, data.roles);
@@ -244,7 +250,7 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
     }
 
     const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "admin.adminDeleteUser");
     return { ok: true };
   });
 
@@ -270,7 +276,7 @@ export const adminResetPassword = createServerFn({ method: "POST" })
         ...(prof?.full_name ? { full_name: prof.full_name } : {}),
       },
     } as never);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "admin.adminResetPassword");
     // The temporary password is never emailed or logged — the UI shows it once.
     return { ok: true };
   });

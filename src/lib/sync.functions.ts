@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { FRESHDESK_HEALTH, summarizeSyncHealth, type SyncHealth } from "@/lib/sync-health";
 import { formatDailyTimeUtc, nextDailyRunAt, snapshotCronFromEnv } from "@/lib/app-config";
+import { dbError } from "@/lib/app-error";
 
 export interface SyncRunRow {
   id: string;
@@ -67,8 +68,8 @@ export const getSyncOverview = createServerFn({ method: "GET" })
       sb.from("transactions").select("id", { count: "exact", head: true }).eq("is_deleted", false),
       sb.from("report_snapshots").select("id", { count: "exact", head: true }),
     ]);
-    if (runsErr) throw new Error(runsErr.message);
-    if (fdErr) throw new Error(fdErr.message);
+    if (runsErr) throw dbError(runsErr, "sync.getSyncOverview");
+    if (fdErr) throw dbError(fdErr, "sync.getSyncOverview");
     const schedule = snapshotSchedule();
     const list = (runs ?? []) as SyncRunRow[];
     const fdList = (fdRuns ?? []) as SyncRunRow[];
@@ -118,6 +119,6 @@ export const listSnapshotRows = createServerFn({ method: "GET" })
       .order("year", { ascending: false })
       .order("month", { ascending: false })
       .limit(data.limit ?? 200);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "sync.listSnapshotRows");
     return (rows ?? []) as SnapshotRow[];
   });

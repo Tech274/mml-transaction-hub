@@ -19,6 +19,7 @@ import {
   type ImportRpcResult,
   type StrictImportDeps,
 } from "@/lib/strict-import/service";
+import { dbError } from "@/lib/app-error";
 
 const IMPORT_ROLES = ["admin", "ops_lead", "ops_user"] as const;
 // base64 is 4/3 of the byte size; allow a little slack.
@@ -35,7 +36,7 @@ function depsFor(context: AuthedContext): StrictImportDeps {
     enabled: isStrictImportEnabled(process.env),
     hasImportRole: async () => {
       const { data, error } = await supabase.rpc("has_any_role", { _user_id: userId, _roles: [...IMPORT_ROLES] });
-      if (error) throw new Error(error.message);
+      if (error) throw dbError(error, "strict-import.depsFor");
       return data === true;
     },
     findCustomers: async (norms) => {
@@ -45,7 +46,7 @@ function depsFor(context: AuthedContext): StrictImportDeps {
           .from("customers")
           .select("customer_name, normalized_name")
           .in("normalized_name", norms.slice(i, i + 200));
-        if (error) throw new Error(error.message);
+        if (error) throw dbError(error, "strict-import.depsFor");
         out.push(...(data ?? []));
       }
       return out;
@@ -61,7 +62,7 @@ function depsFor(context: AuthedContext): StrictImportDeps {
         p_rows: payload.p_rows as unknown as Json,
         p_customer_names: payload.p_customer_names as unknown as Json,
       });
-      if (error) throw new Error(error.message);
+      if (error) throw dbError(error, "strict-import.depsFor");
       return data as unknown as ImportRpcResult;
     },
     loadXlsx: loadSheetJs,

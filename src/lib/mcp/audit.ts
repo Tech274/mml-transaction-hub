@@ -1,6 +1,7 @@
 import type { ToolContext } from "@lovable.dev/mcp-js";
 import { supabaseForUser } from "./supabase-for-user";
 import { makeError, type McpErrorCode } from "./errors";
+import { logError, logIfError } from "../app-error";
 
 type ToolResult = {
   isError?: boolean;
@@ -112,10 +113,13 @@ async function logRow(
     duration_ms: number;
   },
 ) {
+  // Audit must never break a tool call, but a failed audit write must not be silent
+  // either (SCRUM-96 / G-17): supabase-js returns { error } instead of throwing.
   try {
     // Types are regenerated after migration approval; cast until then.
-    await supabase.from("mcp_tool_audit_log").insert(row as never);
-  } catch {
-    // swallow: audit must never break a tool call
+    const res = await supabase.from("mcp_tool_audit_log").insert(row as never);
+    logIfError(res, `mcp.audit:${row.tool_name}`);
+  } catch (e) {
+    logError(e, `mcp.audit:${row.tool_name}`);
   }
 }

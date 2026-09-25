@@ -8,6 +8,7 @@ import {
   TEMPLATE_VERSION,
   getBulkTemplateSchema,
 } from "@/lib/bulk-template";
+import { dbError } from "@/lib/app-error";
 
 // Public schema descriptor — read by the UI (and the E2E template-sync test)
 // to guarantee the downloadable template and the server validator stay in
@@ -104,7 +105,7 @@ export const runArtifactCleanup = createServerFn({ method: "POST" })
       _user_id: context.userId,
       _role: "admin",
     });
-    if (rErr) throw new Error(rErr.message);
+    if (rErr) throw dbError(rErr, "bulk-import.runArtifactCleanup");
     if (!isAdmin) throw new Error("Forbidden: admin role required");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -112,7 +113,7 @@ export const runArtifactCleanup = createServerFn({ method: "POST" })
       "expired_bulk_import_artifacts",
       { _days: data.days } as never,
     );
-    if (fnErr) throw new Error(fnErr.message);
+    if (fnErr) throw dbError(fnErr, "bulk-import.runArtifactCleanup");
 
     const list = (expired ?? []) as Array<{
       run_id: string;
