@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { dbError } from "@/lib/app-error";
+import { dbError, logIfError } from "@/lib/app-error";
 import { APP_ROLES, requireRole, type RoleContext } from "@/lib/require-role";
 import { applyActive, assertNotLastAdmin, syncRoles } from "@/lib/admin-guards";
 
@@ -91,14 +91,20 @@ export const adminUpdateUserProfile = createServerFn({ method: "POST" })
       const { error } = await supabaseAdmin
         .from("profiles").update({ full_name: data.fullName }).eq("id", data.userId);
       if (error) throw dbError(error, "admin.adminUpdateUserProfile");
-      await supabaseAdmin.auth.admin.updateUserById(data.userId, {
-        user_metadata: { full_name: data.fullName },
-      } as never);
+      // SCRUM-96: the profile name is the source of truth; a failed Auth metadata
+      // copy is logged instead of being ignored.
+      logIfError(
+        await supabaseAdmin.auth.admin.updateUserById(data.userId, {
+          user_metadata: { full_name: data.fullName },
+        } as never),
+        "admin.adminUpdateUserProfile:auth_metadata",
+      );
     }
 
     if (data.email) {
-      const { data: clash } = await supabaseAdmin
+      const { data: clash, error: clashErr } = await supabaseAdmin
         .from("profiles").select("id").ilike("email", data.email).maybeSingle();
+      if (clashErr) throw dbError(clashErr, "admin.adminUpdateUserProfile:email_check");
       if (clash && clash.id !== data.userId) throw new Error("A user with this email already exists.");
       const { error: aErr } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
         email: data.email,
@@ -145,8 +151,10 @@ export const adminResetPassword = createServerFn({ method: "POST" })
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    const { data: prof } = await supabaseAdmin
+    const { data: prof, error: profErr } = await supabaseAdmin
       .from("profiles").select("full_name").eq("id", data.userId).maybeSingle();
+    // Only used to keep full_name in the Auth metadata; log, don't block the reset.
+    logIfError({ error: profErr }, "admin.adminResetPassword:profile_read");
 
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.userId, {
       password: data.tempPassword,
