@@ -40,7 +40,7 @@ synthetic data.
 | Dashboard "this month" | rows where `year`/`month` = the **browser's** current year and month |
 | Reports month grouping | `year`/`month` fields on the row |
 | Dashboard "New customers" card and trend | customers whose `created_at` is inside the selected range (browser clock); not a transaction measure |
-| Monthly snapshots (`/api/public/cron/snapshot`) | grouped by `year`/`month` fields |
+| Monthly snapshots (pg_cron → `/api/public/hooks/mcp-sync` → `runSnapshotSync`) | grouped by `year`/`month` fields |
 | MCP `reports_summary` | rows whose **`start_date`** falls in the requested year |
 | Reports "Revenue forecast" | for each of the next 12 months, every row whose `start_date` ≤ month end and `end_date` ≥ month start adds its **full** `selling_cost` / `input_cost` to that month |
 
