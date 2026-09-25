@@ -2,6 +2,7 @@
 // Server-only (service-role client + API credentials) — never import from a component.
 import { DEFAULT_FRESHDESK_SCOPE, freshdeskScopeFromEnv } from "@/lib/app-config";
 import { decideSyncWindow, fullSyncHourFromEnv, runOutcome, type CursorDecision, type SyncMode } from "@/lib/freshdesk-cursor";
+import { markStaleTickets, staleSweepEnabledFromEnv } from "@/lib/freshdesk-stale";
 
 export interface FreshdeskSyncResult {
   /** sync_runs row for this run (SCRUM-74); null if the run could not be recorded. */
@@ -12,6 +13,8 @@ export interface FreshdeskSyncResult {
   updated_since?: string;
   fetched: number;
   upserted: number;
+  /** SCRUM-92: tickets marked stale by this run's sweep (0 when the sweep is off or skipped). */
+  stale_marked?: number;
   duration_ms: number;
   error_message?: string;
 }
@@ -191,6 +194,7 @@ export async function runFreshdeskSync(opts?: {
 
     // Read inside the try: an invalid setting fails (and is recorded as) this run.
     const scope = freshdeskScopeFromEnv(process.env);
+    const staleSweep = staleSweepEnabledFromEnv(process.env);
     const cutoffMs = new Date(scope.ticketsFrom).getTime();
     // SCRUM-92: only ask for tickets updated since the last successful run (daily full pass).
     syncWindow = decideSyncWindow({
@@ -245,6 +249,9 @@ export async function runFreshdeskSync(opts?: {
       ticket_created_at: t.created_at ?? null,
       ticket_updated_at: t.updated_at ?? null,
       synced_at: new Date().toISOString(),
+      // SCRUM-92: a ticket that comes back is no longer stale. Only sent when the sweep
+      // is on, because the column exists only after the SCRUM-92 migration.
+      ...(staleSweep ? { stale_since: null } : {}),
     }));
 
     const admin: Db =
@@ -262,7 +269,20 @@ export async function runFreshdeskSync(opts?: {
     // an incomplete full pass stays a success with a visible note.
     const outcome = runOutcome(syncWindow.mode, complete, maxPages, upserted);
     if (outcome.failure) throw new Error(outcome.failure);
-    const note = outcome.note;
+    // SCRUM-92: after a complete full pass, mark rows it did not return (never deletes).
+    let staleMarked = 0;
+    let staleNote: string | null = null;
+    if (staleSweep && syncWindow.mode === "full") {
+      const sweep = await markStaleTickets(admin, {
+        runStartIso: new Date(startedAt).toISOString(),
+        mode: syncWindow.mode,
+        complete,
+        seen: upserted,
+      });
+      staleMarked = sweep.marked;
+      staleNote = sweep.note;
+    }
+    const note = [outcome.note, staleNote].filter(Boolean).join(" ") || null;
     if (note) console.warn(`[freshdesk-sync] ${note}`);
 
     const duration_ms = Date.now() - startedAt;
@@ -274,6 +294,7 @@ export async function runFreshdeskSync(opts?: {
       updated_since: syncWindow.updatedSince,
       fetched: tickets.length,
       upserted,
+      stale_marked: staleMarked,
       duration_ms,
     };
   } catch (e) {

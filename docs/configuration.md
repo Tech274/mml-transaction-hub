@@ -22,6 +22,7 @@ secrets today) and, for local development, in an uncommitted `.env.local`.
 | `FRESHDESK_GROUP_NAME` | no | `app-config.ts` | current production group name | display / fallback match |
 | `FRESHDESK_TICKETS_FROM` | no | `app-config.ts` | current cut-off date | oldest ticket date to sync |
 | `FRESHDESK_FULL_SYNC_HOUR_UTC` | no | `src/lib/freshdesk-cursor.ts` (SCRUM-92) | `21` | hour (UTC) of the daily full pass; other runs are incremental |
+| `FRESHDESK_STALE_SWEEP_ENABLED` | no | `src/lib/freshdesk-stale.ts` (SCRUM-92) | off | only the exact string `true` turns it on. After a complete full pass, tickets Freshdesk no longer returns get `stale_since` set (never deleted). **Turn on only after migration `20260925150000_scrum92_freshdesk_stale_marker.sql` is applied.** Refuses to mark more than half of all tickets in one run (over 50) |
 | `SNAPSHOT_CRON_UTC` | no | `app-config.ts`, shown on Sync Status | current schedule | label for the snapshot job time |
 | `STRICT_IMPORT_ENABLED` | no | `src/lib/strict-import/flag.ts` | off | `strict_import_enabled` flag; only the exact string `true` turns it on |
 
