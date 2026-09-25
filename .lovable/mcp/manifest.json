@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "sdk_version": "0.23.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://kxqbpmgstdakissfrdwc.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "mml-transactions-mcp",
+      "version": "0.1.0",
+      "title": "MakeMyLabs Transactions"
+    },
+    "tools": [
+      {
+        "name": "whoami",
+        "title": "Who am I",
+        "description": "Return the signed-in user's id, email, and app roles.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_customers",
+        "title": "List customers",
+        "description": "List customers visible to the signed-in user, optionally filtered by a case-insensitive name substring. Returns up to `limit` rows (max 200).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "search": {
+              "type": "string",
+              "description": "Case-insensitive substring to match against customer name."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "description": "Maximum rows to return (default 50)."
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_transactions",
+        "title": "List transactions",
+        "description": "List transactions visible to the signed-in user. Optional filters: customer_id, lab_type (public/private), cloud_provider, line_of_business, and start/end date (YYYY-MM-DD) on start_date. Returns up to `limit` rows (max 200).",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "customer_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "lab_type": {
+              "type": "string",
+              "enum": [
+                "public",
+                "private"
+              ]
+            },
+            "cloud_provider": {
+              "type": "string"
+            },
+            "line_of_business": {
+              "type": "string",
+              "enum": [
+                "VILT",
+                "Standalone",
+                "Integrated"
+              ]
+            },
+            "start_date_from": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "start_date_to": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "reports_summary",
+        "title": "Reports summary",
+        "description": "Return aggregate totals (revenue, input cost, profit, margin %, transaction count, user count) for a given year, optionally filtered by cloud_provider and line_of_business.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "year": {
+              "type": "integer",
+              "minimum": 2000,
+              "maximum": 2100
+            },
+            "cloud_provider": {
+              "type": "string"
+            },
+            "line_of_business": {
+              "type": "string",
+              "enum": [
+                "VILT",
+                "Standalone",
+                "Integrated"
+              ]
+            }
+          },
+          "required": [
+            "year"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

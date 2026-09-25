@@ -1,0 +1,1435 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
+  }
+  public: {
+    Tables: {
+      account_managers: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          normalized_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          normalized_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          normalized_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      agent_identities: {
+        Row: {
+          agent_id: number | null
+          agent_name: string
+          auto_matched: boolean
+          created_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agent_id?: number | null
+          agent_name: string
+          auto_matched?: boolean
+          created_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agent_id?: number | null
+          agent_name?: string
+          auto_matched?: boolean
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_cc_audit: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          agent_key: string | null
+          created_at: string
+          detail: Json
+          id: string
+          inbox_id: string | null
+          run_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          agent_key?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          inbox_id?: string | null
+          run_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          agent_key?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          inbox_id?: string | null
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_cc_audit_inbox_id_fkey"
+            columns: ["inbox_id"]
+            isOneToOne: false
+            referencedRelation: "ai_cc_inbox"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_cc_audit_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_cc_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_cc_inbox: {
+        Row: {
+          agent_key: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decided_by_email: string | null
+          decision_note: string | null
+          id: string
+          item_type: string
+          payload: Json
+          run_id: string | null
+          status: string
+          summary: string | null
+          title: string
+        }
+        Insert: {
+          agent_key: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_email?: string | null
+          decision_note?: string | null
+          id?: string
+          item_type: string
+          payload?: Json
+          run_id?: string | null
+          status?: string
+          summary?: string | null
+          title: string
+        }
+        Update: {
+          agent_key?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_email?: string | null
+          decision_note?: string | null
+          id?: string
+          item_type?: string
+          payload?: Json
+          run_id?: string | null
+          status?: string
+          summary?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_cc_inbox_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_cc_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_cc_lab_requests: {
+        Row: {
+          confirmed_at: string | null
+          created_at: string
+          customer_name: string
+          id: string
+          lab_name: string
+          request_code: string
+          requisition: Json
+          status: string
+        }
+        Insert: {
+          confirmed_at?: string | null
+          created_at?: string
+          customer_name: string
+          id?: string
+          lab_name: string
+          request_code: string
+          requisition?: Json
+          status?: string
+        }
+        Update: {
+          confirmed_at?: string | null
+          created_at?: string
+          customer_name?: string
+          id?: string
+          lab_name?: string
+          request_code?: string
+          requisition?: Json
+          status?: string
+        }
+        Relationships: []
+      }
+      ai_cc_runs: {
+        Row: {
+          actor_email: string | null
+          actor_id: string | null
+          agent_key: string
+          created_at: string
+          finished_at: string | null
+          id: string
+          input_json: Json
+          job_hint: string | null
+          output_json: Json
+          status: string
+        }
+        Insert: {
+          actor_email?: string | null
+          actor_id?: string | null
+          agent_key: string
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          input_json?: Json
+          job_hint?: string | null
+          output_json?: Json
+          status?: string
+        }
+        Update: {
+          actor_email?: string | null
+          actor_id?: string | null
+          agent_key?: string
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          input_json?: Json
+          job_hint?: string | null
+          output_json?: Json
+          status?: string
+        }
+        Relationships: []
+      }
+      bulk_import_audit_events: {
+        Row: {
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          details: Json
+          event_type: string
+          id: string
+          parent_run_id: string | null
+          run_id: string | null
+        }
+        Insert: {
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          event_type: string
+          id?: string
+          parent_run_id?: string | null
+          run_id?: string | null
+        }
+        Update: {
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          details?: Json
+          event_type?: string
+          id?: string
+          parent_run_id?: string | null
+          run_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_audit_events_parent_run_id_fkey"
+            columns: ["parent_run_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_import_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bulk_import_audit_events_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_import_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_import_jobs: {
+        Row: {
+          cancel_requested: boolean
+          created_at: string
+          created_by: string
+          error_message: string | null
+          failed: number
+          finished_at: string | null
+          id: string
+          imported: number
+          linked: number
+          processed: number
+          run_id: string
+          skipped: number
+          started_at: string | null
+          status: string
+          succeeded: number
+          total: number
+          updated_at: string
+          updated_rows: number
+        }
+        Insert: {
+          cancel_requested?: boolean
+          created_at?: string
+          created_by?: string
+          error_message?: string | null
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          imported?: number
+          linked?: number
+          processed?: number
+          run_id: string
+          skipped?: number
+          started_at?: string | null
+          status?: string
+          succeeded?: number
+          total?: number
+          updated_at?: string
+          updated_rows?: number
+        }
+        Update: {
+          cancel_requested?: boolean
+          created_at?: string
+          created_by?: string
+          error_message?: string | null
+          failed?: number
+          finished_at?: string | null
+          id?: string
+          imported?: number
+          linked?: number
+          processed?: number
+          run_id?: string
+          skipped?: number
+          started_at?: string | null
+          status?: string
+          succeeded?: number
+          total?: number
+          updated_at?: string
+          updated_rows?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_jobs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_import_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_import_presets: {
+        Row: {
+          column_mapping: Json
+          created_at: string
+          created_by: string | null
+          created_by_email: string | null
+          duplicate_strategy: string
+          id: string
+          is_shared: boolean
+          kind: string
+          name: string
+          update_fields: Json | null
+          updated_at: string
+        }
+        Insert: {
+          column_mapping: Json
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          duplicate_strategy: string
+          id?: string
+          is_shared?: boolean
+          kind: string
+          name: string
+          update_fields?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          column_mapping?: Json
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          duplicate_strategy?: string
+          id?: string
+          is_shared?: boolean
+          kind?: string
+          name?: string
+          update_fields?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      bulk_import_row_audit: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          filename: string
+          id: string
+          line_number: number
+          potential_id: string | null
+          row_data: Json | null
+          run_id: string
+          status: string
+          transaction_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          filename: string
+          id?: string
+          line_number: number
+          potential_id?: string | null
+          row_data?: Json | null
+          run_id: string
+          status: string
+          transaction_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          filename?: string
+          id?: string
+          line_number?: number
+          potential_id?: string | null
+          row_data?: Json | null
+          run_id?: string
+          status?: string
+          transaction_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_row_audit_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_import_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bulk_import_runs: {
+        Row: {
+          column_mapping: Json | null
+          completed_at: string | null
+          created_at: string
+          duplicate_strategy: string
+          error_artifact_path: string | null
+          filename: string
+          id: string
+          imported_rows: number
+          invalid_rows: number
+          kind: string
+          linked_rows: number
+          max_retries: number
+          original_csv_path: string | null
+          parent_run_id: string | null
+          retry_count: number
+          skipped_rows: number
+          status: string
+          total_rows: number
+          update_fields: Json | null
+          updated_rows: number
+          user_email: string | null
+          user_id: string
+          valid_rows: number
+        }
+        Insert: {
+          column_mapping?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          duplicate_strategy?: string
+          error_artifact_path?: string | null
+          filename: string
+          id?: string
+          imported_rows?: number
+          invalid_rows?: number
+          kind: string
+          linked_rows?: number
+          max_retries?: number
+          original_csv_path?: string | null
+          parent_run_id?: string | null
+          retry_count?: number
+          skipped_rows?: number
+          status?: string
+          total_rows?: number
+          update_fields?: Json | null
+          updated_rows?: number
+          user_email?: string | null
+          user_id: string
+          valid_rows?: number
+        }
+        Update: {
+          column_mapping?: Json | null
+          completed_at?: string | null
+          created_at?: string
+          duplicate_strategy?: string
+          error_artifact_path?: string | null
+          filename?: string
+          id?: string
+          imported_rows?: number
+          invalid_rows?: number
+          kind?: string
+          linked_rows?: number
+          max_retries?: number
+          original_csv_path?: string | null
+          parent_run_id?: string | null
+          retry_count?: number
+          skipped_rows?: number
+          status?: string
+          total_rows?: number
+          update_fields?: Json | null
+          updated_rows?: number
+          user_email?: string | null
+          user_id?: string
+          valid_rows?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bulk_import_runs_parent_run_id_fkey"
+            columns: ["parent_run_id"]
+            isOneToOne: false
+            referencedRelation: "bulk_import_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      config_master: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      customer_audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          changed_by_email: string | null
+          changes: Json | null
+          customer_id: string
+          customer_name: string | null
+          id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          changes?: Json | null
+          customer_id: string
+          customer_name?: string | null
+          id?: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          changes?: Json | null
+          customer_id?: string
+          customer_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          account_manager_name: string | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          created_by: string | null
+          customer_name: string
+          deactivation_reason: string | null
+          id: string
+          industry: string | null
+          is_active: boolean
+          normalized_email: string | null
+          normalized_name: string
+          normalized_phone: string | null
+          notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_manager_name?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_name: string
+          deactivation_reason?: string | null
+          id?: string
+          industry?: string | null
+          is_active?: boolean
+          normalized_email?: string | null
+          normalized_name: string
+          normalized_phone?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_manager_name?: string | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_name?: string
+          deactivation_reason?: string | null
+          id?: string
+          industry?: string | null
+          is_active?: boolean
+          normalized_email?: string | null
+          normalized_name?: string
+          normalized_phone?: string | null
+          notes?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      freshdesk_tickets: {
+        Row: {
+          agent_name: string | null
+          company_name: string | null
+          description_text: string | null
+          due_by: string | null
+          fr_due_by: string | null
+          group_name: string | null
+          id: number
+          is_escalated: boolean
+          priority: string | null
+          priority_id: number | null
+          requester_email: string | null
+          requester_name: string | null
+          satisfaction_rating: string | null
+          source: string | null
+          status: string | null
+          status_id: number | null
+          subject: string | null
+          synced_at: string
+          tags: string[]
+          ticket_created_at: string | null
+          ticket_updated_at: string | null
+          type: string | null
+        }
+        Insert: {
+          agent_name?: string | null
+          company_name?: string | null
+          description_text?: string | null
+          due_by?: string | null
+          fr_due_by?: string | null
+          group_name?: string | null
+          id: number
+          is_escalated?: boolean
+          priority?: string | null
+          priority_id?: number | null
+          requester_email?: string | null
+          requester_name?: string | null
+          satisfaction_rating?: string | null
+          source?: string | null
+          status?: string | null
+          status_id?: number | null
+          subject?: string | null
+          synced_at?: string
+          tags?: string[]
+          ticket_created_at?: string | null
+          ticket_updated_at?: string | null
+          type?: string | null
+        }
+        Update: {
+          agent_name?: string | null
+          company_name?: string | null
+          description_text?: string | null
+          due_by?: string | null
+          fr_due_by?: string | null
+          group_name?: string | null
+          id?: number
+          is_escalated?: boolean
+          priority?: string | null
+          priority_id?: number | null
+          requester_email?: string | null
+          requester_name?: string | null
+          satisfaction_rating?: string | null
+          source?: string | null
+          status?: string | null
+          status_id?: number | null
+          subject?: string | null
+          synced_at?: string
+          tags?: string[]
+          ticket_created_at?: string | null
+          ticket_updated_at?: string | null
+          type?: string | null
+        }
+        Relationships: []
+      }
+      mcp_revoked_clients: {
+        Row: {
+          client_id: string
+          id: string
+          revoked_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          id?: string
+          revoked_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          id?: string
+          revoked_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mcp_tool_audit_log: {
+        Row: {
+          arguments: Json
+          client_id: string | null
+          created_at: string
+          duration_ms: number | null
+          error_code: string | null
+          error_message: string | null
+          id: string
+          success: boolean
+          tool_name: string
+          user_email: string | null
+          user_id: string
+        }
+        Insert: {
+          arguments?: Json
+          client_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          success: boolean
+          tool_name: string
+          user_email?: string | null
+          user_id: string
+        }
+        Update: {
+          arguments?: Json
+          client_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          success?: boolean
+          tool_name?: string
+          user_email?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      permission_audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          changed_by_email: string | null
+          id: string
+          new_enabled: boolean | null
+          new_sort_order: number | null
+          old_enabled: boolean | null
+          old_sort_order: number | null
+          perm_key: string
+          perm_kind: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          id?: string
+          new_enabled?: boolean | null
+          new_sort_order?: number | null
+          old_enabled?: boolean | null
+          old_sort_order?: number | null
+          perm_key: string
+          perm_kind: string
+          role: Database["public"]["Enums"]["app_role"]
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          id?: string
+          new_enabled?: boolean | null
+          new_sort_order?: number | null
+          old_enabled?: boolean | null
+          old_sort_order?: number | null
+          perm_key?: string
+          perm_kind?: string
+          role?: Database["public"]["Enums"]["app_role"]
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      report_snapshots: {
+        Row: {
+          cloud_provider: string
+          cost: number
+          created_at: string
+          customer_name: string
+          id: string
+          lab_name: string
+          line_of_business: string
+          margin_pct: number
+          month: number
+          profit: number
+          revenue: number
+          run_id: string
+          snapshot_date: string
+          total_users: number
+          transactions_count: number
+          year: number
+        }
+        Insert: {
+          cloud_provider: string
+          cost?: number
+          created_at?: string
+          customer_name: string
+          id?: string
+          lab_name: string
+          line_of_business: string
+          margin_pct?: number
+          month: number
+          profit?: number
+          revenue?: number
+          run_id: string
+          snapshot_date?: string
+          total_users?: number
+          transactions_count?: number
+          year: number
+        }
+        Update: {
+          cloud_provider?: string
+          cost?: number
+          created_at?: string
+          customer_name?: string
+          id?: string
+          lab_name?: string
+          line_of_business?: string
+          margin_pct?: number
+          month?: number
+          profit?: number
+          revenue?: number
+          run_id?: string
+          snapshot_date?: string
+          total_users?: number
+          transactions_count?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_snapshots_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          changed_by_email: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          target_email: string | null
+          target_user_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          target_email?: string | null
+          target_user_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          changed_by_email?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          target_email?: string | null
+          target_user_id?: string
+        }
+        Relationships: []
+      }
+      role_permissions: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          key: string
+          kind: string
+          role: Database["public"]["Enums"]["app_role"]
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          key: string
+          kind: string
+          role: Database["public"]["Enums"]["app_role"]
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          key?: string
+          kind?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sync_runs: {
+        Row: {
+          created_at: string
+          customers_count: number
+          duration_ms: number | null
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          kind: string
+          report_rows: number
+          started_at: string
+          status: string
+          transactions_count: number
+          trigger_source: string
+          triggered_by: string | null
+          triggered_by_email: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customers_count?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          report_rows?: number
+          started_at?: string
+          status?: string
+          transactions_count?: number
+          trigger_source?: string
+          triggered_by?: string | null
+          triggered_by_email?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customers_count?: number
+          duration_ms?: number | null
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          kind?: string
+          report_rows?: number
+          started_at?: string
+          status?: string
+          transactions_count?: number
+          trigger_source?: string
+          triggered_by?: string | null
+          triggered_by_email?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ticket_action_log: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_id: string | null
+          created_at: string
+          field_name: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          resolution_note: string | null
+          ticket_id: number
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          resolution_note?: string | null
+          ticket_id: number
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_id?: string | null
+          created_at?: string
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          resolution_note?: string | null
+          ticket_id?: number
+        }
+        Relationships: []
+      }
+      transaction_activity_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          field_name: string | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          transaction_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          transaction_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          field_name?: string | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_activity_log_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transactions: {
+        Row: {
+          cloud_provider: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          customer_name: string
+          end_date: string
+          id: string
+          input_cost: number
+          is_deleted: boolean
+          lab_name: string
+          lab_type: string
+          line_of_business: string
+          month: number
+          potential_id: string
+          repository_type: string
+          selling_cost: number
+          start_date: string
+          system_config: string | null
+          total_users: number
+          updated_at: string
+          updated_by: string | null
+          year: number
+        }
+        Insert: {
+          cloud_provider: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          customer_name: string
+          end_date: string
+          id?: string
+          input_cost?: number
+          is_deleted?: boolean
+          lab_name: string
+          lab_type: string
+          line_of_business: string
+          month: number
+          potential_id: string
+          repository_type: string
+          selling_cost: number
+          start_date: string
+          system_config?: string | null
+          total_users: number
+          updated_at?: string
+          updated_by?: string | null
+          year: number
+        }
+        Update: {
+          cloud_provider?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          customer_name?: string
+          end_date?: string
+          id?: string
+          input_cost?: number
+          is_deleted?: boolean
+          lab_name?: string
+          lab_type?: string
+          line_of_business?: string
+          month?: number
+          potential_id?: string
+          repository_type?: string
+          selling_cost?: number
+          start_date?: string
+          system_config?: string | null
+          total_users?: number
+          updated_at?: string
+          updated_by?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      clear_bulk_import_artifact_paths: {
+        Args: { _run_ids: string[] }
+        Returns: number
+      }
+      expired_bulk_import_artifacts: {
+        Args: { _days: number }
+        Returns: {
+          error_artifact_path: string
+          original_csv_path: string
+          run_id: string
+        }[]
+      }
+      fuzzy_search_transactions: {
+        Args: { max_rows?: number; q: string; threshold?: number }
+        Returns: {
+          id: string
+          score: number
+        }[]
+      }
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+    }
+    Enums: {
+      app_role:
+        | "admin"
+        | "leadership"
+        | "finance"
+        | "ops_lead"
+        | "ops_user"
+        | "viewer"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never) = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never) = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never) = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_role: [
+        "admin",
+        "leadership",
+        "finance",
+        "ops_lead",
+        "ops_user",
+        "viewer",
+      ],
+    },
+  },
+} as const

@@ -1,0 +1,7 @@
+
+ALTER TABLE public.customers
+  ADD COLUMN IF NOT EXISTS account_manager_name TEXT,
+  ADD COLUMN IF NOT EXISTS contact_email TEXT,
+  ADD COLUMN IF NOT EXISTS contact_phone TEXT,
+  ADD COLUMN IF NOT EXISTS industry TEXT,
+  ADD COLUMN IF NOT EXISTS notes TEXT;
