@@ -2,8 +2,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { dbError, logIfError } from "@/lib/app-error";
+import { AppError, dbError, logError, logIfError } from "@/lib/app-error";
 import { requireRole } from "@/lib/require-role";
+import {
+  DECIDE_ROLES,
+  EXTERNAL_WRITE_CONFIRM_MESSAGE,
+  EXTERNAL_WRITE_ROLE_MESSAGE,
+  NO_CONFIRMED_LAB_REQUEST_MESSAGE,
+  planTicketWrite,
+  rolesToConfirm,
+  runTicketWrite,
+  ticketWriteFailureMessage,
+  writesExternally,
+} from "@/lib/ai-cc-policy";
 
 /* ---------------------------------------------------------------------------
  * Types
@@ -117,7 +128,7 @@ async function admin() {
 
 async function assertActor(context: Ctx) {
   // SCRUM-100: a failed permission lookup used to be treated like "not allowed" silently.
-  await requireRole(context, ["admin", "ops_lead", "ops_user", "leadership", "finance"], "You do not have permission to run agents or decide on proposals");
+  await requireRole(context, DECIDE_ROLES, "You do not have permission to run agents or decide on proposals");
 }
 
 async function writeAudit(
@@ -298,7 +309,7 @@ MakeMyLabs Solutions Team`;
   ];
 }
 
-function supportBrain(ticket: {
+export function supportBrain(ticket: {
   id: number;
   subject: string | null;
   status: string | null;
@@ -499,37 +510,10 @@ export const runAgent = createServerFn({ method: "POST" })
           .order("confirmed_at", { ascending: false })
           .limit(5);
         if (error) throw dbError(error, "ai-command-center.runAgent");
-        let confirmed = ((reqs ?? []) as LabRequest[])[0];
-        if (!confirmed) {
-          // Seed a demo CONFIRMED request so the trigger is always demoable.
-          const { data: seeded, error: seedErr } = await sb
-            .from("ai_cc_lab_requests")
-            .insert({
-              request_code: `LR-${new Date().getUTCFullYear()}-${String(Math.floor(Math.random() * 900) + 100)}`,
-              customer_name: "Cognizant",
-              lab_name: data.job_hint?.trim() || "Kogito BPMN Automation Lab",
-              status: "CONFIRMED",
-              confirmed_at: new Date().toISOString(),
-              requisition: {
-                line_of_business: "Integrated",
-                lab_type: "public_cloud",
-                cloud_provider: "AWS",
-                total_users: 45,
-                start_date: "2026-10-01",
-                end_date: "2026-12-31",
-                input_cost: 182500,
-                selling_cost: 312000,
-                currency: "INR",
-                components: ["Kogito runtime (OSS)", "Quarkus", "Keycloak SSO", "Postgres"],
-                notes: "Seeded demo requisition.",
-              },
-            })
-            .select("*")
-            .single();
-          if (seedErr) throw dbError(seedErr, "ai-command-center.runAgent");
-          confirmed = seeded as LabRequest;
-          output['seeded_lab_request'] = confirmed.request_code;
-        }
+        const confirmed = ((reqs ?? []) as LabRequest[])[0];
+        // SCRUM-76 (G-09): this used to insert a made-up CONFIRMED request for a named customer
+        // into live data when none existed. It now stops and says so; nothing is created.
+        if (!confirmed) throw new AppError(NO_CONFIRMED_LAB_REQUEST_MESSAGE, "no_confirmed_lab_request");
         proposals = costAdrBrain(confirmed);
         output['lab_request'] = confirmed.request_code;
       }
@@ -563,19 +547,21 @@ export const runAgent = createServerFn({ method: "POST" })
       }
 
       output['items'] = (inserted ?? []).length;
-      await sb
+      const doneRes = await sb
         .from("ai_cc_runs")
         .update({ status: "done", finished_at: new Date().toISOString(), output_json: output })
         .eq("id", runId);
+      logIfError(doneRes, "ai-command-center.runAgent:mark_done");
 
       return { run_id: runId, items: (inserted ?? []).length, output };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      await sb
+      const errRes = await sb
         .from("ai_cc_runs")
         .update({ status: "error", finished_at: new Date().toISOString(), output_json: { error: message } })
         .eq("id", runId);
-      throw new Error(message);
+      logIfError(errRes, "ai-command-center.runAgent:mark_error");
+      throw e instanceof Error ? e : new Error(message);
     }
   });
 
@@ -585,14 +571,16 @@ export const runAgent = createServerFn({ method: "POST" })
 
 export const confirmInboxItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; note?: string; edited?: { subject?: string; body?: string } }) =>
-    z
-      .object({
-        id: z.string().uuid(),
-        note: z.string().max(2000).optional(),
-        edited: z.object({ subject: z.string().optional(), body: z.string().optional() }).optional(),
-      })
-      .parse(d),
+  .inputValidator(
+    (d: { id: string; note?: string; edited?: { subject?: string; body?: string }; confirm_external_write?: boolean }) =>
+      z
+        .object({
+          id: z.string().uuid(),
+          note: z.string().max(2000).optional(),
+          edited: z.object({ subject: z.string().max(500).optional(), body: z.string().max(20000).optional() }).optional(),
+          confirm_external_write: z.boolean().optional(),
+        })
+        .parse(d),
   )
   .handler(async ({ data, context }) => {
     const ctx = context as unknown as Ctx;
@@ -610,37 +598,63 @@ export const confirmInboxItem = createServerFn({ method: "POST" })
     if (data.edited?.subject !== undefined) payload['subject'] = data.edited.subject;
     if (data.edited?.body !== undefined) payload['body'] = data.edited.body;
 
+    // SCRUM-76 (G-09): a proposal that writes to Freshdesk needs ops_lead/admin and an explicit
+    // second confirmation. Checked before anything is written.
+    if (writesExternally(row.item_type)) {
+      await requireRole(ctx, rolesToConfirm(row.item_type), EXTERNAL_WRITE_ROLE_MESSAGE);
+      if (data.confirm_external_write !== true) throw new AppError(EXTERNAL_WRITE_CONFIRM_MESSAGE, "confirm_required");
+    }
+    // Only email drafts may be edited before approval.
+    if (data.edited && row.item_type !== "email_draft") throw new AppError("Only email drafts can be edited", "not_editable");
+
     let write_result: Record<string, any> = { performed: false, reason: "No external write for this item type" };
 
     if (row.item_type === "ticket_proposal") {
-      // The ONLY place a helpdesk write may happen — after human confirm.
-      const ticketId = Number(payload['ticket_id']);
-      try {
-        const { STATUS_IDS, updateFreshdeskTicket, addFreshdeskNote } = await import("@/lib/freshdesk.server");
-        const status = String(payload['suggested_status'] ?? "");
-        const statusId = STATUS_IDS[status];
-        if (payload['resolution_note']) await addFreshdeskNote(ticketId, String(payload['resolution_note']));
-        if (statusId) await updateFreshdeskTicket(ticketId, { status: statusId });
-        write_result = { performed: true, target: "freshdesk", ticket_id: ticketId, status };
+      // The ONLY place a helpdesk write may happen, after an explicit human confirm.
+      const { STATUS_IDS, updateFreshdeskTicket, addFreshdeskNote } = await import("@/lib/freshdesk.server");
+      const planned = planTicketWrite(payload, STATUS_IDS);
+      if (!planned.ok) throw new AppError(`${planned.reason}. Nothing was sent to the helpdesk.`, "invalid_proposal");
+      const plan = planned.plan;
+      const outcome = await runTicketWrite(plan, {
+        addNote: (id, body) => addFreshdeskNote(id, body),
+        setStatus: (id, statusId) => updateFreshdeskTicket(id, { status: statusId }),
+      });
+      if (!outcome.ok) {
+        // Fail loudly: the proposal is NOT marked confirmed. What already happened is recorded on it.
+        const ref = logError(outcome.error, "ai-command-center.confirmInboxItem:freshdesk", {
+          inbox_id: row.id,
+          ticket_id: plan.ticketId,
+          done: outcome.done,
+          failed_step: outcome.failedStep,
+        });
+        const attempt = {
+          at: new Date().toISOString(),
+          by: email,
+          ref,
+          done: outcome.done,
+          failed_step: outcome.failedStep,
+        };
+        const markRes = await sb
+          .from("ai_cc_inbox")
+          .update({ payload: { ...(row.payload as Record<string, any>), last_write_attempt: attempt } })
+          .eq("id", row.id)
+          .eq("status", "pending");
+        logIfError(markRes, "ai-command-center.confirmInboxItem:record_attempt");
+        throw new AppError(ticketWriteFailureMessage(outcome, plan.ticketId, ref), "helpdesk_write_failed");
+      }
+      write_result = { performed: true, target: "freshdesk", ticket_id: plan.ticketId, status: plan.status, steps: outcome.done };
+      if (plan.status !== null) {
         const logRes = await sb.from("ticket_action_log").insert({
-          ticket_id: ticketId,
+          ticket_id: plan.ticketId,
           action: "status_change",
           field_name: "status",
           old_value: String(payload['current_status'] ?? ""),
-          new_value: status,
-          resolution_note: String(payload['resolution_note'] ?? ""),
+          new_value: plan.status,
+          resolution_note: plan.note ?? "",
           actor_id: ctx.userId,
           actor_email: email,
         });
         logIfError(logRes, "ai-command-center.confirmInboxItem:ticket_action_log");
-      } catch (e) {
-        write_result = {
-          performed: false,
-          stubbed: true,
-          target: "freshdesk",
-          ticket_id: ticketId,
-          reason: e instanceof Error ? e.message : String(e),
-        };
       }
     } else if (row.item_type === "email_draft") {
       write_result = { performed: false, approved_for_human_send: true, note: "Never auto-sent" };
@@ -648,7 +662,7 @@ export const confirmInboxItem = createServerFn({ method: "POST" })
       write_result = { performed: false, note: "Field map approved. A human must save the Master ADR entry." };
     }
 
-    const { error: upErr } = await sb
+    const { data: updated, error: upErr } = await sb
       .from("ai_cc_inbox")
       .update({
         status: "confirmed",
@@ -658,8 +672,16 @@ export const confirmInboxItem = createServerFn({ method: "POST" })
         decided_at: new Date().toISOString(),
         payload: { ...payload, write_result },
       })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("status", "pending")
+      .select("id");
     if (upErr) throw dbError(upErr, "ai-command-center.confirmInboxItem");
+    if (((updated ?? []) as unknown[]).length === 0) {
+      // Someone else decided in the meantime. Say so instead of reporting success.
+      logError({ message: "inbox item no longer pending at confirm" }, "ai-command-center.confirmInboxItem:race", { inbox_id: row.id, write_result });
+      const extra = write_result.performed ? " Your helpdesk update WAS applied, so check the ticket." : "";
+      throw new AppError(`Someone else decided on this proposal at the same time.${extra} Reload the inbox.`, "already_decided");
+    }
 
     await writeAudit(sb, {
       actor_id: ctx.userId,
@@ -691,7 +713,7 @@ export const rejectInboxItem = createServerFn({ method: "POST" })
     const row = item as InboxItem;
     if (row.status !== "pending") throw new Error(`This proposal is already ${row.status}`);
 
-    const { error: upErr } = await sb
+    const { data: rejected, error: upErr } = await sb
       .from("ai_cc_inbox")
       .update({
         status: "rejected",
@@ -700,8 +722,13 @@ export const rejectInboxItem = createServerFn({ method: "POST" })
         decided_by_email: email,
         decided_at: new Date().toISOString(),
       })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("status", "pending")
+      .select("id");
     if (upErr) throw dbError(upErr, "ai-command-center.rejectInboxItem");
+    if (((rejected ?? []) as unknown[]).length === 0) {
+      throw new AppError("Someone else decided on this proposal at the same time. Reload the inbox.", "already_decided");
+    }
 
     await writeAudit(sb, {
       actor_id: ctx.userId,

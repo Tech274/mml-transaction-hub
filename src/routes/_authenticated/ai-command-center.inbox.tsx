@@ -15,7 +15,13 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { AlertTriangle, Check, Copy, FileText, Inbox as InboxIcon, Loader2, ShieldAlert, X } from "lucide-react";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { EmailDraftCard } from "@/components/ai-command-center/email-draft-card";
+import { useAuth } from "@/lib/auth-context";
+import { EXTERNAL_WRITE_ROLE_MESSAGE, EXTERNAL_WRITE_ROLES, writesExternally } from "@/lib/ai-cc-policy";
 import {
   listInbox, confirmInboxItem, rejectInboxItem, AGENTS, type AgentKey, type InboxItem,
 } from "@/lib/ai-command-center.functions";
@@ -45,6 +51,9 @@ function InboxPage() {
   const [note, setNote] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [askExternal, setAskExternal] = useState(false);
+  const { hasAnyRole } = useAuth();
+  const canWriteExternally = hasAnyRole([...EXTERNAL_WRITE_ROLES]);
 
   const listFn = useServerFn(listInbox);
   const confirmFn = useServerFn(confirmInboxItem);
@@ -75,17 +84,22 @@ function InboxPage() {
           id: item.id,
           note: note.trim() || undefined,
           ...(item.item_type === "email_draft" ? { edited: { subject, body } } : {}),
+          // SCRUM-76: only sent after the user accepted the "update the real ticket?" dialog.
+          ...(writesExternally(item.item_type) ? { confirm_external_write: true } : {}),
         },
       }),
     onSuccess: (r) => {
-      const w = r.write_result as { performed?: boolean; stubbed?: boolean; reason?: string };
+      const w = r.write_result as { performed?: boolean };
       if (w?.performed) toast.success("Confirmed — helpdesk updated and logged");
-      else if (w?.stubbed) toast.warning(`Confirmed and logged. Helpdesk write not applied: ${w.reason ?? "unavailable"}`);
       else toast.success("Confirmed and logged");
       qc.invalidateQueries({ queryKey: ["ai-cc"] });
       setOpen(null);
     },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Could not confirm"),
+    // A failed helpdesk write leaves the proposal pending; refresh so the recorded attempt shows.
+    onError: (e) => {
+      toast.error(e instanceof Error ? e.message : "Could not confirm");
+      qc.invalidateQueries({ queryKey: ["ai-cc"] });
+    },
   });
 
   const reject = useMutation({
@@ -99,6 +113,7 @@ function InboxPage() {
   });
 
   const items = q.data ?? [];
+  const openPayload = (open?.payload ?? {}) as Record<string, unknown>;
 
   return (
     <AppShell title="AI Command Center — Inbox">
@@ -229,11 +244,20 @@ function InboxPage() {
                         {reject.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <X className="h-4 w-4 mr-1" />}
                         Reject
                       </Button>
-                      <Button onClick={() => confirm.mutate(open)} disabled={confirm.isPending || reject.isPending}>
+                      <Button
+                        onClick={() => (writesExternally(open.item_type) ? setAskExternal(true) : confirm.mutate(open))}
+                        disabled={
+                          confirm.isPending || reject.isPending || (writesExternally(open.item_type) && !canWriteExternally)
+                        }
+                        title={writesExternally(open.item_type) && !canWriteExternally ? EXTERNAL_WRITE_ROLE_MESSAGE : undefined}
+                      >
                         {confirm.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Check className="h-4 w-4 mr-1" />}
                         Confirm
                       </Button>
                     </div>
+                    {writesExternally(open.item_type) && !canWriteExternally && (
+                      <p className="text-xs text-muted-foreground text-right">{EXTERNAL_WRITE_ROLE_MESSAGE}.</p>
+                    )}
                   </>
                 ) : (
                   <Alert>
@@ -251,6 +275,37 @@ function InboxPage() {
           )}
         </SheetContent>
       </Sheet>
+
+      <AlertDialog open={askExternal} onOpenChange={setAskExternal}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Update the real helpdesk ticket?</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm">
+                <p>
+                  This writes to Freshdesk ticket #{String(openPayload.ticket_id ?? "?")} now:
+                </p>
+                <ul className="list-disc pl-5">
+                  {openPayload.resolution_note ? <li>adds a private note</li> : null}
+                  {openPayload.suggested_status ? <li>sets the status to {String(openPayload.suggested_status)}</li> : null}
+                </ul>
+                <p>The customer does not receive an email from this step.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setAskExternal(false);
+                if (open) confirm.mutate(open);
+              }}
+            >
+              Update helpdesk
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppShell>
   );
 }
@@ -324,6 +379,18 @@ function ItemBody({
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Note added on confirm</Label>
             <p className="text-xs mt-1">{String(p['resolution_note'] ?? "")}</p>
           </div>
+          {p['last_write_attempt'] && item.status === "pending" ? (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Last helpdesk update failed</AlertTitle>
+              <AlertDescription className="text-xs">
+                {String(p['last_write_attempt'].by ?? "someone")} · ref {String(p['last_write_attempt'].ref ?? "—")} · already done:{" "}
+                {Array.isArray(p['last_write_attempt'].done) && p['last_write_attempt'].done.length > 0
+                  ? p['last_write_attempt'].done.join(", ")
+                  : "nothing"}
+              </AlertDescription>
+            </Alert>
+          ) : null}
           {p['write_result'] ? (
             <Alert>
               <AlertDescription className="text-xs font-mono">{JSON.stringify(p['write_result'])}</AlertDescription>
