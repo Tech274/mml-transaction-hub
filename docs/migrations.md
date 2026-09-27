@@ -44,7 +44,8 @@ live exactly, and nothing new is written into them.
 4. **Merge.** The migration is now repo-only. Add it to the register (sandbox: –, live: –).
 5. **Approve.** Get Atlas's engineering go-ahead and Vivek's approval for this migration
    specifically, with the release order (migration before or after the app publish, flags).
-6. **Backup.** Follow SCRUM-62: record the backup/PITR point and the time.
+6. **Backup.** Follow `docs/runbooks/backup-before-live-change.md` (SCRUM-62): latest daily
+   backup, a manual export, and the fingerprint before and after.
 7. **Sandbox.** Apply **one migration at a time**, in register order, then run its verify queries.
    Record the date and who applied it.
 8. **Live.** Apply it in the approved window, in register order, then run the same verify queries

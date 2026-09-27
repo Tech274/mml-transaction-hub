@@ -72,6 +72,7 @@ Full process, reviewer checklist and the register of migrations not yet on live:
   `-- approved-destructive: <ticket> <who>` line and Vivek's approval.
 - A committed migration is never edited, renamed or deleted (CI checks); fix forward.
 - A second reviewer approves every migration PR.
+- Every live change starts with a backup: `docs/runbooks/backup-before-live-change.md` (SCRUM-62).
 - Merging a migration **does not apply it**. It is applied to sandbox first, then to
   live in the agreed release order (migrations before the app publish), with approval.
 

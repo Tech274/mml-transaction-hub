@@ -11,7 +11,7 @@ Adding the header first is harmless to the old code (it ignores unknown headers)
 
 ## Order
 1. **Pre-checks**
-   - DB backup taken (record timestamp) — SCRUM-62.
+   - DB backup taken (record timestamp): `docs/runbooks/backup-before-live-change.md` (SCRUM-62).
    - Not within ±10 min of HH:15 UTC (Freshdesk) or 02:00 UTC (snapshot).
    - `select jobid, jobname, active from cron.job order by jobid;` — note ids; cleanup job must stay `active = false`.
 2. **Apply migrations** `20260925120000_scrum89_cron_secret.sql` and `20260925120100_scrum98_import_artifact_legal_hold.sql`.
