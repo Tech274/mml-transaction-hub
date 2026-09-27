@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { countLabel } from "@/lib/sync-health";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -100,11 +101,20 @@ function SyncStatusPage() {
                 </AlertDescription>
               </Alert>
             )}
+            {d && d.count_error_refs.length > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Some counts could not be loaded</AlertTitle>
+                <AlertDescription className="text-xs">
+                  Shown as "unavailable", not 0. Ref {d.count_error_refs.join(", ")}.
+                </AlertDescription>
+              </Alert>
+            )}
             {d && (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <Stat label="Customers" value={d.live_counts.customers.toLocaleString()} />
-                <Stat label="Transactions" value={d.live_counts.transactions.toLocaleString()} />
-                <Stat label="Snapshot rows" value={d.snapshot_rows.toLocaleString()} />
+                <Stat label="Customers" value={countLabel(d.live_counts.customers)} />
+                <Stat label="Transactions" value={countLabel(d.live_counts.transactions)} />
+                <Stat label="Snapshot rows" value={countLabel(d.snapshot_rows)} />
                 <Stat
                   label="Last successful sync"
                   value={

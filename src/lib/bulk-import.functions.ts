@@ -8,7 +8,8 @@ import {
   TEMPLATE_VERSION,
   getBulkTemplateSchema,
 } from "@/lib/bulk-template";
-import { dbError } from "@/lib/app-error";
+import { dbError, logError } from "@/lib/app-error";
+import { cleanupExpiredArtifacts } from "@/lib/artifact-cleanup";
 import { requireRole } from "@/lib/require-role";
 
 // Public schema descriptor — read by the UI (and the E2E template-sync test)
@@ -116,57 +117,34 @@ export const runArtifactCleanup = createServerFn({ method: "POST" })
       original_csv_path: string | null;
       error_artifact_path: string | null;
     }>;
-    const paths = list.flatMap((r) =>
-      [r.original_csv_path, r.error_artifact_path].filter((p): p is string => !!p),
-    );
-
-    // Track removals per storage bucket + per artifact kind so the admin UI
-    // can render an accurate summary.
-    const csvPaths = list.map((r) => r.original_csv_path).filter((p): p is string => !!p);
-    const errorPaths = list.map((r) => r.error_artifact_path).filter((p): p is string => !!p);
-
-    async function removeAll(bucket: string, all: string[]): Promise<number> {
-      let removed = 0;
-      for (let i = 0; i < all.length; i += 100) {
-        const chunk = all.slice(i, i + 100);
-        const { error } = await supabaseAdmin.storage.from(bucket).remove(chunk);
-        if (!error) removed += chunk.length;
-      }
-      return removed;
-    }
-
-    const csvRemoved = data.dryRun ? csvPaths.length : await removeAll("bulk-imports", csvPaths);
-    const errorRemoved = data.dryRun ? errorPaths.length : await removeAll("bulk-imports", errorPaths);
-    const deletedObjects = csvRemoved + errorRemoved;
-    const buckets: Record<string, { originalCsv: number; errorArtifact: number; total: number }> = {
-      "bulk-imports": {
-        originalCsv: csvRemoved,
-        errorArtifact: errorRemoved,
-        total: csvRemoved + errorRemoved,
+    // SCRUM-96: failures are logged with a ref and reported; a run's paths are cleared only
+    // when all of its files were removed (see src/lib/artifact-cleanup.ts).
+    const summary = await cleanupExpiredArtifacts(
+      list,
+      {
+        remove: (paths) => supabaseAdmin.storage.from("bulk-imports").remove(paths),
+        clearPaths: (runIds) => supabaseAdmin.rpc("clear_bulk_import_artifact_paths", { _run_ids: runIds } as never) as never,
+        log: logError,
       },
-    };
-
-    let clearedRows = 0;
-    const runIds = list.map((r) => r.run_id);
-    if (runIds.length) {
-      if (data.dryRun) {
-        clearedRows = runIds.length;
-      } else {
-        const { data: c } = await supabaseAdmin.rpc(
-          "clear_bulk_import_artifact_paths",
-          { _run_ids: runIds } as never,
-        );
-        clearedRows = Number(c ?? 0);
-      }
-    }
+      { dryRun: data.dryRun, where: "bulk-import.runArtifactCleanup" },
+    );
 
     return {
       days: data.days,
       dryRun: data.dryRun,
-      expiredRuns: list.length,
-      deletedObjects,
-      clearedRows,
-      pathsAttempted: paths.length,
-      buckets,
+      expiredRuns: summary.expiredRuns,
+      deletedObjects: summary.deletedObjects,
+      clearedRows: summary.clearedRows,
+      pathsAttempted: summary.pathsAttempted,
+      failedObjects: summary.failedObjects,
+      runsKept: summary.runsKept,
+      errorRefs: summary.errorRefs,
+      buckets: {
+        "bulk-imports": {
+          originalCsv: summary.csvRemoved,
+          errorArtifact: summary.errorRemoved,
+          total: summary.csvRemoved + summary.errorRemoved,
+        },
+      } as Record<string, { originalCsv: number; errorArtifact: number; total: number }>,
     };
   });

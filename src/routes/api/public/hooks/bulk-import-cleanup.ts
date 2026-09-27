@@ -42,28 +42,23 @@ async function runCleanup(): Promise<{ ok: boolean; body: unknown }> {
     { _days: days } as never,
   );
   if (fnErr) {
-    console.error("[bulk-import-cleanup] expired_bulk_import_artifacts failed:", fnErr.message);
-    return { ok: false, body: { ok: false, error: "cleanup lookup failed" } };
+    const { logError } = await import("@/lib/app-error");
+    const ref = logError(fnErr, "bulk-import-cleanup:lookup");
+    return { ok: false, body: { ok: false, error: "cleanup lookup failed", ref } };
   }
 
+  // SCRUM-96: failures are logged with a ref; paths are cleared only for fully deleted runs.
+  const { cleanupExpiredArtifacts } = await import("@/lib/artifact-cleanup");
+  const { logError } = await import("@/lib/app-error");
   const list = (expired ?? []) as Array<{ run_id: string; original_csv_path: string | null; error_artifact_path: string | null }>;
-  const paths = list.flatMap((r) => [r.original_csv_path, r.error_artifact_path].filter((p): p is string => !!p));
-
-  let deleted = 0;
-  // Delete in chunks of 100 to stay well below storage payload limits.
-  for (let i = 0; i < paths.length; i += 100) {
-    const chunk = paths.slice(i, i + 100);
-    const { error } = await supabaseAdmin.storage.from("bulk-imports").remove(chunk);
-    if (!error) deleted += chunk.length;
-  }
-  const runIds = list.map((r) => r.run_id);
-  let cleared = 0;
-  if (runIds.length) {
-    const { data: c } = await supabaseAdmin.rpc(
-      "clear_bulk_import_artifact_paths",
-      { _run_ids: runIds } as never,
-    );
-    cleared = Number(c ?? 0);
-  }
-  return { ok: true, body: { ok: true, days, expired_runs: list.length, deleted_objects: deleted, cleared_rows: cleared } };
+  const summary = await cleanupExpiredArtifacts(
+    list,
+    {
+      remove: (paths) => supabaseAdmin.storage.from("bulk-imports").remove(paths),
+      clearPaths: (runIds) => supabaseAdmin.rpc("clear_bulk_import_artifact_paths", { _run_ids: runIds } as never) as never,
+      log: logError,
+    },
+    { dryRun: false, where: "bulk-import-cleanup" },
+  );
+  return { ok: summary.ok, body: { days, ...summary } };
 }

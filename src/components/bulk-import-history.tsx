@@ -75,9 +75,15 @@ export function BulkImportHistory() {
       const verb = res.dryRun ? "Dry-run preview" : "Cleanup done";
       const noun = res.dryRun ? "would remove" : "removed";
       const pathVerb = res.dryRun ? "would clear" : "cleared";
-      toast.success(
-        `${verb} · ${res.expiredRuns} expired runs · ${res.deletedObjects}/${res.pathsAttempted} objects ${noun} · ${res.clearedRows} paths ${pathVerb}${bucketSummary ? ` · ${bucketSummary}` : ""}`,
-      );
+      const line = `${verb} · ${res.expiredRuns} expired runs · ${res.deletedObjects}/${res.pathsAttempted} objects ${noun} · ${res.clearedRows} paths ${pathVerb}${bucketSummary ? ` · ${bucketSummary}` : ""}`;
+      // SCRUM-96: partial failures used to be reported as success.
+      if (res.errorRefs && res.errorRefs.length > 0) {
+        toast.error(
+          `${line} · ${res.failedObjects} objects NOT removed, ${res.runsKept} runs kept their paths (ref ${res.errorRefs.join(", ")})`,
+        );
+      } else {
+        toast.success(line);
+      }
       if (!res.dryRun) refetch();
     } catch (e) {
       toast.error(`Cleanup failed: ${(e as Error).message}`);
