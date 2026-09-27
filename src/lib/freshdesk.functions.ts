@@ -3,7 +3,8 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { TICKET_OPS_ROLES, canClaimAgent } from "@/lib/ticket-access";
 import { fetchAllPages, ttlCache } from "@/lib/paging";
-import { dbError } from "@/lib/app-error";
+import { AppError, dbError } from "@/lib/app-error";
+import { identityRow, saveAgentIdentity, SAVE_IDENTITY_FAILED } from "@/lib/agent-identity";
 import { hasAnyRole, requireRole, type RoleContext } from "@/lib/require-role";
 
 export interface TicketRow {
@@ -247,9 +248,14 @@ export const getAgentDirectory = createServerFn({ method: "GET" })
     const match = email ? agents.find((a) => a.email?.toLowerCase() === email) : undefined;
     if (!match) return { agents, identity: null };
 
-    await sb
-      .from("agent_identities")
-      .upsert({ user_id: context.userId, agent_name: match.name, agent_id: match.id, auto_matched: true });
+    // SCRUM-102: written by the server (service role) after the email match; a failure is logged,
+    // not hidden, and the match is still shown for this visit.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await saveAgentIdentity(
+      supabaseAdmin as never,
+      identityRow(context.userId, match, true),
+      "freshdesk.getAgentDirectory:auto_match",
+    );
     return { agents, identity: { agent_name: match.name, agent_id: match.id, auto_matched: true } };
   });
 
@@ -282,14 +288,14 @@ export const setMyAgentIdentity = createServerFn({ method: "POST" })
     const verdict = canClaimAgent({ callerEmail, isAdmin: await isAdmin(context as never), agent });
     if (!verdict.ok) throw new Error(verdict.reason);
 
-    const sb = context.supabase as unknown as { from: (t: string) => any };
-    const { error } = await sb.from("agent_identities").upsert({
-      user_id: context.userId,
-      agent_name: agent!.name,
-      agent_id: agent!.id,
-      auto_matched: false,
-    });
-    if (error) throw new Error("Could not save your agent identity. Please try again.");
+    // SCRUM-102: users can't write agent_identities directly; the server writes it after the check.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const saved = await saveAgentIdentity(
+      supabaseAdmin as never,
+      identityRow(context.userId, agent!, false),
+      "freshdesk.setMyAgentIdentity",
+    );
+    if (!saved.ok) throw new AppError(`${SAVE_IDENTITY_FAILED} (ref ${saved.ref})`);
     return { ok: true };
   });
 

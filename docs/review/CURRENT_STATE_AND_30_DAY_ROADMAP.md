@@ -18,7 +18,7 @@ with Vivek's approved accounts), and their findings get added to the "Live walk"
 | Last snapshot sync before review | 24 Sep 2026 07:30 IST | SCRUM-46 |
 | Accounts | 13 (1 admin); review pending | SCRUM-45 |
 | Live build | Lovable, 25 Sep emergency lockdown (sign-up closed, no default role, anon locked out) | PR #1 |
-| GitHub `main` | PRs #1–#32 merged; **nothing from GitHub is live**; 7 migrations repo-only | this repo |
+| GitHub `main` | PRs #1–#34 merged; **nothing from GitHub is live**; 8 migrations repo-only | this repo |
 | Tests / CI | ~370 unit tests, incl. access-rule tests on a local Postgres with every migration; CI on every PR | `README.md` |
 
 ## Page by page (code in `main`)
@@ -36,7 +36,7 @@ for publish/migration · **Open** = known gap · **Waits** = blocked on a decisi
 | Private cloud `src/routes/_authenticated/private-cloud.tsx` | Transactions filtered to private cloud | OK | Classification rules (SCRUM-68, Vivek) | _to do_ |
 | Customers `src/routes/_authenticated/customers.tsx` | Customer list and edit | OK (all-rows read) | Duplicate detection rules (SCRUM-67, Vivek) | _to do_ |
 | Reports `src/routes/_authenticated/reports.tsx` | Report views and Excel export | Fixed, not live: all-rows reads (#16), SheetJS upgrade (#7) | Export role visibility (SCRUM-71, after SCRUM-58) | _to do_ |
-| Tickets `src/routes/_authenticated/tickets.tsx` | Freshdesk tickets, conversations, agent claim | Fixed, not live: no 5k cap (#15), conversations limited to synced tickets and ops roles (#4), incremental sync (#14) | Server-side totals + status labels (SCRUM-94/105, paused); direct `agent_identities` writes (SCRUM-102 follow-up) | _to do_ |
+| Tickets `src/routes/_authenticated/tickets.tsx` | Freshdesk tickets, conversations, agent claim | Fixed, not live: no 5k cap (#15), conversations limited to synced tickets and ops roles (#4), incremental sync (#14) | Server-side totals + status labels (SCRUM-94/105, paused); `agent_identities` server-only writes need their migration after publish (SCRUM-102) | _to do_ |
 | AI Command Center: agents `src/routes/_authenticated/ai-command-center.agents.tsx` | Agent list | Fixed, not live (#26) | Keep / Preview / hide on live (Vivek) | _to do_ |
 | AI Command Center: inbox `src/routes/_authenticated/ai-command-center.inbox.tsx` | Proposals to confirm or reject | Fixed, not live: helpdesk writes need ops_lead/admin + explicit confirm; failures stay pending (#26) | Same decision; remove seeded demo rows on live (Vivek) | _to do_ |
 | AI Command Center: run now `src/routes/_authenticated/ai-command-center.run-now.tsx` | Run an agent on demand | Fixed, not live: no demo seeding (#26) | Same decision | _to do_ |
@@ -82,6 +82,7 @@ for publish/migration · **Open** = known gap · **Waits** = blocked on a decisi
   
   Use the pre-change checklist and fingerprint for each.
 - Publish `main` (SCRUM-89 order: migration → cron headers → code). Verify the jobs, Sync Status and AI Command Center confirm flow.
+- After the publish: apply the `agent_identities` migration (register #8; it needs the new code live first).
 - Move tickets from Testing to Done after live verification.
 
 **Week 3 (12 – 18 Oct): real data.**

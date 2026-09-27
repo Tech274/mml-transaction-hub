@@ -55,7 +55,7 @@ Roles: A admin, L leadership, F finance, OL ops_lead, OU ops_user, V viewer, "an
 | account_managers | any role | A/OL | |
 | freshdesk_tickets | any role | none | finding 1 (ticket history scope is SCRUM-91) |
 | ticket_action_log | any role | insert own `actor_id` | append-only |
-| agent_identities | own; A all | own row (insert/update/delete) | finding 2 |
+| agent_identities | own; A all | none after migration 20260928020000 (server writes after its check) | finding 2 (fixed in repo) |
 | ai_cc_* (4 tables) | any role | none (server only) | |
 | bulk_import_runs | own; A/L/OL all | insert/update own | finding 3 |
 | bulk_import_jobs | own; A/OL all | insert own (A/OL/OU) | |
@@ -69,7 +69,7 @@ Roles: A admin, L leadership, F finance, OL ops_lead, OU ops_user, V viewer, "an
 ## Findings that need a decision or another ticket (not changed here)
 
 1. **Finance and ticket data are readable by every role, including viewer.** This covers transactions (costs, selling price), report_snapshots (revenue/cost/profit) and freshdesk_tickets. Narrowing this is the finance visibility matrix: **SCRUM-58, Vivek decision**. Ticket scope: SCRUM-91.
-2. **agent_identities can be written directly.** `setMyAgentIdentity` checks on the server that the agent exists and its email matches (SCRUM-102), but the policy "Users manage their own agent identity" also lets a user upsert any agent id straight through the REST API with their own token. Fix (separate PR, needs a release order): replace the policy with read/delete-own and write through the service role after the check.
+2. **agent_identities can be written directly.** `setMyAgentIdentity` checks on the server that the agent exists and its email matches (SCRUM-102), but the policy "Users manage their own agent identity" also lets a user upsert any agent id straight through the REST API with their own token. **Fixed in the repo (SCRUM-102 follow-up):** the server now writes the row with the service role after its check (`src/lib/agent-identity.ts`), and migration `20260928020000_scrum102_agent_identities_server_writes.sql` (not applied) makes the table read-own for users. Release order: publish the code first, then apply the migration.
 3. **Import evidence can be changed by its uploader.** The uploader can update their own `bulk_import_runs` rows (including `original_csv_path` / `error_artifact_path`) and update or delete their own files in the `bulk-imports` bucket. The SCRUM-98 legal hold only stops the clean-up job. Tightening this belongs to **SCRUM-98 (on hold)**.
 4. **A user can delete their own MCP revocation** (`mcp_revoked_clients`), which re-enables a client they revoked. Probably intended ("undo"), but it should be confirmed in the MCP scope review (**SCRUM-59**).
 5. **`has_role` / `has_any_role` accept any user id.** Any signed-in user can ask whether another user id holds a role (they'd need the id first). Low risk; restricting it needs care because RLS policies and server code call it. Logged for later.

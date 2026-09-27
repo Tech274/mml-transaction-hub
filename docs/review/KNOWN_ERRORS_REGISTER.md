@@ -53,7 +53,7 @@ Add each report here as it comes in:
 | G-22 | .env committed | Low | no | SCRUM-82, SCRUM-60 | #17 | `src/lib/__tests__/no-secrets-in-client.test.ts` | Fixed (public values only; guard test) | Turn on GitHub secret scanning | Repo owner setting |
 | G-23 | Duplicate code, index, unused UI | Low | no | SCRUM-100 | #20 | CI (typecheck, build) | Code done | Drop the duplicate index (`supabase/migrations-pending/`) | **Vivek (destructive)** |
 | G-24 | Business settings hard-coded | Low | no | SCRUM-101 | #13 | `src/lib/__tests__/app-config.test.ts` | Fixed in code | Publish | Publish GO |
-| G-25 | Any user can claim any helpdesk agent | Low | **High** | SCRUM-102 | #4 | `src/lib/__tests__/ticket-access.test.ts` | Server check fixed; direct table upsert still possible (found in #28) | Follow-up: server-only writes to `agent_identities` | Release order |
+| G-25 | Any user can claim any helpdesk agent | Low | **High** | SCRUM-102 | #4 | `src/lib/__tests__/ticket-access.test.ts` | Fixed in code: server check (#4); server-only writes + read-own migration (#34) | Publish, then apply migration `20260928020000` | Approval (release order) |
 | G-26 | Snapshot table grows forever | Low | no | SCRUM-73 | – | – | Not started | Retention job (90 days daily, month-end forever) deletes rows | **Vivek: confirm retention** (destructive) |
 
 ## 3. Likely causes of the known errors (GAP_ANALYSIS, before the owner list)
@@ -74,7 +74,7 @@ Add each report here as it comes in:
 
 | Finding | From | Ticket | Status |
 |---|---|---|---|
-| `agent_identities` can be written directly, bypassing the SCRUM-102 server check | RLS audit #28 | SCRUM-102 | Follow-up PR (server-only writes) |
+| `agent_identities` can be written directly, bypassing the SCRUM-102 server check | RLS audit #28 | SCRUM-102 | Fixed in #34 (migration not applied) |
 | Uploader can edit own import-run paths and delete own import files | RLS audit #28 | SCRUM-98 | On hold |
 | MCP disconnect failed open when the revocation lookup errored | MCP review #29 | SCRUM-59 | Fixed in #29 |
 | Finance and ticket data readable by every role incl. viewer | RLS audit #28 | SCRUM-58 | Waits on the finance matrix (Vivek) |

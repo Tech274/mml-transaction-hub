@@ -226,6 +226,41 @@ describe("grants match policies (SCRUM-57 migration 20260928010000)", () => {
   });
 });
 
+describe("agent identities are written by the server only (SCRUM-102, migration 20260928020000)", () => {
+  const seed = async () => {
+    await db.query(
+      `insert into public.agent_identities (user_id, agent_name, agent_id, auto_matched) values
+         ($1, 'Agent Ops', 11, true), ($2, 'Agent Two', 22, false)
+       on conflict (user_id) do nothing`,
+      [U.opsUser, U.opsUser2],
+    );
+  };
+  it("a user reads only their own identity; admins read all", async () => {
+    await seed();
+    const own = await asActor(db, as(U.opsUser), (q) => q.query<{ agent_name: string }>("select agent_name from public.agent_identities"));
+    expect(own.rows.map((r) => r.agent_name)).toEqual(["Agent Ops"]);
+    const all = await asActor(db, as(U.admin), (q) => q.query("select 1 from public.agent_identities"));
+    expect(all.rows.length).toBeGreaterThanOrEqual(2);
+  });
+  it("a user cannot insert, change or delete an identity directly, even their own", async () => {
+    await seed();
+    expect(await asActor(db, as(U.opsLead), (q) => outcome(q.query(
+      "insert into public.agent_identities (user_id, agent_name, agent_id) values ($1, 'Someone Else', 99)", [U.opsLead])))).toBe("42501");
+    expect(await asActor(db, as(U.opsUser), (q) => outcome(q.query(
+      "update public.agent_identities set agent_name = 'Someone Else', agent_id = 99 where user_id = $1", [U.opsUser])))).toBe("42501");
+    expect(await asActor(db, as(U.opsUser), (q) => outcome(q.query(
+      "delete from public.agent_identities where user_id = $1", [U.opsUser])))).toBe("42501");
+    expect(await asActor(db, as(U.admin), (q) => outcome(q.query(
+      "update public.agent_identities set agent_id = 99 where user_id = $1", [U.opsUser2])))).toBe("42501");
+  });
+  it("the server (service role) can still save an identity after its checks", async () => {
+    const r = await asActor(db, { role: "service_role" }, (q) => outcome(q.query(
+      `insert into public.agent_identities (user_id, agent_name, agent_id, auto_matched) values ($1, 'Agent Lead', 33, false)
+       on conflict (user_id) do update set agent_name = excluded.agent_name, agent_id = excluded.agent_id`, [U.opsLead])));
+    expect(r).toBe("ok");
+  });
+});
+
 describe("existing sandbox SQL checks also pass locally", () => {
   it.each(["supabase/tests/rls/scrum99_profiles_audit.sql", "supabase/tests/rls/scrum103_import_batch.sql"])("%s", async (file) => {
     const { readFileSync } = await import("node:fs");
