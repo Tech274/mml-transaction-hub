@@ -11,7 +11,7 @@ PR #31). All times IST.
   fails on the old code or rules), or, where marked, a sandbox check is still needed. Live data is
   never used to reproduce.
 - **Data-impacting** errors (they can change, lose or expose business data) are marked **High** and
-  come first in the 30-day plan (SCRUM-46).
+  come first in the 30-day plan (`docs/review/CURRENT_STATE_AND_30_DAY_ROADMAP.md`, SCRUM-46).
 - Exploit-level detail is kept out of this file, the same as `GAP_ANALYSIS.md` (repository copy).
 
 ## 1. Owner-reported errors
