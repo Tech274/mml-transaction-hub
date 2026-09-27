@@ -1,7 +1,7 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { withAudit } from "../audit";
-import { makeError } from "../errors";
+import { makeError, toolDbError } from "../errors";
 
 export default defineTool({
   name: "list_transactions",
@@ -36,10 +36,7 @@ export default defineTool({
     if (input.start_date_from) q = q.gte("start_date", input.start_date_from);
     if (input.start_date_to) q = q.lte("start_date", input.start_date_to);
     const { data, error } = await q;
-    if (error) {
-      const isPerm = /permission|denied|rls/i.test(error.message);
-      return makeError(isPerm ? "permission_denied" : "internal", error.message);
-    }
+    if (error) return toolDbError(error, "mcp.list-transactions");
     if (!data || data.length === 0) {
       return makeError("empty_result", "No transactions match your filters.", {
         hint: "Broaden or remove filters, or verify your role can see this data.",

@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getMyAgentKpis } from "@/lib/freshdesk.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { readAllRows } from "@/lib/read-all";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
@@ -26,12 +27,16 @@ function DashboardPage() {
   const { data } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
-      const { data: rows, error } = await supabase
-        .from("transactions")
-        .select("month,year,repository_type,cloud_provider,line_of_business,customer_name,total_users,input_cost,selling_cost,is_deleted")
-        .eq("is_deleted", false);
-      if (error) throw error;
-      return rows ?? [];
+      // SCRUM-70: all rows, not just the first 1,000 (PostgREST default limit).
+      return readAllRows(
+        () =>
+          supabase
+            .from("transactions")
+            .select("month,year,repository_type,cloud_provider,line_of_business,customer_name,total_users,input_cost,selling_cost,is_deleted")
+            .eq("is_deleted", false)
+            .order("id"),
+        "Dashboard transactions",
+      );
     },
   });
 
@@ -315,11 +320,10 @@ function CustomersByAccountManager() {
   const { data } = useQuery({
     queryKey: ["dashboard-customers-by-am"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("customers")
-        .select("id, account_manager_name, is_active, created_at");
-      if (error) throw error;
-      return data ?? [];
+      return readAllRows(
+        () => supabase.from("customers").select("id, account_manager_name, is_active, created_at").order("id"),
+        "Customers by account manager",
+      );
     },
     enabled: allowed,
   });

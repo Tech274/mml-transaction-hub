@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { TICKET_OPS_ROLES, canClaimAgent } from "@/lib/ticket-access";
+import { fetchAllPages, ttlCache } from "@/lib/paging";
+import { AppError, dbError } from "@/lib/app-error";
+import { identityRow, saveAgentIdentity, SAVE_IDENTITY_FAILED } from "@/lib/agent-identity";
+import { hasAnyRole, requireRole, type RoleContext } from "@/lib/require-role";
 
 export interface TicketRow {
   id: number;
@@ -17,7 +22,8 @@ export interface TicketRow {
   tags: string[];
   due_by: string | null;
   is_escalated: boolean;
-  description_text: string | null;
+  /** SCRUM-94: not sent with the list any more; load it with getTicketDescription. */
+  description_text?: string | null;
   ticket_created_at: string | null;
   ticket_updated_at: string | null;
   synced_at: string;
@@ -41,7 +47,20 @@ export interface TicketsOverview {
   by_month: { month: string; value: number }[];
   last_synced_at: string | null;
   connection: { ok: boolean; message: string; domain?: string };
+  /** SCRUM-94: true if there were more than MAX_TICKETS rows (shown as a warning, never silent). */
+  truncated: boolean;
 }
+
+/** Columns the list needs (no description text: that is loaded per ticket). */
+const LIST_COLUMNS =
+  "id, subject, status, priority, type, source, requester_name, requester_email, company_name, agent_name, group_name, tags, due_by, is_escalated, ticket_created_at, ticket_updated_at, synced_at";
+const MAX_TICKETS = 20_000;
+
+/** The Freshdesk connection check is a live API call; cache it for 5 minutes per server instance. */
+const cachedConnection = ttlCache(5 * 60_000, async () => {
+  const { checkFreshdeskConnection } = await import("@/lib/freshdesk.server");
+  return checkFreshdeskConnection();
+});
 
 const OPEN_LIKE = ["Open", "Waiting on Customer", "Waiting on Third Party"];
 
@@ -59,21 +78,23 @@ export const getTicketsOverview = createServerFn({ method: "GET" })
   .handler(async ({ context }): Promise<TicketsOverview> => {
     const sb = context.supabase as unknown as { from: (t: string) => any };
     // PostgREST caps a single response at 1000 rows, so page through.
-    const PAGE = 1000;
-    const all: TicketRow[] = [];
-    for (let from = 0; from < 5000; from += PAGE) {
-      const { data, error } = await sb
-        .from("freshdesk_tickets")
-        .select("*")
-        .order("ticket_created_at", { ascending: false })
-        .range(from, from + PAGE - 1);
-      if (error) throw new Error(error.message);
-      const page = (data ?? []) as TicketRow[];
-      all.push(...page);
-      if (page.length < PAGE) break;
-    }
+    // SCRUM-94 (G-14): no silent 5,000 cap any more (up to MAX_TICKETS, then a visible
+    // warning), stable order (id tie-break) and no description text in the list.
+    const { rows: all, truncated } = await fetchAllPages<TicketRow>(
+      async (from, to) => {
+        const { data, error } = await sb
+          .from("freshdesk_tickets")
+          .select(LIST_COLUMNS)
+          .order("ticket_created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to);
+        if (error) throw dbError(error, "freshdesk.getTicketsOverview");
+        return (data ?? []) as TicketRow[];
+      },
+      1000,
+      MAX_TICKETS,
+    );
     const rows = all.map((r) => ({ ...r, tags: r.tags ?? [] }));
-
 
     const now = Date.now();
     const counts = {
@@ -98,8 +119,7 @@ export const getTicketsOverview = createServerFn({ method: "GET" })
       monthMap.set(key, (monthMap.get(key) ?? 0) + 1);
     }
 
-    const { checkFreshdeskConnection } = await import("@/lib/freshdesk.server");
-    const connection = await checkFreshdeskConnection();
+    const connection = await cachedConnection();
 
     return {
       tickets: rows,
@@ -118,23 +138,42 @@ export const getTicketsOverview = createServerFn({ method: "GET" })
         null,
       ),
       connection,
+      truncated,
     };
+  });
+
+/** SCRUM-94: description text for one ticket (same table and access rules as the list). */
+export const getTicketDescription = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { ticketId: number }) => z.object({ ticketId: z.number().int().positive() }).parse(d))
+  .handler(async ({ data, context }): Promise<{ description_text: string | null }> => {
+    const sb = context.supabase as unknown as { from: (t: string) => any };
+    const { data: row, error } = await sb
+      .from("freshdesk_tickets")
+      .select("description_text")
+      .eq("id", data.ticketId)
+      .maybeSingle();
+    if (error) throw dbError(error, "freshdesk.getTicketDescription");
+    return { description_text: (row?.description_text as string | null | undefined) ?? null };
   });
 
 /** Manual sync — admins and ops leads. */
 export const syncFreshdeskNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d?: { maxPages?: number }) =>
-    z.object({ maxPages: z.number().int().min(1).max(300).optional() }).parse(d ?? {}),
+  .inputValidator((d?: { maxPages?: number; full?: boolean }) =>
+    z.object({ maxPages: z.number().int().min(1).max(300).optional(), full: z.boolean().optional() }).parse(d ?? {}),
   )
   .handler(async ({ data, context }) => {
-    const { data: allowed } = await context.supabase.rpc("has_any_role", {
-      _user_id: context.userId,
-      _roles: ["admin", "ops_lead"],
-    } as never);
-    if (!allowed) throw new Error("Only admins and ops leads can sync Freshdesk tickets");
+    await requireRole(context, ["admin", "ops_lead"], "Only admins and ops leads can sync Freshdesk tickets");
     const { runFreshdeskSync } = await import("@/lib/freshdesk.server");
-    return runFreshdeskSync(data.maxPages ? { maxPages: data.maxPages } : undefined);
+    return runFreshdeskSync({
+      ...(data.maxPages ? { maxPages: data.maxPages } : {}),
+      // SCRUM-92: manual runs are incremental unless a full pass is asked for.
+      full: data.full === true,
+      trigger_source: "manual",
+      triggered_by: context.userId,
+      triggered_by_email: (context.claims as { email?: string } | null)?.email ?? null,
+    });
 
   });
 
@@ -166,18 +205,27 @@ export interface TicketActionEntry {
   created_at: string;
 }
 
+const isTicketOps = (context: RoleContext) => hasAnyRole(context, TICKET_OPS_ROLES);
+const isAdmin = (context: RoleContext) => hasAnyRole(context, ["admin"]);
+
 async function assertTicketActor(context: { supabase: any; userId: string }) {
-  const { data: allowed } = await context.supabase.rpc("has_any_role", {
-    _user_id: context.userId,
-    _roles: ["admin", "ops_lead", "ops_user"],
-  } as never);
-  if (!allowed) throw new Error("You do not have permission to update support tickets");
+  if (!(await isTicketOps(context))) throw new Error("You do not have permission to update support tickets");
 }
 
 /** Helpdesk agents plus the caller's saved (or auto-matched) identity. */
 export const getAgentDirectory = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ agents: AgentOption[]; identity: AgentIdentity | null }> => {
+    const sbUser = context.supabase as unknown as { from: (t: string) => any };
+    // SCRUM-91 (G-06): the Freshdesk agent directory (names + emails) is for ops roles only.
+    if (!(await isTicketOps(context as never))) {
+      const { data: savedOnly } = await sbUser
+        .from("agent_identities")
+        .select("agent_name, agent_id, auto_matched")
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      return { agents: [], identity: (savedOnly as AgentIdentity | null) ?? null };
+    }
     const { listFreshdeskAgents } = await import("@/lib/freshdesk.server");
     let agents: AgentOption[] = [];
     try {
@@ -200,27 +248,54 @@ export const getAgentDirectory = createServerFn({ method: "GET" })
     const match = email ? agents.find((a) => a.email?.toLowerCase() === email) : undefined;
     if (!match) return { agents, identity: null };
 
-    await sb
-      .from("agent_identities")
-      .upsert({ user_id: context.userId, agent_name: match.name, agent_id: match.id, auto_matched: true });
+    // SCRUM-102: written by the server (service role) after the email match; a failure is logged,
+    // not hidden, and the match is still shown for this visit.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await saveAgentIdentity(
+      supabaseAdmin as never,
+      identityRow(context.userId, match, true),
+      "freshdesk.getAgentDirectory:auto_match",
+    );
     return { agents, identity: { agent_name: match.name, agent_id: match.id, auto_matched: true } };
   });
 
-/** Manually choose which helpdesk agent the signed-in user is. */
+/**
+ * Manually choose which helpdesk agent the signed-in user is.
+ * SCRUM-102 (G-25): the agent must exist in Freshdesk and its email must match
+ * the caller's sign-in email (admins may choose any existing agent). The stored
+ * name always comes from Freshdesk, never from the caller.
+ */
 export const setMyAgentIdentity = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { agentName: string; agentId?: number | null }) =>
     z.object({ agentName: z.string().min(1), agentId: z.number().int().nullable().optional() }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const sb = context.supabase as unknown as { from: (t: string) => any };
-    const { error } = await sb.from("agent_identities").upsert({
-      user_id: context.userId,
-      agent_name: data.agentName,
-      agent_id: data.agentId ?? null,
-      auto_matched: false,
-    });
-    if (error) throw new Error(error.message);
+    if (!(await isTicketOps(context as never))) {
+      throw new Error("Only ops roles can link a helpdesk agent identity");
+    }
+    if (data.agentId == null) throw new Error("Pick an agent from the Freshdesk list");
+
+    const { listFreshdeskAgents } = await import("@/lib/freshdesk.server");
+    let agents: AgentOption[];
+    try {
+      agents = (await listFreshdeskAgents()).map((a) => ({ id: a.id, name: a.name, email: a.email }));
+    } catch {
+      throw new Error("The Freshdesk agent list is unavailable right now. Please try again later.");
+    }
+    const agent = agents.find((a) => a.id === data.agentId);
+    const callerEmail = (context.claims as { email?: string } | undefined)?.email ?? null;
+    const verdict = canClaimAgent({ callerEmail, isAdmin: await isAdmin(context as never), agent });
+    if (!verdict.ok) throw new Error(verdict.reason);
+
+    // SCRUM-102: users can't write agent_identities directly; the server writes it after the check.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const saved = await saveAgentIdentity(
+      supabaseAdmin as never,
+      identityRow(context.userId, agent!, false),
+      "freshdesk.setMyAgentIdentity",
+    );
+    if (!saved.ok) throw new AppError(`${SAVE_IDENTITY_FAILED} (ref ${saved.ref})`);
     return { ok: true };
   });
 
@@ -230,12 +305,33 @@ export const getTicketHistory = createServerFn({ method: "GET" })
   .inputValidator((d: { ticketId: number }) => z.object({ ticketId: z.number().int().positive() }).parse(d))
   .handler(async ({ data, context }) => {
     const sb = context.supabase as unknown as { from: (t: string) => any };
+
+    // SCRUM-91 (G-06): only tickets that were synced into this app (the Cloud Labs
+    // group) can be looked up. The check uses the caller's own client, so the
+    // tickets RLS policy applies too.
+    const { data: known, error: knownErr } = await sb
+      .from("freshdesk_tickets")
+      .select("id")
+      .eq("id", data.ticketId)
+      .maybeSingle();
+    if (knownErr) throw new Error("Could not load this ticket. Please try again.");
+    if (!known) throw new Error(`Ticket #${data.ticketId} is not in this app`);
+
     const { data: actions, error } = await sb
       .from("ticket_action_log")
       .select("*")
       .eq("ticket_id", data.ticketId)
       .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    if (error) throw new Error("Could not load the ticket history. Please try again.");
+
+    // Freshdesk conversation text (customer emails, internal notes) is for ops roles only.
+    if (!(await isTicketOps(context as never))) {
+      return {
+        actions: (actions ?? []) as TicketActionEntry[],
+        conversations: [] as Awaited<ReturnType<typeof import("@/lib/freshdesk.server").fetchTicketConversations>>,
+        conversations_error: "Conversation history is available to ops roles only." as string | null,
+      };
+    }
 
     const { fetchTicketConversations } = await import("@/lib/freshdesk.server");
     let conversations: Awaited<ReturnType<typeof fetchTicketConversations>> = [];
@@ -278,7 +374,7 @@ export const resolveTicket = createServerFn({ method: "POST" })
       .select("id, status, agent_name")
       .eq("id", data.ticketId)
       .maybeSingle();
-    if (beforeErr) throw new Error(beforeErr.message);
+    if (beforeErr) throw dbError(beforeErr, "freshdesk.resolveTicket");
     if (!before) throw new Error(`Ticket #${data.ticketId} is not in this app yet`);
 
     const { STATUS_IDS, updateFreshdeskTicket, addFreshdeskNote } = await import("@/lib/freshdesk.server");
@@ -326,7 +422,7 @@ export const resolveTicket = createServerFn({ method: "POST" })
     }
     if (entries.length > 0) {
       const { error: logErr } = await sb.from("ticket_action_log").insert(entries);
-      if (logErr) throw new Error(logErr.message);
+      if (logErr) throw dbError(logErr, "freshdesk.resolveTicket");
     }
 
     return { ok: true, status: result.status, agent_name: result.agent_name };
@@ -378,7 +474,7 @@ export const getMyAgentKpis = createServerFn({ method: "GET" })
         .eq("agent_name", agentName)
         .order("ticket_created_at", { ascending: false })
         .range(from, from + PAGE - 1);
-      if (error) throw new Error(error.message);
+      if (error) throw dbError(error, "freshdesk.getMyAgentKpis");
       const page = (data ?? []) as TicketRow[];
       rows.push(...page);
       if (page.length < PAGE) break;

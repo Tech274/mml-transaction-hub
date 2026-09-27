@@ -1,6 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { requireRouteRoles } from "@/lib/route-guard";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -42,12 +43,7 @@ import {
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
-  beforeLoad: async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw redirect({ to: "/auth", search: { next: "" } });
-    const { data: isAdmin } = await supabase.rpc("has_role", { _user_id: user.id, _role: "admin" });
-    if (!isAdmin) throw redirect({ to: "/dashboard" });
-  },
+  beforeLoad: requireRouteRoles("/admin"),
   component: AdminPage,
 });
 

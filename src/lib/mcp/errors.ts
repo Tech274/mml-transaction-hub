@@ -1,4 +1,5 @@
 // Structured MCP error codes shared by tools and clients.
+import { friendlyMessage, logError } from "../app-error";
 export type McpErrorCode =
   | "unauthenticated"
   | "permission_denied"
@@ -45,4 +46,17 @@ export function makeError(
     content: [{ type: "text", text: human }],
     structuredContent: { error: err },
   };
+}
+
+/**
+ * SCRUM-59 / SCRUM-96: turn a database error inside a tool into a structured MCP error without
+ * sending raw database text (table, column, constraint names) to the AI client. The full error
+ * is logged on the server with a ref.
+ */
+export function toolDbError(err: unknown, where: string) {
+  const ref = logError(err, where);
+  const msg = typeof (err as { message?: unknown })?.message === "string" ? (err as { message: string }).message : String(err);
+  const code = (err as { code?: unknown })?.code;
+  const isPerm = code === "42501" || /permission|denied|row-level security|rls/i.test(msg);
+  return makeError(isPerm ? "permission_denied" : "internal", `${friendlyMessage(err)} (ref ${ref})`);
 }

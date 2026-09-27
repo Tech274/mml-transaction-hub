@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { FRESHDESK_HEALTH, countOrNull, summarizeSyncHealth, type SyncHealth } from "@/lib/sync-health";
+import { formatDailyTimeUtc, nextDailyRunAt, snapshotCronFromEnv } from "@/lib/app-config";
+import { dbError, logError } from "@/lib/app-error";
+import { requireRole } from "@/lib/require-role";
 
 export interface SyncRunRow {
   id: string;
@@ -15,6 +19,9 @@ export interface SyncRunRow {
   started_at: string;
   finished_at: string | null;
   duration_ms: number | null;
+  /** Freshdesk runs only (SCRUM-74 migration); absent until it is applied. */
+  fetched_count?: number | null;
+  upserted_count?: number | null;
 }
 
 export interface SnapshotRow {
@@ -36,42 +43,56 @@ export interface SnapshotRow {
 export interface SyncOverview {
   runs: SyncRunRow[];
   last_success: SyncRunRow | null;
-  live_counts: { customers: number; transactions: number };
-  snapshot_rows: number;
+  /** null when the count could not be read (logged with a ref; SCRUM-96). Never a silent 0. */
+  live_counts: { customers: number | null; transactions: number | null };
+  snapshot_rows: number | null;
+  /** Refs for counts that failed to load, so the page can say so. */
+  count_error_refs: string[];
   next_cron_at: string;
+  /** e.g. "02:00 UTC" */
+  snapshot_schedule_utc: string;
+  /** SCRUM-74: hourly Freshdesk sync, recorded in sync_runs with kind = 'freshdesk'. */
+  freshdesk: { runs: SyncRunRow[]; health: SyncHealth };
 }
 
-/** Daily schedule: 02:00 UTC. */
-function nextCronAt(): string {
-  const now = new Date();
-  const next = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 2, 0, 0),
-  );
-  if (next.getTime() <= now.getTime()) next.setUTCDate(next.getUTCDate() + 1);
-  return next.toISOString();
+/** SCRUM-101: daily schedule (display only) from SNAPSHOT_CRON_UTC, default 02:00 UTC. */
+function snapshotSchedule() {
+  const t = snapshotCronFromEnv(process.env);
+  return { next: nextDailyRunAt(new Date(), t), label: formatDailyTimeUtc(t) };
 }
 
 export const getSyncOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<SyncOverview> => {
     const sb = context.supabase as unknown as { from: (t: string) => any };
-    const [{ data: runs, error: runsErr }, customers, transactions, snaps] = await Promise.all([
-      sb.from("sync_runs").select("*").order("started_at", { ascending: false }).limit(50),
+    const [{ data: runs, error: runsErr }, { data: fdRuns, error: fdErr }, customers, transactions, snaps] = await Promise.all([
+      sb.from("sync_runs").select("*").eq("kind", "snapshot").order("started_at", { ascending: false }).limit(50),
+      sb.from("sync_runs").select("*").eq("kind", "freshdesk").order("started_at", { ascending: false }).limit(48),
       sb.from("customers").select("id", { count: "exact", head: true }),
       sb.from("transactions").select("id", { count: "exact", head: true }).eq("is_deleted", false),
       sb.from("report_snapshots").select("id", { count: "exact", head: true }),
     ]);
-    if (runsErr) throw new Error(runsErr.message);
+    if (runsErr) throw dbError(runsErr, "sync.getSyncOverview");
+    if (fdErr) throw dbError(fdErr, "sync.getSyncOverview");
+    // SCRUM-96: a failed count used to show as 0. Show "unavailable" with a ref instead.
+    const countErrorRefs: string[] = [];
+    const countOf = (res: { count: number | null; error: unknown }, what: string) =>
+      countOrNull(res, (err) => countErrorRefs.push(logError(err, `sync.getSyncOverview:count_${what}`)));
+    const schedule = snapshotSchedule();
     const list = (runs ?? []) as SyncRunRow[];
+    const fdList = (fdRuns ?? []) as SyncRunRow[];
     return {
       runs: list,
       last_success: list.find((r) => r.status === "success") ?? null,
       live_counts: {
-        customers: Number(customers.count ?? 0),
-        transactions: Number(transactions.count ?? 0),
+        customers: countOf(customers, "customers"),
+        transactions: countOf(transactions, "transactions"),
       },
-      snapshot_rows: Number(snaps.count ?? 0),
-      next_cron_at: nextCronAt(),
+      snapshot_rows: countOf(snaps, "report_snapshots"),
+      count_error_refs: countErrorRefs,
+      next_cron_at: schedule.next,
+      snapshot_schedule_utc: schedule.label,
+      freshdesk: { runs: fdList, health: summarizeSyncHealth(fdList, new Date(), FRESHDESK_HEALTH) },
     };
   });
 
@@ -79,11 +100,7 @@ export const getSyncOverview = createServerFn({ method: "GET" })
 export const triggerSyncNow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    } as never);
-    if (!isAdmin) throw new Error("Only admins can trigger a snapshot run");
+    await requireRole(context, ["admin"], "Only admins can trigger a snapshot run");
     const { runSnapshotSync } = await import("@/lib/sync.server");
     return runSnapshotSync({
       trigger_source: "manual",
@@ -107,6 +124,6 @@ export const listSnapshotRows = createServerFn({ method: "GET" })
       .order("year", { ascending: false })
       .order("month", { ascending: false })
       .limit(data.limit ?? 200);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "sync.listSnapshotRows");
     return (rows ?? []) as SnapshotRow[];
   });

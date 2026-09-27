@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_authenticated/ai-command-center/run-now"
 const HINT_PLACEHOLDER: Record<AgentKey, string> = {
   generalist: "e.g. Kogito BPMN Automation Lab for Cognizant, 45 learners",
   support: "Optional: ticket number or words from the subject",
-  cost_adr: "Optional: lab name for the demo CONFIRMED request",
+  cost_adr: "Not used: the agent reads the latest CONFIRMED lab request",
 };
 
 function RunNowPage() {
@@ -107,7 +107,7 @@ function RunNowPage() {
           <CardHeader>
             <CardTitle className="text-base">Lab requests</CardTitle>
             <CardDescription>
-              The Cost / ADR agent triggers on requests with status CONFIRMED. If none exist, the first run seeds a demo one.
+              The Cost / ADR agent triggers on requests with status CONFIRMED. If none exist, it stops and creates nothing.
             </CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
@@ -132,7 +132,7 @@ function RunNowPage() {
                 {labs.data?.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
-                      No lab requests yet — run the Cost / ADR agent to seed a demo one.
+                      No lab requests yet. The Cost / ADR agent has nothing to work on until a request is CONFIRMED.
                     </TableCell>
                   </TableRow>
                 )}

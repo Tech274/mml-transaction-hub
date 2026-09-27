@@ -11,10 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth-context";
+import { requireRouteRoles } from "@/lib/route-guard";
 import { listAllMcpAudit, type McpAuditRow } from "@/lib/mcp-audit.functions";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/mcp-audit")({
+  beforeLoad: requireRouteRoles("/mcp-audit"),
   component: McpAuditPage,
 });
 

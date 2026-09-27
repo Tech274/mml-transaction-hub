@@ -1,27 +1,30 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-// Scheduled Freshdesk ticket sync. Called by the scheduler with the `apikey` header.
+// Scheduled Freshdesk ticket sync. Called by pg_cron.
+// Auth (SCRUM-89 / G-03): the `x-cron-secret` header must match the Vault
+// secret `cron_secret`. The public `apikey` header is no longer accepted.
+// The request body is ignored: callers can no longer choose `maxPages`.
+// SCRUM-72: replies 202 at once; the sync runs in the background within
+// HOOK_TIMEOUT_SECONDS (default 25). The outcome is recorded in sync_runs.
 export const Route = createFileRoute("/api/public/hooks/freshdesk-sync")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const apikey = request.headers.get("apikey") ?? request.headers.get("Apikey");
-        if (!apikey || apikey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
-          return new Response("Unauthorized", { status: 401 });
-        }
-        let maxPages: number | undefined;
-        try {
-          const body = (await request.json()) as { maxPages?: number };
-          if (typeof body?.maxPages === "number") maxPages = body.maxPages;
-        } catch {
-          /* empty body is fine */
-        }
-        const { runFreshdeskSync } = await import("@/lib/freshdesk.server");
-        const result = await runFreshdeskSync(maxPages ? { maxPages } : undefined);
+        const { isAuthorizedCronRequest, unauthorizedResponse } = await import(
+          "@/lib/cron-auth.server"
+        );
+        if (!(await isAuthorizedCronRequest(request))) return unauthorizedResponse();
 
-        return new Response(JSON.stringify(result), {
-          status: result.status === "success" ? 200 : 500,
-          headers: { "Content-Type": "application/json" },
+        const { respondThenRun, hookTimeoutMsFromEnv } = await import("@/lib/background-hook");
+        return respondThenRun(request, {
+          name: "freshdesk-sync",
+          timeoutMs: hookTimeoutMsFromEnv(process.env),
+          run: async (deadline) => {
+            const { runFreshdeskSync } = await import("@/lib/freshdesk.server");
+            // SCRUM-74: recorded in sync_runs (kind = 'freshdesk', trigger_source = 'cron').
+            const result = await runFreshdeskSync({ trigger_source: "cron", deadline });
+            return { ok: result.status === "success", body: result };
+          },
         });
       },
     },

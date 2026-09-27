@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { dbError } from "@/lib/app-error";
+import { requireRole } from "@/lib/require-role";
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
 
@@ -53,7 +55,7 @@ export const listMyMcpAudit = createServerFn({ method: "GET" })
     if (typeof filter.success === "boolean") q = q.eq("success", filter.success);
     if (filter.client_id) q = q.eq("client_id", filter.client_id);
     const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "mcp-audit.listMyMcpAudit");
     return (rows ?? []) as unknown as McpAuditRow[];
   });
 
@@ -62,6 +64,8 @@ export const listAllMcpAudit = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: unknown) => filterSchema.parse(data ?? {}) ?? {})
   .handler(async ({ data, context }): Promise<McpAuditRow[]> => {
+    // SCRUM-61 (G-21): explicit server-side check (RLS also limits rows).
+    await requireRole(context, ["admin"], "Forbidden: admin role required");
     const filter = data ?? {};
     let q = context.supabase
       .from("mcp_tool_audit_log")
@@ -72,7 +76,7 @@ export const listAllMcpAudit = createServerFn({ method: "GET" })
     if (typeof filter.success === "boolean") q = q.eq("success", filter.success);
     if (filter.client_id) q = q.eq("client_id", filter.client_id);
     const { data: rows, error } = await q;
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "mcp-audit.listAllMcpAudit");
     return (rows ?? []) as unknown as McpAuditRow[];
   });
 
@@ -84,12 +88,14 @@ export const listMyMcpClients = createServerFn({ method: "GET" })
       .from("mcp_tool_audit_log")
       .select("client_id, created_at, success")
       .eq("user_id", context.userId);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "mcp-audit.listMyMcpClients");
 
-    const { data: revoked } = await context.supabase
+    // SCRUM-59: a failed lookup used to show every client as "connected".
+    const { data: revoked, error: revokedErr } = await context.supabase
       .from("mcp_revoked_clients")
       .select("client_id, revoked_at")
       .eq("user_id", context.userId);
+    if (revokedErr) throw dbError(revokedErr, "mcp-audit.listMyMcpClients");
     const revokedMap = new Map<string, string>();
     for (const r of revoked ?? []) revokedMap.set((r as { client_id: string }).client_id, (r as { revoked_at: string }).revoked_at);
 
@@ -139,7 +145,7 @@ export const revokeMcpClient = createServerFn({ method: "POST" })
     const { error } = await context.supabase
       .from("mcp_revoked_clients")
       .insert({ user_id: context.userId, client_id: data.client_id } as never);
-    if (error && !/duplicate key/i.test(error.message)) throw new Error(error.message);
+    if (error && !/duplicate key/i.test(error.message)) throw dbError(error, "mcp-audit.revokeMcpClient");
     return { ok: true };
   });
 
@@ -152,6 +158,6 @@ export const unrevokeMcpClient = createServerFn({ method: "POST" })
       .delete()
       .eq("user_id", context.userId)
       .eq("client_id", data.client_id);
-    if (error) throw new Error(error.message);
+    if (error) throw dbError(error, "mcp-audit.unrevokeMcpClient");
     return { ok: true };
   });

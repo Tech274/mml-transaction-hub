@@ -1,7 +1,7 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { withAudit } from "../audit";
-import { makeError } from "../errors";
+import { makeError, toolDbError } from "../errors";
 
 export default defineTool({
   name: "reports_summary",
@@ -17,20 +17,26 @@ export default defineTool({
   handler: withAudit("reports_summary", async ({ year, cloud_provider, line_of_business }, ctx) => {
     const { supabaseForUser } = await import("../supabase-for-user");
     const supabase = supabaseForUser(ctx);
-    let q = supabase
-      .from("transactions")
-      .select("selling_cost, input_cost, total_users, start_date, cloud_provider, line_of_business")
-      .eq("is_deleted", false)
-      .gte("start_date", `${year}-01-01`)
-      .lte("start_date", `${year}-12-31`);
-    if (cloud_provider) q = q.eq("cloud_provider", cloud_provider);
-    if (line_of_business) q = q.eq("line_of_business", line_of_business);
-    const { data, error } = await q;
-    if (error) {
-      const isPerm = /permission|denied|rls/i.test(error.message);
-      return makeError(isPerm ? "permission_denied" : "internal", error.message);
+    const build = () => {
+      let q = supabase
+        .from("transactions")
+        .select("selling_cost, input_cost, total_users, start_date, cloud_provider, line_of_business")
+        .eq("is_deleted", false)
+        .gte("start_date", `${year}-01-01`)
+        .lte("start_date", `${year}-12-31`);
+      if (cloud_provider) q = q.eq("cloud_provider", cloud_provider);
+      if (line_of_business) q = q.eq("line_of_business", line_of_business);
+      return q.order("id");
+    };
+    type Row = { selling_cost: number | null; input_cost: number | null; total_users: number | null };
+    let rows: Row[];
+    try {
+      // SCRUM-70: all matching rows, not just the first 1,000.
+      const { readAllRows } = await import("../../read-all");
+      rows = await readAllRows<Row>(build, "reports_summary");
+    } catch (e) {
+      return toolDbError(e, "mcp.reports_summary");
     }
-    const rows = data ?? [];
     if (rows.length === 0) {
       return makeError("empty_result", `No transactions found for ${year}.`, {
         hint: "Try a different year or clear filters.",

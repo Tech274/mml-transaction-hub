@@ -48,6 +48,7 @@ import {
   TEMPLATE_VERSION_COMMENT_PREFIX,
   enrichPgConstraintError,
 } from "@/lib/bulk-template";
+import { logIfError } from "@/lib/app-error";
 
 const PUBLIC_SAMPLE: string[][] = [
   ["POT-2026-001", "1", "2026", "Acme Corp", "AWS Lab A", "VILT", "2026-01-01", "2026-01-31", "10", "1000.00", "1500.00", "AWS"],
@@ -219,6 +220,21 @@ function suggestCorrection(field: string, raw: string, kind: CloudKind): string 
   return "";
 }
 
+// SCRUM-96 slice 2: the importer's bookkeeping writes (audit rows, run status) used
+// to be fire-and-forget, so failures were invisible. Each one is now checked; a
+// failure is logged with a ref and the user is told once at the end of the run.
+function noteWrite(failures: string[], res: { error: unknown } | null | undefined, where: string) {
+  const ref = logIfError(res, `bulk-import:${where}`);
+  if (ref) failures.push(`${where} (ref ${ref})`);
+}
+
+function warnWriteFailures(failures: string[]) {
+  if (failures.length === 0) return;
+  toast.warning(
+    `${failures.length} audit/status record(s) could not be saved: ${failures.slice(0, 3).join("; ")}${failures.length > 3 ? " …" : ""}. The import itself is shown above; tell engineering the ref.`,
+  );
+}
+
 export function BulkImport() {
   const [kind, setKind] = useState<CloudKind>("public_cloud");
   const [rows, setRows] = useState<ParsedRow[]>([]);
@@ -296,20 +312,27 @@ export function BulkImport() {
   async function abandonPendingImports() {
     if (!user || !pendingRuns.length) return;
     if (!confirm(`Mark ${pendingRuns.length} pending import(s) as cancelled? No data is changed.`)) return;
+    const writeFailures: string[] = [];
+    let cancelled = 0;
     for (const r of pendingRuns) {
-      await supabase
+      const res = await supabase
         .from("bulk_import_runs")
         .update({ status: "cancelled", completed_at: new Date().toISOString() })
         .eq("id", r.id);
-      void supabase.from("bulk_import_audit_events").insert({
+      noteWrite(writeFailures, res, "run_cancel");
+      if (res.error) continue; // do not log a cancel event for a run that was not cancelled
+      cancelled++;
+      noteWrite(writeFailures, await supabase.from("bulk_import_audit_events").insert({
         run_id: r.id,
         event_type: "run_cancelled",
         actor_id: user.id,
         actor_email: user.email ?? null,
         details: { filename: r.filename, reason: "abandoned by user from bulk import tab" },
-      } as never);
+      } as never), "audit:run_cancelled");
     }
-    toast.success(`Cancelled ${pendingRuns.length} pending import(s)`);
+    if (cancelled > 0) toast.success(`Cancelled ${cancelled} pending import(s)`);
+    if (cancelled < pendingRuns.length) toast.error(`${pendingRuns.length - cancelled} pending import(s) could not be cancelled. Try again.`);
+    warnWriteFailures(writeFailures);
     qc.invalidateQueries({ queryKey: ["bulk_import_runs"] });
   }
 
@@ -564,7 +587,12 @@ export function BulkImport() {
         actor_id: user.id,
         actor_email: user.email ?? null,
         details: { kind, filename: fileName, invalid_rows: invalid.length, fixed_after_apply: fixed, fields_applied: applied },
-      } as never);
+      } as never).then((res) => {
+        // SCRUM-96: not fire-and-forget any more; this handler is synchronous, so check in .then.
+        const failures: string[] = [];
+        noteWrite(failures, res, "audit:apply_suggestions");
+        warnWriteFailures(failures);
+      });
     }
     toast.success(`Applied suggestions · ${fixed}/${next.length} now valid. Click "Import valid rows" to retry.`);
   }
@@ -662,9 +690,10 @@ export function BulkImport() {
       return;
     }
     const runId = run.id;
+    const writeFailures: string[] = [];
 
     // Audit: every import is recorded, not only retries.
-    void supabase.from("bulk_import_audit_events").insert({
+    noteWrite(writeFailures, await supabase.from("bulk_import_audit_events").insert({
       run_id: runId,
       parent_run_id: isRetryRun ? parentRunId : null,
       event_type: "import_started",
@@ -674,18 +703,18 @@ export function BulkImport() {
         kind, filename: fileName, strategy: dupStrategy,
         valid: valid.length, invalid: rows.length - valid.length,
       },
-    } as never);
+    } as never), "audit:import_started");
 
     // Audit: record that a retry run started.
     if (isRetryRun) {
-      void supabase.from("bulk_import_audit_events").insert({
+      noteWrite(writeFailures, await supabase.from("bulk_import_audit_events").insert({
         run_id: runId,
         parent_run_id: parentRunId,
         event_type: "retry_started",
         actor_id: user.id,
         actor_email: user.email ?? null,
         details: { kind, filename: fileName, valid_rows: valid.length, invalid_rows: rows.length - valid.length },
-      } as never);
+      } as never), "audit:retry_started");
     }
 
     // Idempotency for retries: skip lines that already succeeded in the
@@ -694,11 +723,21 @@ export function BulkImport() {
     // (parent_run_id, line_number) instead of potential_id.
     const alreadyDoneLines = new Set<number>();
     if (isRetryRun && parentRunId) {
-      const { data: prior } = await supabase
+      const { data: prior, error: priorErr } = await supabase
         .from("bulk_import_row_audit")
         .select("line_number,status")
         .eq("run_id", parentRunId)
         .in("status", ["imported", "updated", "linked"]);
+      if (priorErr) {
+        // SCRUM-96: without this list a retry would re-import lines that already
+        // succeeded (duplicates). Stop instead of guessing.
+        const ref = logIfError({ error: priorErr }, "bulk-import:retry_lookup");
+        noteWrite(writeFailures, await supabase.from("bulk_import_runs").update({ status: "failed", completed_at: new Date().toISOString() }).eq("id", runId), "run_update");
+        setSubmitting(false);
+        toast.error(`Retry stopped: could not read which lines already succeeded, so nothing was imported (ref ${ref}). Try again.`);
+        warnWriteFailures(writeFailures);
+        return;
+      }
       for (const p of (prior ?? []) as Array<{ line_number: number }>) alreadyDoneLines.add(p.line_number);
     }
 
@@ -708,21 +747,22 @@ export function BulkImport() {
       const up = await supabase.storage
         .from("bulk-imports")
         .upload(path, new Blob([rawCsvText], { type: "text/csv" }), { upsert: true, contentType: "text/csv" });
+      noteWrite(writeFailures, up, "storage_upload:original_csv");
       if (!up.error) {
-        await supabase.from("bulk_import_runs").update({ original_csv_path: path } as never).eq("id", runId);
+        noteWrite(writeFailures, await supabase.from("bulk_import_runs").update({ original_csv_path: path } as never).eq("id", runId), "run_update");
       }
     }
 
     // Log invalid rows up-front
     const invalidRows = rows.filter((r) => r.errors.length > 0);
     if (invalidRows.length) {
-      await supabase.from("bulk_import_row_audit").insert(
+      noteWrite(writeFailures, await supabase.from("bulk_import_row_audit").insert(
         invalidRows.map((r) => ({
           run_id: runId, user_id: user.id, filename: fileName,
           line_number: r.line, potential_id: r.raw.potential_id || null,
           status: "error", error_message: r.errors.join("; "), row_data: r.raw,
         })),
-      );
+      ), "row_audit");
     }
 
     try {
@@ -741,13 +781,13 @@ export function BulkImport() {
         if (alreadyDoneLines.has(r.line)) {
           rowStatus = "skipped"; skipped++;
           updated[idx] = { ...r, errors: [`skipped: line ${r.line} already imported in parent run`] };
-          await supabase.from("bulk_import_row_audit").insert({
+          noteWrite(writeFailures, await supabase.from("bulk_import_row_audit").insert({
             run_id: runId, user_id: user.id, filename: fileName,
             line_number: r.line, potential_id: String(p.potential_id),
             transaction_id: null, status: rowStatus,
             error_message: "idempotent: already processed in parent run",
             row_data: r.raw,
-          });
+          }), "row_audit");
           setProgress((prev) => ({
             done: i + 1, total: valid.length,
             succeeded: (prev?.succeeded ?? 0) + 1,
@@ -781,7 +821,7 @@ export function BulkImport() {
           // Duplicate match is the NATURAL KEY (potential_id + month + year +
           // lab_name), never potential_id alone — one Potential ID can hold
           // several ADR lines, and those extra lines must insert as new ADRs.
-          const { data: match } = await supabase
+          const { data: match, error: matchErr } = await supabase
             .from("transactions")
             .select("id")
             .eq("potential_id", String(fullPayload.potential_id))
@@ -791,6 +831,12 @@ export function BulkImport() {
             .eq("is_deleted", false)
             .limit(1)
             .maybeSingle();
+          if (matchErr) {
+            // SCRUM-96: a failed lookup used to look like "no match" and the row was
+            // inserted again (possible duplicate ADR). Mark the row failed instead.
+            const ref = logIfError({ error: matchErr }, "bulk-import:match_lookup");
+            throw new Error(`Could not check for an existing ADR, so this row was not imported (ref ${ref}). Retry the import.`);
+          }
 
           if (match?.id) {
             matchedIds.add(match.id);
@@ -832,11 +878,11 @@ export function BulkImport() {
           rowStatus = "error"; rowError = (err as Error).message;
           updated[idx] = { ...r, errors: [rowError] };
         }
-        await supabase.from("bulk_import_row_audit").insert({
+        noteWrite(writeFailures, await supabase.from("bulk_import_row_audit").insert({
           run_id: runId, user_id: user.id, filename: fileName,
           line_number: r.line, potential_id: String(p.potential_id),
           transaction_id: txId, status: rowStatus, error_message: rowError, row_data: r.raw,
-        });
+        }), "row_audit");
         setProgress((prev) => ({
           done: i + 1,
           total: valid.length,
@@ -845,10 +891,10 @@ export function BulkImport() {
           isRetry: prev?.isRetry ?? isRetryRun,
         }));
       }
-      await supabase.from("bulk_import_runs").update({
+      noteWrite(writeFailures, await supabase.from("bulk_import_runs").update({
         imported_rows: imported, skipped_rows: skipped, updated_rows: updatedCount, linked_rows: linked,
         status: "completed", completed_at: new Date().toISOString(),
-      }).eq("id", runId);
+      }).eq("id", runId), "run_update");
       // Upload structured error artifact (JSON) for fast post-mortem.
       const failedRows = updated.filter((r) => r.errors.length > 0);
       if (failedRows.length) {
@@ -870,12 +916,13 @@ export function BulkImport() {
           .from("bulk-imports")
           .upload(path, new Blob([JSON.stringify(artifact, null, 2)], { type: "application/json" }),
                   { upsert: true, contentType: "application/json" });
+        noteWrite(writeFailures, up, "storage_upload:errors_json");
         if (!up.error) {
-          await supabase.from("bulk_import_runs").update({ error_artifact_path: path } as never).eq("id", runId);
+          noteWrite(writeFailures, await supabase.from("bulk_import_runs").update({ error_artifact_path: path } as never).eq("id", runId), "run_update");
         }
       }
       setRows(updated);
-      void supabase.from("bulk_import_audit_events").insert({
+      noteWrite(writeFailures, await supabase.from("bulk_import_audit_events").insert({
         run_id: runId,
         parent_run_id: isRetryRun ? parentRunId : null,
         event_type: "import_completed",
@@ -888,7 +935,7 @@ export function BulkImport() {
           valid: valid.length, invalid: rows.length - valid.length,
           claimed_valid: valid.length,
         },
-      } as never);
+      } as never), "audit:import_completed");
       toast.success(
         `Done · ${imported} new · ${updatedCount} updated (${matchedIds.size} existing matches of ${valid.length} valid rows) · ${skipped} skipped · ${linked} linked`,
       );
@@ -896,11 +943,12 @@ export function BulkImport() {
       qc.invalidateQueries({ queryKey: ["dashboard"] });
       qc.invalidateQueries({ queryKey: ["bulk_import_runs"] });
       qc.invalidateQueries({ queryKey: ["bulk_import_runs", "retry-stats", user?.id, kind] });
+      warnWriteFailures(writeFailures);
     } catch (e) {
-      await supabase.from("bulk_import_runs").update({
+      noteWrite(writeFailures, await supabase.from("bulk_import_runs").update({
         status: "failed", completed_at: new Date().toISOString(),
-      }).eq("id", runId);
-      void supabase.from("bulk_import_audit_events").insert({
+      }).eq("id", runId), "run_update");
+      noteWrite(writeFailures, await supabase.from("bulk_import_audit_events").insert({
         run_id: runId,
         parent_run_id: isRetryRun ? parentRunId : null,
         event_type: "import_failed",
@@ -913,8 +961,9 @@ export function BulkImport() {
           valid: valid.length, invalid: rows.length - valid.length,
           error: (e as Error).message,
         },
-      } as never);
+      } as never), "audit:import_failed");
       toast.error(`Import failed: ${(e as Error).message}`);
+      warnWriteFailures(writeFailures);
     } finally {
       setSubmitting(false);
     }

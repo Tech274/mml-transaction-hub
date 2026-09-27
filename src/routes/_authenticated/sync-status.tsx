@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { countLabel } from "@/lib/sync-health";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -15,11 +16,12 @@ import {
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
 import { formatDistanceToNow, format } from "date-fns";
-import { RefreshCw, Database, AlertTriangle, Eye, Loader2 } from "lucide-react";
+import { RefreshCw, Database, AlertTriangle, Eye, Loader2, LifeBuoy } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
   getSyncOverview, triggerSyncNow, listSnapshotRows, type SyncRunRow, type SnapshotRow,
 } from "@/lib/sync.functions";
+import type { SyncHealth } from "@/lib/sync-health";
 
 export const Route = createFileRoute("/_authenticated/sync-status")({
   component: SyncStatusPage,
@@ -68,7 +70,7 @@ function SyncStatusPage() {
               </CardTitle>
               <CardDescription>
                 Captures monthly revenue, cost, profit and margin per customer, lab, provider and line of business.
-                Runs automatically every day at 02:00 UTC.
+                Runs automatically every day at {d?.snapshot_schedule_utc ?? "02:00 UTC"}.
               </CardDescription>
             </div>
             <div className="flex gap-2">
@@ -99,11 +101,20 @@ function SyncStatusPage() {
                 </AlertDescription>
               </Alert>
             )}
+            {d && d.count_error_refs.length > 0 && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Some counts could not be loaded</AlertTitle>
+                <AlertDescription className="text-xs">
+                  Shown as "unavailable", not 0. Ref {d.count_error_refs.join(", ")}.
+                </AlertDescription>
+              </Alert>
+            )}
             {d && (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                <Stat label="Customers" value={d.live_counts.customers.toLocaleString()} />
-                <Stat label="Transactions" value={d.live_counts.transactions.toLocaleString()} />
-                <Stat label="Snapshot rows" value={d.snapshot_rows.toLocaleString()} />
+                <Stat label="Customers" value={countLabel(d.live_counts.customers)} />
+                <Stat label="Transactions" value={countLabel(d.live_counts.transactions)} />
+                <Stat label="Snapshot rows" value={countLabel(d.snapshot_rows)} />
                 <Stat
                   label="Last successful sync"
                   value={
@@ -118,10 +129,12 @@ function SyncStatusPage() {
           </CardContent>
         </Card>
 
+        {d && <FreshdeskSyncCard runs={d.freshdesk.runs} health={d.freshdesk.health} />}
+
         <Card>
           <CardHeader>
-            <CardTitle>Run history</CardTitle>
-            <CardDescription>Last 50 runs, newest first.</CardDescription>
+            <CardTitle>Snapshot run history</CardTitle>
+            <CardDescription>Last 50 snapshot runs, newest first.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <Table>
@@ -236,6 +249,88 @@ function SyncStatusPage() {
         </SheetContent>
       </Sheet>
     </AppShell>
+  );
+}
+
+const HEALTH_BADGE: Record<SyncHealth["state"], { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
+  ok: { label: "Healthy", variant: "default" },
+  warning: { label: "Last run failed", variant: "secondary" },
+  failing: { label: "Failing", variant: "destructive" },
+  stale: { label: "Stale", variant: "destructive" },
+  never: { label: "No runs yet", variant: "outline" },
+};
+
+// SCRUM-74 (G-07) / SCRUM-72: Freshdesk sync health from sync_runs (kind = 'freshdesk').
+function FreshdeskSyncCard({ runs, health }: { runs: SyncRunRow[]; health: SyncHealth }) {
+  const badge = HEALTH_BADGE[health.state];
+  const alerting = health.state === "failing" || health.state === "stale";
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <LifeBuoy className="h-5 w-5" /> Freshdesk ticket sync <Badge variant={badge.variant}>{badge.label}</Badge>
+        </CardTitle>
+        <CardDescription>
+          Hourly import of Cloud Labs tickets. An alert shows here after 2 failed runs in a row or 3 hours without a successful run.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {alerting && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>{health.message}</AlertTitle>
+            {health.lastError && (
+              <AlertDescription className="font-mono text-xs whitespace-pre-wrap">{health.lastError}</AlertDescription>
+            )}
+          </Alert>
+        )}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <Stat
+            label="Last successful run"
+            value={health.lastSuccessAt ? `${formatDistanceToNow(new Date(health.lastSuccessAt))} ago` : "Never"}
+          />
+          <Stat label="Failures in a row" value={String(health.consecutiveFailures)} />
+          <Stat label="Runs (last 24h)" value={String(health.runsLast24h)} />
+          <Stat label="Failed (last 24h)" value={String(health.failuresLast24h)} />
+        </div>
+        {runs.length > 0 && (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Started</TableHead>
+                  <TableHead>Trigger</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Fetched</TableHead>
+                  <TableHead className="text-right">Saved</TableHead>
+                  <TableHead className="text-right">Duration</TableHead>
+                  <TableHead>Error</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {runs.slice(0, 12).map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>{format(new Date(r.started_at), "dd MMM yyyy HH:mm")}</TableCell>
+                    <TableCell>{r.trigger_source === "cron" ? "Schedule" : "Manual"}</TableCell>
+                    <TableCell>
+                      <Badge variant={r.status === "success" ? "default" : r.status === "running" ? "secondary" : "destructive"}>
+                        {r.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">{r.fetched_count ?? "—"}</TableCell>
+                    <TableCell className="text-right">{r.upserted_count ?? "—"}</TableCell>
+                    <TableCell className="text-right">{r.duration_ms ? `${(r.duration_ms / 1000).toFixed(1)}s` : "—"}</TableCell>
+                    <TableCell className="max-w-xs truncate text-xs text-muted-foreground" title={r.error_message ?? ""}>
+                      {r.error_message ?? ""}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
