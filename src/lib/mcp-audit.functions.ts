@@ -90,10 +90,12 @@ export const listMyMcpClients = createServerFn({ method: "GET" })
       .eq("user_id", context.userId);
     if (error) throw dbError(error, "mcp-audit.listMyMcpClients");
 
-    const { data: revoked } = await context.supabase
+    // SCRUM-59: a failed lookup used to show every client as "connected".
+    const { data: revoked, error: revokedErr } = await context.supabase
       .from("mcp_revoked_clients")
       .select("client_id, revoked_at")
       .eq("user_id", context.userId);
+    if (revokedErr) throw dbError(revokedErr, "mcp-audit.listMyMcpClients");
     const revokedMap = new Map<string, string>();
     for (const r of revoked ?? []) revokedMap.set((r as { client_id: string }).client_id, (r as { revoked_at: string }).revoked_at);
 
