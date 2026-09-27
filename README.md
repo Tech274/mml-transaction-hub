@@ -62,10 +62,16 @@ The SQL files in `supabase/tests/` are for the **sandbox** database (and also ru
 
 ## Database changes
 
+Full process, reviewer checklist and the register of migrations not yet on live:
+**`docs/migrations.md`** (SCRUM-64). In short:
+
 - One file per change in `supabase/migrations/`, named `YYYYMMDDHHMMSS_scrumNN_what.sql`,
-  with `-- SCRUM-NN` in the first 15 lines (CI checks this).
+  later than every existing one, with `-- SCRUM-NN` in the first 15 lines and a
+  `-- Rollback:` section (CI checks all three).
 - Destructive statements (drop, truncate, destructive alter) need an
-  `-- approved-destructive: <who/when>` line.
+  `-- approved-destructive: <ticket> <who>` line and Vivek's approval.
+- A committed migration is never edited, renamed or deleted (CI checks); fix forward.
+- A second reviewer approves every migration PR.
 - Merging a migration **does not apply it**. It is applied to sandbox first, then to
   live in the agreed release order (migrations before the app publish), with approval.
 
