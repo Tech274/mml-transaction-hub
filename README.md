@@ -85,6 +85,8 @@ Today the live app is published from Lovable. The Lovable ↔ GitHub connection
 2. Migrations are applied to sandbox, tested, then applied to live by an approved person.
 3. The app is published from Lovable after its migrations are live.
 
+The step-by-step order for getting today's `main` live is in `docs/runbooks/publish-main.md`.
+
 Scheduled jobs (pg_cron): Freshdesk sync, snapshot sync, bulk-import cleanup. They
 call `/api/public/hooks/*` with the Vault `cron_secret` (see
 `docs/runbooks/scrum-89-cron-secret.md`).

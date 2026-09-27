@@ -56,6 +56,20 @@ live exactly, and nothing new is written into them.
 Never run a bulk push (`supabase db push`, or a Lovable/CLI sync) against live while the register
 has migrations that aren't approved. It would apply all of them at once.
 
+## Publish order for getting `main` live
+
+Full steps: **`docs/runbooks/publish-main.md`**. In short:
+
+1. Owner/admin links the Lovable project to GitHub (Lovable creates a new repository), then push
+   `main` into it **without the 9 register migration files**. Do not publish yet.
+2. Apply 1 and 2, then add `x-cron-secret` to all three cron jobs
+   (`docs/runbooks/scrum-89-cron-secret.md`). This comes before the publish.
+3. Publish, avoiding ±10 min around HH:45 IST (HH:15 UTC) and 07:30 IST (02:00 UTC).
+4. Apply 8, then 9.
+5. After a fresh drift check, apply 3, 5, 6 and 7 one at a time.
+6. Hold 4 until the SCRUM-103 rules are decided.
+7. Verify the next sync and snapshot runs, the 401 for the old `apikey`, and the register.
+
 ## Drift check (read-only; run on sandbox and live before a release)
 
 ```sql
