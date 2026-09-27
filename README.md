@@ -55,7 +55,10 @@ bash scripts/ci/secret-scan.sh
 bash scripts/ci/migration-lint.sh
 ```
 
-SQL/RLS tests live in `supabase/tests/` and run against a **sandbox** database only.
+Access-rule (RLS) tests: `src/lib/__tests__/rls-policies.test.ts` applies every migration to an
+in-process Postgres (PGlite, no network, synthetic data) and checks what each role can read and
+write. It runs with `bun run test` and in CI. See `docs/rls-audit.md`.
+The SQL files in `supabase/tests/` are for the **sandbox** database (and also run locally in that test).
 
 ## Database changes
 
