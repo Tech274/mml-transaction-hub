@@ -59,7 +59,16 @@ job without the header. Always use the live names above, and stop if `cron.job` 
        '\1 || jsonb_build_object(''x-cron-secret'', (select decrypted_secret from vault.decrypted_secrets where name = ''cron_secret''))'))
        from cron.job where jobname = 'mml-hourly-freshdesk-sync' and command not like '%x-cron-secret%';
      ```
-   - Cleanup job (`bulk-import-cleanup-daily`): use the statement that matches its header style,
+   - Cleanup job (`bulk-import-cleanup-daily`): its command contains **two** `jsonb_build_object(`
+     calls (headers and body), so do not use the snapshot `replace(...)` (it would add the header twice).
+     Target only the headers call (this is what ran on 28 Sep; the job stayed inactive):
+     ```sql
+     select cron.alter_job(jobid, command := regexp_replace(command,
+       '(headers\s*:=\s*jsonb_build_object\()',
+       '\1''x-cron-secret'', (select decrypted_secret from vault.decrypted_secrets where name = ''cron_secret''), '))
+       from cron.job where jobname = 'bulk-import-cleanup-daily' and command not like '%x-cron-secret%';
+     ```
+     Otherwise use the statement that matches its header style,
      with `jobname = 'bulk-import-cleanup-daily'`. Only the command changes: `cron.alter_job` is
      called **without** `active`, so the job stays `active = false`. Do not enable it (SCRUM-98).
      - `jsonb_build_object(...)` style: the snapshot statement above with the job name changed.

@@ -3,14 +3,17 @@
 Goal: no schema change reaches the live database without review, a sandbox run and a written
 rollback. Merging a migration to `main` **does not apply it**.
 
-## Current state (28 Sep 2026)
+## Current state (28 Sep 2026, after the release)
 
-- Live has every migration up to `20260925024238_…` (written and applied by Lovable, brought into
-  the repo in PR #1).
-- The 9 migrations listed in the [register](#register-of-migrations-not-yet-on-live) exist **in the
-  repo only**. None has been applied to sandbox or live.
-- Live has had edits made directly in the Lovable SQL editor that aren't in any migration file (see
-  `docs/rls-audit.md`). Run the drift check below before the first apply.
+- Live has every migration up to `20260925024238` plus 8 of the 9 register migrations, applied on
+  28 Sep 2026 between 04:22 and 04:50 IST with Vivek's approval, in the order of
+  `docs/runbooks/publish-main.md`. Each is recorded in `supabase_migrations.schema_migrations`
+  (43 rows, latest `20260928030000`).
+- **Held:** `20260925130000_scrum103_import_batches` (register #4) until the SCRUM-103 rules are decided.
+- The app code from `main` (3cb7202f) was published at 04:23 IST (Lovable deploy `565140ef`), via
+  the Lovable-linked repository `Tech274/mml-internal`. That repository does not carry the register
+  migrations or `.github/workflows/`.
+- Sandbox was skipped for this release (Vivek approved applying straight to live).
 
 ## Rules
 
@@ -91,22 +94,22 @@ present, and nothing from the register should be. Then run the policy and grant 
 - [ ] Locking: no long rewrite or full-table lock on large tables (`transactions`, `freshdesk_tickets`)
 - [ ] Local tests cover it. Sandbox verify queries are written down
 
-## Register of migrations not yet on live
+## Register of migrations not yet on live (and the 28 Sep release)
 
 Order = the order to apply them (timestamp order). "Needs first" = what must happen before the
 migration.
 
 | # | Version / file | Ticket | What it does | Needs first / release order | Rollback | Sandbox | Live |
 |---|---|---|---|---|---|---|---|
-| 1 | `20260925120000_scrum89_cron_secret` | SCRUM-89 | Vault `cron_secret` plus `verify_cron_secret()` (service role only) | Backup. Then migration → cron headers → code (`docs/runbooks/scrum-89-cron-secret.md`) | Revert the code first. Remove the cron header. Then `DROP FUNCTION public.verify_cron_secret(text);` and `DELETE FROM vault.secrets WHERE name='cron_secret';` (destructive: approval) | – | – |
-| 2 | `20260925120100_scrum98_import_artifact_legal_hold` | SCRUM-98 | Legal hold: `expired_bulk_import_artifacts()` returns nothing, so no import evidence can be auto-deleted | None; safe any time | Restore the original body quoted in the file header. **Only with Vivek's approval** (lifts the hold) | – | – |
-| 3 | `20260925121000_scrum99_profile_guard_audit_writes` | SCRUM-99, SCRUM-57 | Users can edit only their own display name. Audit tables are trigger-only. No default anon grants | None; admin flows use the service role | `DROP TRIGGER profiles_guard_self_update ON public.profiles; DROP FUNCTION public.guard_profile_self_update();` `GRANT INSERT, UPDATE, DELETE ON public.customer_audit_log, public.permission_audit_log, public.role_audit_log, public.transaction_activity_log TO authenticated;` (anon grants are not restored) | – | – |
-| 4 | `20260925130000_scrum103_import_batches` | SCRUM-103, SCRUM-79 | `import_batches` table, batch link on transactions, NOT VALID checks, all-or-nothing import function | Rule decisions (SCRUM-103, Vivek). No app code uses it until the strict importer ships | If `select count(*) from import_batches` = 0: drop the function, the two constraints, the unique index, the two `transactions` columns, and `import_batches`. If batches exist: needs a Vivek decision (data loss) | – | – |
-| 5 | `20260925140000_scrum74_sync_runs_freshdesk` | SCRUM-74, SCRUM-72 | `fetched_count` / `upserted_count` on `sync_runs`, plus an index | None; the code works without it | `DROP INDEX public.idx_sync_runs_kind_started; ALTER TABLE public.sync_runs DROP COLUMN fetched_count, DROP COLUMN upserted_count;` (loses the counts only) | – | – |
-| 6 | `20260925150000_scrum92_freshdesk_stale_marker` | SCRUM-92 | `freshdesk_tickets.stale_since`, plus a partial index | Migration first, then set `FRESHDESK_STALE_SWEEP_ENABLED=true` | Unset the flag, then `DROP INDEX public.idx_freshdesk_tickets_stale; ALTER TABLE public.freshdesk_tickets DROP COLUMN stale_since;` | – | – |
-| 7 | `20260928010000_scrum57_revoke_unused_write_grants` | SCRUM-57 | Removes write grants that no policy uses. No behaviour change | Drift check first (`docs/rls-audit.md`) | GRANT statements in the file header | – | – |
-| 8 | `20260928020000_scrum102_agent_identities_server_writes` | SCRUM-102 | `agent_identities` becomes read-own for users; the server writes it after its check | **Publish the app code first**, then apply (before the code, "link my agent" fails with an error, no data lost) | Policy + GRANT statements in the file header | – | – |
-| 9 | `20260928030000_scrum77_mcp_audit_server_writes` | SCRUM-77 | MCP audit rows written by the server only (users lose INSERT) | **Publish the app code first**, then apply (before the code, audit rows fail to save, logged) | Policy + GRANT statements in the file header | – | – |
+| 1 | `20260925120000_scrum89_cron_secret` | SCRUM-89 | Vault `cron_secret` plus `verify_cron_secret()` (service role only) | Backup. Then migration → cron headers → code (`docs/runbooks/scrum-89-cron-secret.md`) | Revert the code first. Remove the cron header. Then `DROP FUNCTION public.verify_cron_secret(text);` and `DELETE FROM vault.secrets WHERE name='cron_secret';` (destructive: approval) | skipped (Vivek approved direct to live) | 28 Sep 04:22 IST |
+| 2 | `20260925120100_scrum98_import_artifact_legal_hold` | SCRUM-98 | Legal hold: `expired_bulk_import_artifacts()` returns nothing, so no import evidence can be auto-deleted | None; safe any time | Restore the original body quoted in the file header. **Only with Vivek's approval** (lifts the hold) | skipped (Vivek approved direct to live) | 28 Sep 04:22 IST |
+| 3 | `20260925121000_scrum99_profile_guard_audit_writes` | SCRUM-99, SCRUM-57 | Users can edit only their own display name. Audit tables are trigger-only. No default anon grants | None; admin flows use the service role | `DROP TRIGGER profiles_guard_self_update ON public.profiles; DROP FUNCTION public.guard_profile_self_update();` `GRANT INSERT, UPDATE, DELETE ON public.customer_audit_log, public.permission_audit_log, public.role_audit_log, public.transaction_activity_log TO authenticated;` (anon grants are not restored) | skipped (Vivek approved direct to live) | 28 Sep 04:49 IST |
+| 4 | `20260925130000_scrum103_import_batches` | SCRUM-103, SCRUM-79 | `import_batches` table, batch link on transactions, NOT VALID checks, all-or-nothing import function | Rule decisions (SCRUM-103, Vivek). No app code uses it until the strict importer ships | If `select count(*) from import_batches` = 0: drop the function, the two constraints, the unique index, the two `transactions` columns, and `import_batches`. If batches exist: needs a Vivek decision (data loss) | – | **held** (SCRUM-103 rules pending) |
+| 5 | `20260925140000_scrum74_sync_runs_freshdesk` | SCRUM-74, SCRUM-72 | `fetched_count` / `upserted_count` on `sync_runs`, plus an index | None; the code works without it | `DROP INDEX public.idx_sync_runs_kind_started; ALTER TABLE public.sync_runs DROP COLUMN fetched_count, DROP COLUMN upserted_count;` (loses the counts only) | skipped (Vivek approved direct to live) | 28 Sep 04:49 IST |
+| 6 | `20260925150000_scrum92_freshdesk_stale_marker` | SCRUM-92 | `freshdesk_tickets.stale_since`, plus a partial index | Migration first, then set `FRESHDESK_STALE_SWEEP_ENABLED=true` | Unset the flag, then `DROP INDEX public.idx_freshdesk_tickets_stale; ALTER TABLE public.freshdesk_tickets DROP COLUMN stale_since;` | skipped (Vivek approved direct to live) | 28 Sep 04:49 IST |
+| 7 | `20260928010000_scrum57_revoke_unused_write_grants` | SCRUM-57 | Removes write grants that no policy uses. No behaviour change | Drift check first (`docs/rls-audit.md`) | GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:50 IST |
+| 8 | `20260928020000_scrum102_agent_identities_server_writes` | SCRUM-102 | `agent_identities` becomes read-own for users; the server writes it after its check | **Publish the app code first**, then apply (before the code, "link my agent" fails with an error, no data lost) | Policy + GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:47 IST |
+| 9 | `20260928030000_scrum77_mcp_audit_server_writes` | SCRUM-77 | MCP audit rows written by the server only (users lose INSERT) | **Publish the app code first**, then apply (before the code, audit rows fail to save, logged) | Policy + GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:47 IST |
 
 Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
 `scrum100_drop_duplicate_bulk_import_index.sql` (SCRUM-100, destructive, needs Vivek).

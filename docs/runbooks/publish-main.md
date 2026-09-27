@@ -1,9 +1,10 @@
 # Runbook: getting `main` live (publish order)
 
-Status (28 Sep 2026): **not started.** The live Lovable project still runs the 25 Sep code
-(Lovable commit `7db1fd06`, the same content as this repository at `a969c92`, PR #1). It is not
-connected to GitHub, so nothing merged after PR #1 has reached live. None of the 9 migrations in the
-register (`docs/migrations.md`) is applied to live.
+Status: **done on 28 Sep 2026 (04:17–04:50 IST), except migration 4 (held).** Steps 1–7 ran in
+this order with Vivek's approval: `main` 3cb7202f pushed to the Lovable-linked repository
+`Tech274/mml-internal` (commit `35943226`), migrations 1+2 and the cron header at 04:22–04:23 IST,
+publish at 04:23 IST (Lovable deploy `565140ef`), then 8, 9, drift check, 3, 5, 6, 7 by 04:50 IST.
+Before this release the live project ran the 25 Sep code (Lovable commit `7db1fd06`).
 
 Every live step below needs Atlas's engineering go-ahead **and** Vivek's approval. Timings are
 given in UTC and IST.
