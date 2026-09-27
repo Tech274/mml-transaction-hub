@@ -1,9 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { FRESHDESK_HEALTH, summarizeSyncHealth, type SyncHealth } from "@/lib/sync-health";
+import { FRESHDESK_HEALTH, countOrNull, summarizeSyncHealth, type SyncHealth } from "@/lib/sync-health";
 import { formatDailyTimeUtc, nextDailyRunAt, snapshotCronFromEnv } from "@/lib/app-config";
-import { dbError } from "@/lib/app-error";
+import { dbError, logError } from "@/lib/app-error";
 import { requireRole } from "@/lib/require-role";
 
 export interface SyncRunRow {
@@ -43,8 +43,11 @@ export interface SnapshotRow {
 export interface SyncOverview {
   runs: SyncRunRow[];
   last_success: SyncRunRow | null;
-  live_counts: { customers: number; transactions: number };
-  snapshot_rows: number;
+  /** null when the count could not be read (logged with a ref; SCRUM-96). Never a silent 0. */
+  live_counts: { customers: number | null; transactions: number | null };
+  snapshot_rows: number | null;
+  /** Refs for counts that failed to load, so the page can say so. */
+  count_error_refs: string[];
   next_cron_at: string;
   /** e.g. "02:00 UTC" */
   snapshot_schedule_utc: string;
@@ -71,6 +74,10 @@ export const getSyncOverview = createServerFn({ method: "GET" })
     ]);
     if (runsErr) throw dbError(runsErr, "sync.getSyncOverview");
     if (fdErr) throw dbError(fdErr, "sync.getSyncOverview");
+    // SCRUM-96: a failed count used to show as 0. Show "unavailable" with a ref instead.
+    const countErrorRefs: string[] = [];
+    const countOf = (res: { count: number | null; error: unknown }, what: string) =>
+      countOrNull(res, (err) => countErrorRefs.push(logError(err, `sync.getSyncOverview:count_${what}`)));
     const schedule = snapshotSchedule();
     const list = (runs ?? []) as SyncRunRow[];
     const fdList = (fdRuns ?? []) as SyncRunRow[];
@@ -78,10 +85,11 @@ export const getSyncOverview = createServerFn({ method: "GET" })
       runs: list,
       last_success: list.find((r) => r.status === "success") ?? null,
       live_counts: {
-        customers: Number(customers.count ?? 0),
-        transactions: Number(transactions.count ?? 0),
+        customers: countOf(customers, "customers"),
+        transactions: countOf(transactions, "transactions"),
       },
-      snapshot_rows: Number(snaps.count ?? 0),
+      snapshot_rows: countOf(snaps, "report_snapshots"),
+      count_error_refs: countErrorRefs,
       next_cron_at: schedule.next,
       snapshot_schedule_utc: schedule.label,
       freshdesk: { runs: fdList, health: summarizeSyncHealth(fdList, new Date(), FRESHDESK_HEALTH) },

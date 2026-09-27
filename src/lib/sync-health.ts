@@ -90,3 +90,20 @@ export function summarizeSyncHealth(runs: RunLike[], now: Date, o: SyncHealthOpt
     message,
   };
 }
+
+/**
+ * SCRUM-96: turns a Supabase `count` response into a number, or null when it failed.
+ * The caller logs the error; a failed count must never be shown as 0.
+ */
+export function countOrNull(res: { count: number | null; error: unknown }, onError: (err: unknown) => void): number | null {
+  if (res.error) {
+    onError(res.error);
+    return null;
+  }
+  return Number(res.count ?? 0);
+}
+
+/** SCRUM-96: display text for a count that may have failed to load. */
+export function countLabel(n: number | null): string {
+  return n === null ? "unavailable" : n.toLocaleString();
+}
