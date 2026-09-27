@@ -1,7 +1,7 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { withAudit } from "../audit";
-import { makeError } from "../errors";
+import { makeError, toolDbError } from "../errors";
 
 export default defineTool({
   name: "list_customers",
@@ -24,10 +24,7 @@ export default defineTool({
       .limit(limit ?? 50);
     if (search) q = q.ilike("customer_name", `%${search}%`);
     const { data, error } = await q;
-    if (error) {
-      const isPerm = /permission|denied|rls/i.test(error.message);
-      return makeError(isPerm ? "permission_denied" : "internal", error.message);
-    }
+    if (error) return toolDbError(error, "mcp.list-customers");
     if (!data || data.length === 0) {
       return makeError("empty_result", "No customers match your filters.", {
         hint: search ? `Try a shorter or different search term.` : "You may not have any customers visible under your role.",

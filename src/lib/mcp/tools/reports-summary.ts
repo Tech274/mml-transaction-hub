@@ -1,7 +1,7 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { z } from "zod";
 import { withAudit } from "../audit";
-import { makeError } from "../errors";
+import { makeError, toolDbError } from "../errors";
 
 export default defineTool({
   name: "reports_summary",
@@ -35,9 +35,7 @@ export default defineTool({
       const { readAllRows } = await import("../../read-all");
       rows = await readAllRows<Row>(build, "reports_summary");
     } catch (e) {
-      const message = e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e);
-      const isPerm = /permission|denied|rls/i.test(message);
-      return makeError(isPerm ? "permission_denied" : "internal", message);
+      return toolDbError(e, "mcp.reports_summary");
     }
     if (rows.length === 0) {
       return makeError("empty_result", `No transactions found for ${year}.`, {

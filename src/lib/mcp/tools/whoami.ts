@@ -1,6 +1,6 @@
 import { defineTool } from "@lovable.dev/mcp-js";
 import { withAudit } from "../audit";
-import { makeError } from "../errors";
+import { toolDbError } from "../errors";
 
 export default defineTool({
   name: "whoami",
@@ -15,7 +15,7 @@ export default defineTool({
       .from("user_roles")
       .select("role")
       .eq("user_id", ctx.getUserId());
-    if (error) return makeError("internal", error.message);
+    if (error) return toolDbError(error, "mcp.whoami");
     const info = {
       user_id: ctx.getUserId(),
       email: ctx.getUserEmail(),
