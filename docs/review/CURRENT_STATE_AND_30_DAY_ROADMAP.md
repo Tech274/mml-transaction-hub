@@ -18,7 +18,7 @@ with Vivek's approved accounts), and their findings get added to the "Live walk"
 | Last snapshot sync before review | 24 Sep 2026 07:30 IST | SCRUM-46 |
 | Accounts | 13 (1 admin); review pending | SCRUM-45 |
 | Live build | Lovable, 25 Sep emergency lockdown (sign-up closed, no default role, anon locked out) | PR #1 |
-| GitHub `main` | PRs #1–#34 merged; **nothing from GitHub is live**; 8 migrations repo-only | this repo |
+| GitHub `main` | PRs #1–#36 merged; **nothing from GitHub is live**; 9 migrations repo-only | this repo |
 | Tests / CI | ~370 unit tests, incl. access-rule tests on a local Postgres with every migration; CI on every PR | `README.md` |
 
 ## Page by page (code in `main`)
@@ -82,7 +82,7 @@ for publish/migration · **Open** = known gap · **Waits** = blocked on a decisi
   
   Use the pre-change checklist and fingerprint for each.
 - Publish `main` (SCRUM-89 order: migration → cron headers → code). Verify the jobs, Sync Status and AI Command Center confirm flow.
-- After the publish: apply the `agent_identities` migration (register #8; it needs the new code live first).
+- After the publish: apply the `agent_identities` and MCP audit migrations (register #8 and #9; they need the new code live first).
 - Move tickets from Testing to Done after live verification.
 
 **Week 3 (12 – 18 Oct): real data.**

@@ -8,13 +8,20 @@ const state: { revoked: Res; inserts: Record<string, unknown>[] } = { revoked: {
 vi.mock("../mcp/supabase-for-user", () => ({
   supabaseForUser: () => ({
     from: (table: string) => {
-      if (table === "mcp_tool_audit_log") {
-        return { insert: async (row: Record<string, unknown>) => { state.inserts.push(row); return { error: null }; } };
-      }
+      if (table === "mcp_tool_audit_log") throw new Error("SCRUM-77: audit rows must not be written with the user's token");
       const chain = { select: () => chain, eq: () => chain, maybeSingle: async () => state.revoked };
       return chain;
     },
   }),
+}));
+// SCRUM-77: audit rows are written by the server (service role).
+vi.mock("../../integrations/supabase/client.server", () => ({
+  supabaseAdmin: {
+    from: (table: string) => {
+      if (table !== "mcp_tool_audit_log") throw new Error(`unexpected service-role table ${table}`);
+      return { insert: async (row: Record<string, unknown>) => { state.inserts.push(row); return { error: null }; } };
+    },
+  },
 }));
 
 const { withAudit, REVOCATION_CHECK_FAILED } = await import("../mcp/audit");
@@ -95,5 +102,17 @@ describe("tools", () => {
   it.each(Object.keys(src))("%s never returns error.message to the client", (f) => {
     expect(src[f]).not.toMatch(/makeError\([^)]*error\.message/);
     expect(src[f]).toContain("annotations: { readOnlyHint: true");
+  });
+});
+
+describe("audit rows (SCRUM-77)", () => {
+  it("are written by the server with redacted arguments", async () => {
+    await withAudit("t", ok)({ year: 2026, api_key: "abc", note: "Bearer abc.def" } as never, ctx());
+    expect(state.inserts).toHaveLength(1);
+    expect(state.inserts[0]).toMatchObject({
+      user_id: "00000000-0000-4000-8000-000000000001",
+      tool_name: "t",
+      arguments: { year: 2026, api_key: "[redacted]", note: "[redacted]" },
+    });
   });
 });

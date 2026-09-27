@@ -261,6 +261,24 @@ describe("agent identities are written by the server only (SCRUM-102, migration 
   });
 });
 
+describe("MCP audit log (SCRUM-77, migration 20260928030000)", () => {
+  it("signed-in users cannot write audit rows, not even their own; the server can", async () => {
+    const row = `insert into public.mcp_tool_audit_log (user_id, tool_name, success) values ($1, 'whoami', true)`;
+    expect(await asActor(db, as(U.opsUser), (q) => outcome(q.query(row, [U.opsUser])))).toBe("42501");
+    expect(await asActor(db, as(U.admin), (q) => outcome(q.query(row, [U.admin])))).toBe("42501");
+    expect(await asActor(db, { role: "service_role" }, (q) => outcome(q.query(row, [U.opsUser])))).toBe("ok");
+  });
+  it("users read their own rows, admins read all, nobody edits or deletes", async () => {
+    await db.query(`insert into public.mcp_tool_audit_log (user_id, tool_name, success) values ($1, 'whoami', true), ($2, 'whoami', true)`, [U.opsUser, U.viewer]);
+    const own = await asActor(db, as(U.viewer), (q) => q.query<{ user_id: string }>("select user_id from public.mcp_tool_audit_log"));
+    expect(new Set(own.rows.map((r) => r.user_id))).toEqual(new Set([U.viewer]));
+    const all = await asActor(db, as(U.admin), (q) => q.query<{ user_id: string }>("select distinct user_id from public.mcp_tool_audit_log"));
+    expect(all.rows.length).toBeGreaterThanOrEqual(2);
+    expect(await asActor(db, as(U.admin), (q) => outcome(q.query("update public.mcp_tool_audit_log set success = false")))).toBe("42501");
+    expect(await asActor(db, as(U.admin), (q) => outcome(q.query("delete from public.mcp_tool_audit_log")))).toBe("42501");
+  });
+});
+
 describe("existing sandbox SQL checks also pass locally", () => {
   it.each(["supabase/tests/rls/scrum99_profiles_audit.sql", "supabase/tests/rls/scrum103_import_batch.sql"])("%s", async (file) => {
     const { readFileSync } = await import("node:fs");

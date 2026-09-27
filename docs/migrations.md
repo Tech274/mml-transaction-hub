@@ -7,7 +7,7 @@ rollback. Merging a migration to `main` **does not apply it**.
 
 - Live has every migration up to `20260925024238_…` (written and applied by Lovable, brought into
   the repo in PR #1).
-- The 8 migrations listed in the [register](#register-of-migrations-not-yet-on-live) exist **in the
+- The 9 migrations listed in the [register](#register-of-migrations-not-yet-on-live) exist **in the
   repo only**. None has been applied to sandbox or live.
 - Live has had edits made directly in the Lovable SQL editor that aren't in any migration file (see
   `docs/rls-audit.md`). Run the drift check below before the first apply.
@@ -92,6 +92,7 @@ migration.
 | 6 | `20260925150000_scrum92_freshdesk_stale_marker` | SCRUM-92 | `freshdesk_tickets.stale_since`, plus a partial index | Migration first, then set `FRESHDESK_STALE_SWEEP_ENABLED=true` | Unset the flag, then `DROP INDEX public.idx_freshdesk_tickets_stale; ALTER TABLE public.freshdesk_tickets DROP COLUMN stale_since;` | – | – |
 | 7 | `20260928010000_scrum57_revoke_unused_write_grants` | SCRUM-57 | Removes write grants that no policy uses. No behaviour change | Drift check first (`docs/rls-audit.md`) | GRANT statements in the file header | – | – |
 | 8 | `20260928020000_scrum102_agent_identities_server_writes` | SCRUM-102 | `agent_identities` becomes read-own for users; the server writes it after its check | **Publish the app code first**, then apply (before the code, "link my agent" fails with an error, no data lost) | Policy + GRANT statements in the file header | – | – |
+| 9 | `20260928030000_scrum77_mcp_audit_server_writes` | SCRUM-77 | MCP audit rows written by the server only (users lose INSERT) | **Publish the app code first**, then apply (before the code, audit rows fail to save, logged) | Policy + GRANT statements in the file header | – | – |
 
 Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
 `scrum100_drop_duplicate_bulk_import_index.sql` (SCRUM-100, destructive, needs Vivek).
