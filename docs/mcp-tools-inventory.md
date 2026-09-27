@@ -36,7 +36,7 @@ Each call also writes (not a tool):
 
 | What | Table | Written by | Notes |
 |---|---|---|---|
-| Audit row per call | `mcp_tool_audit_log` | the user's own token (policy "insert own") | Append-only. A user could add extra audit rows **about themselves** through the API. That doesn't hide anything, but see SCRUM-77 |
+| Audit row per call | `mcp_tool_audit_log` | the server, service role (SCRUM-77; users lose INSERT with migration `20260928030000`) | Append-only; arguments redacted (`docs/ai-mcp-audit.md`) |
 | Revocation check | `mcp_revoked_clients` (read) | – | Disconnect/undo from the Agent integrations page |
 
 ## Follow-ups
@@ -44,7 +44,7 @@ Each call also writes (not a tool):
 | Item | Ticket | Status |
 |---|---|---|
 | Cost/revenue/margin visible to every role through `list_transactions` / `reports_summary` | SCRUM-58 | Waits on the finance visibility matrix (Vivek) |
-| Audit rows written with the user's token (forgeable for oneself); audit retention not defined | SCRUM-77 | Open. Retention needs a decision |
+| Audit rows were written with the user's token (forgeable for oneself); audit retention not defined | SCRUM-77 | Server-only writes + redaction done; retention waits on Vivek |
 | Any future **write** tool must: add a role check on the server, require an explicit confirm like the AI Command Center (#26), and be added here as `write` or `destructive` | – | Rule; the test fails if a tool drops `readOnlyHint` |
 
 The AI Command Center is not part of the MCP server. Its write actions (Freshdesk proposals) and
