@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import type { Database } from "@/integrations/supabase/types";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { AppError, dbError, logIfError } from "@/lib/app-error";
 import { requireRole } from "@/lib/require-role";
 import { DECIDE_ROLES } from "@/lib/ai-cc-policy";
@@ -67,7 +67,7 @@ export const enqueueAiWorkItem = createServerFn({ method: "POST" })
       .insert({
         title: data.title,
         work_type: data.work_type,
-        payload: data.payload ?? {},
+        payload: (data.payload ?? {}) as Json,
         status: "queued",
         requested_agent_key: data.requested_agent_key ?? null,
         requires_approval: approvalRequired,

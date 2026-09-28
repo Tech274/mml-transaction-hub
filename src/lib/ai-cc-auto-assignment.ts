@@ -46,7 +46,7 @@ export function pickWorkerForAssignment(
   const active = workers.filter(
     (worker) =>
       worker.is_active &&
-      (requestedAgentKey == null || requestedAgentKey === "" || worker.agent_key === requestedAgentKey),
+      (requestedAgentKey == null || worker.agent_key === requestedAgentKey),
   );
   if (active.length === 0) return null;
   const ts = (iso: string | null): number => (iso == null ? Number.NEGATIVE_INFINITY : Date.parse(iso));

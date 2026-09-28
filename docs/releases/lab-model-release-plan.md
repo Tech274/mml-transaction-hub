@@ -2,6 +2,23 @@
 
 All PRs below must remain open and unmerged until the full set is complete.
 
+## Deadline scope split
+
+### Demo essentials (Tue 29 Sep 2026 IST)
+
+- Lab transaction model with quote-vs-transaction separation.
+- Locked transaction costs (`selling_cost`, `input_cost`) with admin-only audited correction path.
+- Public cloud margin breakdown (service margin + unused credit from actual consumption).
+- Lab batch totals hard invariant: batch totals always equal the sum of transactions.
+- AI Command Center backend auto-assignment with strict admin approval gate for live-impacting work (`publish`, `deploy`, `live_write`).
+- Mockup-first workflow completed before UI implementation.
+
+### Post-demo / production hardening (by Mon 5 Oct 2026)
+
+- UI implementation after explicit owner mockup approval (feature-flagged rollout).
+- Optional PR-C follow-up hardening and review-driven refinements.
+- Final hosting/deployment target selection and environment-specific release wiring (owner decision required).
+
 ## Planned PR set and merge order
 
 1. **PR-A: non-UI foundations** (`#46`, HOLD)

@@ -74,6 +74,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_cc_agent_workers: {
+        Row: {
+          agent_key: string
+          created_at: string
+          current_load: number
+          id: string
+          is_active: boolean
+          last_assigned_at: string | null
+          worker_name: string
+        }
+        Insert: {
+          agent_key: string
+          created_at?: string
+          current_load?: number
+          id?: string
+          is_active?: boolean
+          last_assigned_at?: string | null
+          worker_name: string
+        }
+        Update: {
+          agent_key?: string
+          created_at?: string
+          current_load?: number
+          id?: string
+          is_active?: boolean
+          last_assigned_at?: string | null
+          worker_name?: string
+        }
+        Relationships: []
+      }
       ai_cc_audit: {
         Row: {
           action: string
@@ -252,6 +282,71 @@ export type Database = {
           status?: string
         }
         Relationships: []
+      }
+      ai_cc_work_items: {
+        Row: {
+          approval_note: string | null
+          approved_at: string | null
+          approved_by: string | null
+          assigned_agent_key: string | null
+          assigned_worker_id: string | null
+          created_at: string
+          created_by: string | null
+          created_by_email: string | null
+          id: string
+          payload: Json
+          requested_agent_key: string | null
+          requires_approval: boolean
+          status: string
+          title: string
+          updated_at: string
+          work_type: string
+        }
+        Insert: {
+          approval_note?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_agent_key?: string | null
+          assigned_worker_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          payload?: Json
+          requested_agent_key?: string | null
+          requires_approval?: boolean
+          status?: string
+          title: string
+          updated_at?: string
+          work_type: string
+        }
+        Update: {
+          approval_note?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_agent_key?: string | null
+          assigned_worker_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          payload?: Json
+          requested_agent_key?: string | null
+          requires_approval?: boolean
+          status?: string
+          title?: string
+          updated_at?: string
+          work_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_cc_work_items_assigned_worker_id_fkey"
+            columns: ["assigned_worker_id"]
+            isOneToOne: false
+            referencedRelation: "ai_cc_agent_workers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bulk_import_audit_events: {
         Row: {
