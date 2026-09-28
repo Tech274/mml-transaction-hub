@@ -44,20 +44,18 @@ Characterisation tests: `src/lib/__tests__/pack3-behaviour.test.ts` and
 ## 3B: legacy bulk import (`src/components/bulk-import.tsx`)
 
 - **Apply loop.** Runs **in the browser**, one row at a time, writing straight to
-  `transactions` under the user's RLS. It matches existing ADRs on
-  **potential_id + month + year + lab_name** (live rows only):
-  - *skip*: leave the existing row;
-  - *update*: overwrite only the chosen fields of that one row, by id;
-  - *link*: associate, change nothing.
-  Rows without a match are inserted.
+  `transactions` under the user's RLS. Every non-blank row is inserted. Identical
+  rows, and rows that match an existing potential id, are inserted too. Nothing is
+  merged, skipped, updated or linked. (A retry of the same run still skips lines
+  that already succeeded in that run.)
 - **Audit events:** `import_started`, `retry_started`, `apply_suggestions`, `import_completed`, `import_failed` and `run_cancelled` go to
   `bulk_import_audit_events`, and there are per-row records in `bulk_import_row_audit`.
 - **Stale pending runs.** A pending run blocks retries. The user can mark their own pending
   runs "cancelled"; no data is changed.
 - **Invalid rows.** Downloaded as `<kind>-invalid-rows-<date>.csv/json`, with the stored
   artifact in the `bulk-imports` bucket as a fallback.
-- **Who.** The Bulk Import tab is for ops_user, ops_lead and admin; import history is for admin, ops_lead and leadership.
-  When `strict_import_enabled` is on, the legacy tab is admin-only (SCRUM-103).
+- **Who.** The Bulk Import tab (lenient importer) is for ops_user, ops_lead and admin, with no config flag.
+  Legacy import is admin-only. Import history is for admin, ops_lead and leadership.
 
 ## Known issues
 
@@ -67,7 +65,7 @@ Characterisation tests: `src/lib/__tests__/pack3-behaviour.test.ts` and
 | 2 | 3B | Audit inserts and run-status updates in the browser ignored failures; "Cancelled N imports" was shown even if the update failed | fixed in SCRUM-96 slice 2, PR #22 (checked + logged) |
 | 3 | 3B | Row-by-row browser writes: a closed tab or lost connection leaves a partial import; there is no all-or-nothing | by design of the legacy importer; the strict importer (SCRUM-103) replaces it with an all-or-nothing server function |
 | 4 | 3B | "Cancel pending" can mark a run cancelled that is still importing in another tab | open; goes away with the strict importer |
-| 5 | 3B | Matching on `lab_name` is exact (case and spaces matter), so "Lab A" and "lab a " create two ADRs | open; strict importer rule D6 pending Vivek |
+| 5 | 3B | The legacy importer used to match on lab name and skip or update. It now inserts every non-blank row, including identical ones | fixed in SCRUM-103 (insert-only) |
 | 6 | 3A | Delete is a hard delete in Auth; profile/audit handling after delete depends on FKs | policy decision **SCRUM-78 (Vivek)**; not changed |
 | 7 | 3A | The "last Super Admin" guard ignored lookup errors, so a failed read let the change through | fixed in SCRUM-100 |
 | 8 | 3B | On a retry, if the "which lines already succeeded" lookup failed, every line was re-imported (duplicates) | fixed in SCRUM-96 slice 2 (PR #22): the retry stops and is marked failed |
@@ -76,8 +74,7 @@ Characterisation tests: `src/lib/__tests__/pack3-behaviour.test.ts` and
 
 - **3A: keep, admin-only.** The server enforces admin on every action, and it's covered by tests.
   The delete policy (SCRUM-78) stays with Vivek.
-- **3B: keep for now, then replace.** It's still the working import path while the strict importer's
-  flag is off. After the SCRUM-103 go-live, restrict it to admins (already wired to the
-  flag) and later remove it.
+- **3B: admin-only legacy path.** The Bulk Import tab is the lenient importer for every
+  import role. Legacy import stays available to admins and inserts every non-blank row.
 - The **"preview" label** in `roadmap.md` should be dropped or confirmed once someone with
   Lovable access confirms what is published on live.

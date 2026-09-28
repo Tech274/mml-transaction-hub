@@ -1,5 +1,4 @@
-import { useMemo, useRef, useState } from "react";
-import { z } from "zod";
+import { useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +14,14 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useServerFn } from "@tanstack/react-start";
 import { findOrCreateCustomer } from "@/lib/transactions.functions";
+import { validateBulkImportRows } from "@/lib/bulk-import.functions";
+import {
+  parseLenientBulkRow,
+  PUBLIC_PROVIDERS,
+  SYSTEM_CONFIG_OPTIONS,
+  type LenientValues,
+} from "@/lib/bulk-import-lenient";
+import { PRIVATE_CLOUD_PROVIDER } from "@/lib/adr-entry";
 import { useAuth } from "@/lib/auth-context";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 
@@ -29,16 +36,6 @@ interface Preset {
   duplicate_strategy: DupStrategy;
   update_fields: string[] | null;
 }
-
-const PUBLIC_PROVIDERS = ["AWS", "Azure", "GCP"] as const;
-const SYSTEM_CONFIG_OPTIONS = [
-  "8GB 2vCPUs",
-  "8GB 4vCPUs",
-  "12GB 4vCPUs",
-  "16GB 4vCPUs",
-  "24GB 6vCPUs",
-  "32GB 8vCPUs",
-] as const;
 
 import {
   LINE_OF_BUSINESS_OPTIONS,
@@ -59,8 +56,11 @@ const PRIVATE_SAMPLE: string[][] = [
   ["POT-2026-102", "2", "2026", "Beta Ltd", "Private Lab B", "VILT", "2026-02-01", "2026-02-28", "8", "1200.00", "1800.00", "8GB 4vCPUs"],
 ];
 
-const dateRe = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_ROWS_PER_CSV = 50_000;
+
+function normHeader(h: string): string {
+  return h.trim().toLowerCase().replace(/\s+/g, "_");
+}
 
 // Excel-style column letter for a zero-based index (A, B, ..., Z, AA, AB, ...)
 function colLetter(idx: number): string {
@@ -80,49 +80,6 @@ function parseRowError(err: string): { field: string; message: string } {
   const i = err.indexOf(":");
   if (i === -1) return { field: "row", message: err };
   return { field: err.slice(0, i).trim(), message: err.slice(i + 1).trim() };
-}
-
-function buildRowSchema(kind: CloudKind) {
-  const base = {
-    potential_id: z.string().trim().min(1, "potential_id required").max(50),
-    month: z.coerce.number().int().min(1).max(12),
-    year: z.coerce.number().int().min(2000).max(2100),
-    customer_name: z.string().trim().min(1).max(200),
-    lab_name: z.string().trim().min(1).max(200),
-    line_of_business: z.enum(LINE_OF_BUSINESS_OPTIONS, {
-      errorMap: () => ({
-        message: `line_of_business must be one of ${LINE_OF_BUSINESS_OPTIONS.join(", ")}`,
-      }),
-    }),
-    start_date: z.string().regex(dateRe, "start_date must be YYYY-MM-DD"),
-    end_date: z.string().regex(dateRe, "end_date must be YYYY-MM-DD"),
-    total_users: z.coerce.number().int().positive(),
-    input_cost: z.coerce.number().nonnegative().max(1_000_000_000),
-    selling_cost: z.coerce.number().nonnegative().max(1_000_000_000),
-  };
-  if (kind === "public_cloud") {
-    return z
-      .object({
-        ...base,
-        cloud_provider: z.enum(PUBLIC_PROVIDERS, {
-          errorMap: () => ({ message: `cloud_provider must be one of ${PUBLIC_PROVIDERS.join(", ")}` }),
-        }),
-      })
-      .superRefine(commonRefine);
-  }
-  return z
-    .object({
-      ...base,
-      system_config: z.enum(SYSTEM_CONFIG_OPTIONS, {
-        errorMap: () => ({ message: `system_config must be one of ${SYSTEM_CONFIG_OPTIONS.join(", ")}` }),
-      }),
-    })
-    .superRefine(commonRefine);
-}
-
-function commonRefine(v: { start_date: string; end_date: string; input_cost: number; selling_cost: number }, ctx: z.RefinementCtx) {
-  if (v.end_date < v.start_date) ctx.addIssue({ code: "custom", path: ["end_date"], message: "end_date < start_date" });
-  if (v.input_cost > v.selling_cost) ctx.addIssue({ code: "custom", path: ["input_cost"], message: "input_cost > selling_cost" });
 }
 
 // ---------- CSV ----------
@@ -183,9 +140,30 @@ function downloadFile(name: string, content: string, mime = "text/csv") {
 interface ParsedRow {
   line: number;
   raw: Record<string, string>;
-  parsed?: Record<string, unknown>;
+  parsed?: LenientValues;
   errors: string[];
+  warnings: string[];
+  notes: string[];
   failedFields?: string[];
+}
+
+function formatNote(n: { column: string; value: string; message: string }): string {
+  return `${n.column}: ${n.message}${n.value ? ` (was "${n.value}")` : ""}`;
+}
+
+function evaluateRow(raw: Record<string, string>, kind: CloudKind, line: number): ParsedRow {
+  const parsed = parseLenientBulkRow(raw, kind, line);
+  if (parsed.blank || !parsed.values) {
+    return { line, raw, errors: [], warnings: [], notes: [], parsed: undefined };
+  }
+  return {
+    line,
+    raw,
+    parsed: parsed.values,
+    errors: [],
+    warnings: parsed.warnings.map(formatNote),
+    notes: parsed.notes.map(formatNote),
+  };
 }
 
 // Heuristic correction suggestions per field; aimed at common fixable mistakes.
@@ -371,7 +349,7 @@ export function BulkImport() {
 
   const headers = kind === "public_cloud" ? PUBLIC_HEADERS : PRIVATE_HEADERS;
   const sample = kind === "public_cloud" ? PUBLIC_SAMPLE : PRIVATE_SAMPLE;
-  const schema = useMemo(() => buildRowSchema(kind), [kind]);
+  const validateRows = useServerFn(validateBulkImportRows);
 
   function downloadTemplate() {
     const versionLine = `${TEMPLATE_VERSION_COMMENT_PREFIX} ${TEMPLATE_VERSION}`;
@@ -409,7 +387,7 @@ export function BulkImport() {
     }
     setRawCsvText(text);
     const [header, ...body] = matrix;
-    const hdr = header.map((h) => h.trim().toLowerCase());
+    const hdr = header.map((h) => normHeader(h));
     const colIdx: Record<string, number> = {};
     hdr.forEach((h, i) => { if (!(h in colIdx)) colIdx[h] = i; });
     const matched = headers.filter((h) => h in colIdx);
@@ -422,28 +400,24 @@ export function BulkImport() {
   function confirmMappingAndValidate() {
     if (!mapping) return;
     if (mapping.missing.length) {
-      toast.error(`Cannot proceed: missing columns ${mapping.missing.join(", ")}`);
-      return;
+      toast.message(`Missing columns will be stored blank: ${mapping.missing.join(", ")}`);
     }
     const { body, colIdx } = mapping;
-    const parsed: ParsedRow[] = body.map((cols, idx) => {
+    let blank = 0;
+    const parsed: ParsedRow[] = [];
+    body.forEach((cols, idx) => {
       const raw: Record<string, string> = {};
       for (const h of headers) raw[h] = (cols[colIdx[h]] ?? "").trim();
-      const errors: string[] = [];
-      const res = schema.safeParse(raw);
-      if (!res.success) {
-        for (const issue of res.error.issues) {
-          errors.push(`${issue.path.join(".") || "row"}: ${issue.message}`);
-        }
+      const row = evaluateRow(raw, kind, idx + 2);
+      if (!row.parsed) {
+        blank += 1;
+        return;
       }
-      // A Potential ID may legitimately cover several transactions, so repeats
-      // within the file are allowed and never reported as errors.
-
-      return { line: idx + 2, raw, parsed: res.success ? (res.data as Record<string, unknown>) : undefined, errors };
+      parsed.push(row);
     });
     setRows(parsed);
-    const ok = parsed.filter((r) => r.errors.length === 0).length;
-    toast.success(`Parsed ${parsed.length} rows · ${ok} valid · ${parsed.length - ok} with errors`);
+    const notes = parsed.reduce((n, r) => n + r.warnings.length + r.notes.length, 0);
+    toast.success(`Parsed ${parsed.length + blank} rows · ${parsed.length} to import · ${blank} blank skipped${notes ? ` · ${notes} notes` : ""}`);
   }
 
   function retryInvalidOnly() {
@@ -559,16 +533,7 @@ export function BulkImport() {
     if (!invalid.length) { toast.message("No invalid rows to retry"); return; }
     const next: ParsedRow[] = invalid.map((r) => {
       const raw = correctedRawFor(r);
-      const errors: string[] = [];
-      const res = schema.safeParse(raw);
-      if (!res.success) {
-        for (const issue of res.error.issues) {
-          errors.push(`${issue.path.join(".") || "row"}: ${issue.message}`);
-        }
-      }
-      // Repeated Potential IDs are allowed — never an error.
-
-      return { line: r.line, raw, parsed: res.success ? (res.data as Record<string, unknown>) : undefined, errors };
+      return evaluateRow(raw, kind, r.line);
     });
     setRows(next);
     setIsRetryRun(true);
@@ -657,6 +622,20 @@ export function BulkImport() {
     const valid = rows.filter((r) => r.errors.length === 0 && r.parsed);
     if (!valid.length) { toast.error("No valid rows to import"); return; }
     if (!user) { toast.error("Not authenticated"); return; }
+    let serverValues: LenientValues[];
+    try {
+      const checked = await validateRows({
+        data: { kind, rows: valid.map((r) => r.raw), lines: valid.map((r) => r.line) },
+      });
+      if (checked.rows.length !== valid.length || checked.rows.some((r) => r.blank || !r.values)) {
+        toast.error("Server re-check did not return one record per row. Nothing was imported.");
+        return;
+      }
+      serverValues = checked.rows.map((r) => r.values as LenientValues);
+    } catch (e) {
+      toast.error(`Server re-check failed, nothing was imported: ${(e as Error).message}`);
+      return;
+    }
     setSubmitting(true);
     setProgress({ done: 0, total: valid.length, succeeded: 0, failed: 0, isRetry: isRetryRun });
     const updated = [...rows];
@@ -772,7 +751,7 @@ export function BulkImport() {
         if (i % 5 === 0) await new Promise((r) => setTimeout(r, 0));
         const r = valid[i];
         const idx = updated.findIndex((x) => x.line === r.line);
-        const p = r.parsed as Record<string, unknown>;
+        const p = serverValues[i];
         let rowStatus: "imported" | "updated" | "linked" | "skipped" | "error" = "imported";
         let rowError: string | null = null;
         let txId: string | null = null;
@@ -783,7 +762,7 @@ export function BulkImport() {
           updated[idx] = { ...r, errors: [`skipped: line ${r.line} already imported in parent run`] };
           noteWrite(writeFailures, await supabase.from("bulk_import_row_audit").insert({
             run_id: runId, user_id: user.id, filename: fileName,
-            line_number: r.line, potential_id: String(p.potential_id),
+            line_number: r.line, potential_id: p.potential_id,
             transaction_id: null, status: rowStatus,
             error_message: "idempotent: already processed in parent run",
             row_data: r.raw,
@@ -797,90 +776,66 @@ export function BulkImport() {
           continue;
         }
         try {
-          const cust = await findOrCreate({ data: { customerName: String(p.customer_name) } });
-          const fullPayload = {
-            potential_id: String(p.potential_id),
-            month: Number(p.month),
-            year: Number(p.year),
-            customer_id: cust.id,
-            customer_name: cust.customer_name,
-            lab_name: String(p.lab_name),
+          const cust = p.customer_name
+            ? await findOrCreate({ data: { customerName: p.customer_name } })
+            : null;
+          const fullPayload: {
+            potential_id: string | null;
+            month: number | null;
+            year: number | null;
+            customer_id: string | null;
+            customer_name: string | null;
+            lab_name: string | null;
+            lab_type: typeof kind;
+            repository_type: typeof kind;
+            cloud_provider: string | null;
+            system_config: string | null;
+            line_of_business: string | null;
+            start_date: string | null;
+            end_date: string | null;
+            total_users: number | null;
+            input_cost: number | null;
+            selling_cost: number | null;
+            created_by: string;
+            [key: string]: unknown;
+          } = {
+            potential_id: p.potential_id,
+            month: p.month,
+            year: p.year,
+            customer_id: cust?.id ?? null,
+            customer_name: cust?.customer_name ?? p.customer_name,
+            lab_name: p.lab_name,
             lab_type: kind,
             repository_type: kind,
-            cloud_provider: kind === "private_cloud" ? "MakeMyLabs Private Cloud" : String(p.cloud_provider),
-            system_config: kind === "private_cloud" ? String(p.system_config) : null,
-            line_of_business: String(p.line_of_business),
-            start_date: String(p.start_date),
-            end_date: String(p.end_date),
-            total_users: Number(p.total_users),
-            input_cost: Number(p.input_cost),
-            selling_cost: Number(p.selling_cost),
+            cloud_provider: kind === "private_cloud"
+              ? (p.cloud_provider && p.cloud_provider.trim() !== "" ? p.cloud_provider : PRIVATE_CLOUD_PROVIDER)
+              : p.cloud_provider,
+            system_config: kind === "private_cloud" ? p.system_config : null,
+            line_of_business: p.line_of_business,
+            start_date: p.start_date,
+            end_date: p.end_date,
+            total_users: p.total_users,
+            input_cost: p.input_cost,
+            selling_cost: p.selling_cost,
             created_by: user.id,
-          } as Record<string, unknown>;
+          };
 
-          // Duplicate match is the NATURAL KEY (potential_id + month + year +
-          // lab_name), never potential_id alone — one Potential ID can hold
-          // several ADR lines, and those extra lines must insert as new ADRs.
-          const { data: match, error: matchErr } = await supabase
-            .from("transactions")
-            .select("id")
-            .eq("potential_id", String(fullPayload.potential_id))
-            .eq("month", Number(fullPayload.month))
-            .eq("year", Number(fullPayload.year))
-            .eq("lab_name", String(fullPayload.lab_name))
-            .eq("is_deleted", false)
-            .limit(1)
-            .maybeSingle();
-          if (matchErr) {
-            // SCRUM-96: a failed lookup used to look like "no match" and the row was
-            // inserted again (possible duplicate ADR). Mark the row failed instead.
-            const ref = logIfError({ error: matchErr }, "bulk-import:match_lookup");
-            throw new Error(`Could not check for an existing ADR, so this row was not imported (ref ${ref}). Retry the import.`);
-          }
-
-          if (match?.id) {
-            matchedIds.add(match.id);
-            if (dupStrategy === "skip") {
-              updated[idx] = { ...r, errors: [`skipped: existing ADR for potential_id+month+year+lab_name (${String(fullPayload.potential_id)} · ${String(fullPayload.month)}/${String(fullPayload.year)} · ${String(fullPayload.lab_name)}) — nothing changed`] };
-              rowStatus = "skipped"; skipped++; txId = match.id;
-            } else if (dupStrategy === "update") {
-              // Only overwrite the fields the user opted into; preserve the rest.
-              // Update THIS matched row by id — never every txn sharing the PID.
-              const partial: Record<string, unknown> = {};
-              for (const f of updateFields) if (f in fullPayload) partial[f] = fullPayload[f];
-              if (kind === "private_cloud") partial.system_config = fullPayload.system_config;
-              const { error: updErr } = await supabase
-                .from("transactions")
-                .update(partial as never)
-                .eq("id", match.id);
-              if (updErr) {
-                const enriched = enrichPgConstraintError(updErr.message, (updErr as { code?: string }).code);
-                rowStatus = "error"; rowError = enriched.message;
-                updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
-              } else {
-                rowStatus = "updated"; updatedCount++; txId = match.id;
-              }
-            } else { // link
-              // Link = read-only association, no fields overwritten.
-              rowStatus = "linked"; linked++; txId = match.id;
-              updated[idx] = { ...r, errors: [`linked to existing ADR ${String(fullPayload.potential_id)} (no fields changed)`] };
-            }
-          } else {
-            const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
-            if (error) {
-              const enriched = enrichPgConstraintError(error.message, (error as { code?: string }).code);
-              rowStatus = "error"; rowError = enriched.message;
-              updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
-            }
-            else { imported++; txId = ins?.id ?? null; }
-          }
+          // Every non-blank row is a new transaction. Identical rows, and rows
+          // that match an existing potential_id + month + year + lab_name, are
+          // inserted too. Nothing is merged, skipped, updated or linked.
+          const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
+          if (error) {
+            const enriched = enrichPgConstraintError(error.message, (error as { code?: string }).code);
+            rowStatus = "error"; rowError = enriched.message;
+            updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
+          } else { imported++; txId = ins?.id ?? null; }
         } catch (err) {
           rowStatus = "error"; rowError = (err as Error).message;
           updated[idx] = { ...r, errors: [rowError] };
         }
         noteWrite(writeFailures, await supabase.from("bulk_import_row_audit").insert({
           run_id: runId, user_id: user.id, filename: fileName,
-          line_number: r.line, potential_id: String(p.potential_id),
+          line_number: r.line, potential_id: p.potential_id,
           transaction_id: txId, status: rowStatus, error_message: rowError, row_data: r.raw,
         }), "row_audit");
         setProgress((prev) => ({
@@ -937,7 +892,7 @@ export function BulkImport() {
         },
       } as never), "audit:import_completed");
       toast.success(
-        `Done · ${imported} new · ${updatedCount} updated (${matchedIds.size} existing matches of ${valid.length} valid rows) · ${skipped} skipped · ${linked} linked`,
+        `Done · ${imported} inserted · ${skipped} skipped on retry · ${valid.length} non-blank rows`,
       );
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -1034,17 +989,6 @@ export function BulkImport() {
           <div className="flex flex-col gap-1">
             <Label className="text-xs">CSV file</Label>
             <Input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} className="max-w-sm" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs">If potential_id already exists</Label>
-            <Select value={dupStrategy} onValueChange={(v) => setDupStrategy(v as DupStrategy)}>
-              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="skip">Skip the row</SelectItem>
-                <SelectItem value="update">Update existing record</SelectItem>
-                <SelectItem value="link">Link only (no write)</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           {fileName && <span className="text-xs text-muted-foreground self-end pb-2">{fileName}</span>}
           {rows.length > 0 && (
@@ -1174,7 +1118,7 @@ export function BulkImport() {
                 </ul>
               </div>
               <div>
-                <div className="font-medium text-foreground mb-1">Missing required ({mapping.missing.length})</div>
+                <div className="font-medium text-foreground mb-1">Missing — stored blank ({mapping.missing.length})</div>
                 {mapping.missing.length === 0
                   ? <div className="text-muted-foreground">None — good to go.</div>
                   : <ul className="space-y-0.5">{mapping.missing.map((h) => (
@@ -1193,7 +1137,7 @@ export function BulkImport() {
               </div>
             </div>
             <div className="flex gap-2 pt-1">
-              <Button size="sm" onClick={confirmMappingAndValidate} disabled={mapping.missing.length > 0}>
+              <Button size="sm" onClick={confirmMappingAndValidate}>
                 Confirm & validate {mapping.body.length} row{mapping.body.length === 1 ? "" : "s"}
               </Button>
               <Button size="sm" variant="ghost" onClick={reset}>Cancel</Button>
@@ -1201,58 +1145,20 @@ export function BulkImport() {
           </div>
         )}
 
-        {/* Duplicate handling explainer + per-field selector */}
-        <div className="rounded-md border p-3 text-xs space-y-2">
-          <div className="font-medium text-foreground">Duplicate handling: <span className="uppercase">{dupStrategy}</span></div>
-          <div className="text-muted-foreground">
-            Skip / Update / Link match on <span className="font-medium text-foreground">potential_id + month + year + lab_name</span>.
-            Rows that do not match insert as new ADRs — including extra lines for an existing Potential ID and brand-new Potential IDs.
-            Update only ever touches the one matched ADR; it never blasts every transaction sharing a Potential ID.
-          </div>
-          {dupStrategy === "skip" && (
-            <div className="text-muted-foreground">An existing ADR with the same potential_id + month + year + lab_name is left unchanged and the incoming row is ignored (not an error).</div>
-          )}
-          {dupStrategy === "link" && (
-            <div className="text-muted-foreground">No fields are written. All existing fields are preserved as-is. The audit log records a link reference only.</div>
-          )}
-          {dupStrategy === "update" && (
-            <div className="space-y-2">
-              <div className="text-muted-foreground">Pick which fields overwrite the matched ADR. Unchecked fields are preserved.</div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
-                {UPDATABLE_FIELDS.map((f) => {
-                  const disabled = (f === "cloud_provider" && kind === "private_cloud")
-                    || (f === "system_config" && kind === "public_cloud");
-                  if (disabled) return null;
-                  return (
-                    <label key={f} className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={updateFields.has(f)}
-                        onCheckedChange={(c) => {
-                          setUpdateFields((prev) => {
-                            const next = new Set(prev);
-                            if (c) next.add(f); else next.delete(f);
-                            return next;
-                          });
-                        }}
-                      />
-                      <span>{f}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+        <div className="rounded-md border p-3 text-xs text-muted-foreground">
+          Every non-blank row is inserted as a new transaction, including rows that match an existing one or each other. Nothing is merged or skipped.
         </div>
 
         <div className="rounded-md border text-xs text-muted-foreground p-3">
           <div className="font-medium text-foreground mb-1">Expected columns ({kind === "public_cloud" ? "Public" : "Private"} Cloud)</div>
           <code className="break-all">{headers.join(", ")}</code>
           {kind === "public_cloud" ? (
-            <div className="mt-1">cloud_provider must be one of: {PUBLIC_PROVIDERS.join(", ")}.</div>
+            <div className="mt-1">A cloud_provider other than {PUBLIC_PROVIDERS.join(", ")} is saved blank and listed as a note. It does not block the import.</div>
           ) : (
-            <div className="mt-1">system_config must be one of: {SYSTEM_CONFIG_OPTIONS.join(", ")}.</div>
+            <div className="mt-1">A system_config outside {SYSTEM_CONFIG_OPTIONS.join(", ")} is saved blank and listed as a note. It does not block the import.</div>
           )}
-          <div>Dates use ISO format YYYY-MM-DD. A potential_id may repeat — several transactions can belong to one Potential ID. Column order is flexible.</div>
+          <div>Blank cells stay blank (they are not stored as 0). Dates use YYYY-MM-DD. A potential_id may repeat — several transactions can belong to one Potential ID, and identical rows are all inserted. Column order is flexible; header names ignore case and spaces.</div>
+          {kind === "private_cloud" && <div>A blank cloud provider is stored as {PRIVATE_CLOUD_PROVIDER}.</div>}
         </div>
 
         {rows.length > 0 && (
@@ -1275,7 +1181,7 @@ export function BulkImport() {
                        <TableCell className="text-muted-foreground">{r.line}</TableCell>
                        <TableCell>
                          {r.errors.length === 0
-                           ? <Badge variant="outline" className="text-green-700 border-green-600/40">Valid</Badge>
+                           ? <Badge variant="outline" className="text-green-700 border-green-600/40">{r.warnings.length || r.notes.length ? "Saved with notes" : "Ready"}</Badge>
                            : <Badge variant="destructive">Error</Badge>}
                        </TableCell>
                        {headers.map((h, hi) => {
@@ -1292,6 +1198,11 @@ export function BulkImport() {
                          );
                        })}
                        <TableCell className="text-xs">
+                         {r.warnings.length + r.notes.length > 0 && (
+                           <ul className="mb-1 space-y-1 text-amber-800" data-testid={`row-notes-${r.line}`}>
+                             {[...r.warnings, ...r.notes].map((n, i) => <li key={i}>{n}</li>)}
+                           </ul>
+                         )}
                          {parsedErrs.length === 0 ? null : (
                            <ul className="space-y-1" data-testid={`row-errors-${r.line}`}>
                              {parsedErrs.map((e, i) => {

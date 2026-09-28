@@ -4,7 +4,8 @@ export const MONTH_NAMES = [
 ];
 
 export function fmtCurrency(n: number | string | null | undefined) {
-  const v = typeof n === "string" ? Number(n) : n ?? 0;
+  if (n === null || n === undefined || n === "") return "—";
+  const v = typeof n === "string" ? Number(n) : n;
   if (!Number.isFinite(v)) return "—";
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -14,7 +15,8 @@ export function fmtCurrency(n: number | string | null | undefined) {
 }
 
 export function fmtNumber(n: number | string | null | undefined) {
-  const v = typeof n === "string" ? Number(n) : n ?? 0;
+  if (n === null || n === undefined || n === "") return "—";
+  const v = typeof n === "string" ? Number(n) : n;
   if (!Number.isFinite(v)) return "—";
   return new Intl.NumberFormat("en-IN").format(v);
 }

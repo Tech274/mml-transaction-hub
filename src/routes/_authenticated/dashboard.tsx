@@ -8,6 +8,7 @@ import { readAllRows } from "@/lib/read-all";
 import { AppShell } from "@/components/app-shell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
+import { addNullable } from "@/lib/nullable-sum";
 import { usePermissions, setPreviewRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -48,17 +49,17 @@ function DashboardPage() {
   const total = rows.length;
   const pub = rows.filter((r) => r.repository_type === "public_cloud").length;
   const priv = rows.filter((r) => r.repository_type === "private_cloud").length;
-  const users = rows.reduce((s, r) => s + (r.total_users ?? 0), 0);
-  const revenue = rows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0);
-  const inputCostTotal = rows.reduce((s, r) => s + Number(r.input_cost ?? 0), 0);
+  const users = rows.reduce((s, r) => addNullable(s, r.total_users), 0);
+  const revenue = rows.reduce((s, r) => addNullable(s, r.selling_cost), 0);
+  const inputCostTotal = rows.reduce((s, r) => addNullable(s, r.input_cost), 0);
   const profit = revenue - inputCostTotal;
   const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
   const avgCost = rows.length ? revenue / rows.length : 0;
   const curRows = rows.filter((r) => r.month === curMonth && r.year === curYear);
-  const curRevenue = curRows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0);
-  const curInputCost = curRows.reduce((s, r) => s + Number(r.input_cost ?? 0), 0);
+  const curRevenue = curRows.reduce((s, r) => addNullable(s, r.selling_cost), 0);
+  const curInputCost = curRows.reduce((s, r) => addNullable(s, r.input_cost), 0);
   const curProfit = curRevenue - curInputCost;
-  const curUsers = curRows.reduce((s, r) => s + (r.total_users ?? 0), 0);
+  const curUsers = curRows.reduce((s, r) => addNullable(s, r.total_users), 0);
 
   const navigate = useNavigate();
   const reportsTo = can("feature_reports_access") ? "/reports" : "/transactions";
@@ -74,8 +75,8 @@ function DashboardPage() {
 
   const byMonth = Array.from({ length: 12 }, (_, i) => {
     const monthRows = rows.filter((r) => r.month === i + 1 && r.year === curYear);
-    const mRev = monthRows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0);
-    const mCost = monthRows.reduce((s, r) => s + Number(r.input_cost ?? 0), 0);
+    const mRev = monthRows.reduce((s, r) => addNullable(s, r.selling_cost), 0);
+    const mCost = monthRows.reduce((s, r) => addNullable(s, r.input_cost), 0);
     return {
       month: MONTH_NAMES[i],
       transactions: monthRows.length,
@@ -102,9 +103,9 @@ function DashboardPage() {
   const custRev = new Map<string, { revenue: number; cost: number; users: number }>();
   for (const r of rows) {
     const e = custRev.get(r.customer_name) ?? { revenue: 0, cost: 0, users: 0 };
-    e.revenue += Number(r.selling_cost ?? 0);
-    e.cost += Number(r.input_cost ?? 0);
-    e.users += r.total_users ?? 0;
+    e.revenue = addNullable(e.revenue, r.selling_cost);
+    e.cost = addNullable(e.cost, r.input_cost);
+    e.users = addNullable(e.users, r.total_users);
     custRev.set(r.customer_name, e);
   }
   const topRev = Array.from(custRev.entries()).sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5)

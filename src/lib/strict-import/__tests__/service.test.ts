@@ -18,10 +18,9 @@ const GOOD = csv(
 function fakeDeps(over: Partial<StrictImportDeps> = {}) {
   const calls: ImportRpcPayload[] = [];
   const deps: StrictImportDeps = {
-    enabled: true,
     hasImportRole: async () => true,
     findCustomers: async () => [{ customer_name: "Acme Test Co", normalized_name: "acme test co" }],
-    isFileImported: async () => false,
+    priorImport: async () => null,
     callImport: async (p) => {
       calls.push(p);
       const sell = p.p_rows.reduce((a, r) => a + Math.round(Number(r.selling_cost) * 100), 0);
@@ -57,10 +56,6 @@ describe("parseStrictBytes", () => {
 });
 
 describe("runPreview", () => {
-  it("is refused when the flag is off", async () => {
-    const { deps } = fakeDeps({ enabled: false });
-    await expect(runPreview(deps, { filename: "f.csv", bytes: GOOD })).rejects.toMatchObject({ code: "disabled" });
-  });
   it("is refused for roles without import rights", async () => {
     const { deps } = fakeDeps({ hasImportRole: async () => false });
     await expect(runPreview(deps, { filename: "f.csv", bytes: GOOD })).rejects.toMatchObject({ code: "forbidden" });
@@ -71,19 +66,20 @@ describe("runPreview", () => {
     expect(p.summary).toMatchObject({ rowsToImport: 3, errorCount: 0, totalSellingCents: 330100, totalInputCents: 220025 });
     expect(p.customers.newCustomers).toEqual(["Beta Test Ltd"]);
     expect(p.fileSha256).toBe(await sha256Hex(GOOD));
-    expect(p.templateStatus).toBe("PENDING_VIVEK_CONFIRMATION");
+    expect(p.templateStatus).toBe("LENIENT_2026-09-28");
     expect(p.blockers).toEqual([]);
     expect(calls).toHaveLength(0);
   });
-  it("shows the not-applied migration as a blocker", async () => {
-    const { deps } = fakeDeps({ isFileImported: async () => null });
+  it("a failed duplicate-file lookup does not block", async () => {
+    const { deps } = fakeDeps({ priorImport: async () => null });
     const p = await runPreview(deps, { filename: "f.csv", bytes: GOOD });
-    expect(p.blockers.join(" ")).toMatch(/Could not check/);
+    expect(p.priorImport).toBeNull();
+    expect(p.blockers).toEqual([]);
   });
 });
 
 describe("runCommit", () => {
-  const base = async () => ({ filename: "f.csv", bytes: GOOD, expectedSha256: await sha256Hex(GOOD), warningsAcknowledged: true, approvedNewCustomers: ["Beta Test Ltd"] });
+  const base = async () => ({ filename: "f.csv", bytes: GOOD, expectedSha256: await sha256Hex(GOOD), importAnyway: false });
 
   it("commits one row per input row through the database function", async () => {
     const { deps, calls } = fakeDeps();
@@ -99,17 +95,52 @@ describe("runCommit", () => {
     await expect(runCommit(deps, { ...(await base()), expectedSha256: "0".repeat(64) })).rejects.toMatchObject({ code: "file_changed" });
     expect(calls).toHaveLength(0);
   });
-  it("re-validates on the server: an invalid file never reaches the database", async () => {
-    const bad = csv(line("PID-TEST-003", "Acme Test Co", "", "100"));
+  it("re-validates on the server: a blank cost is stored null and still committed", async () => {
+    const blankCost = csv(line("PID-TEST-003", "Acme Test Co", "", "100"));
     const { deps, calls } = fakeDeps();
-    const err = await runCommit(deps, { filename: "f.csv", bytes: bad, expectedSha256: await sha256Hex(bad), warningsAcknowledged: true, approvedNewCustomers: [] }).catch((e) => e);
+    const r = await runCommit(deps, { filename: "f.csv", bytes: blankCost, expectedSha256: await sha256Hex(blankCost), importAnyway: false });
+    expect(r.inserted).toBe(1);
+    expect(calls[0].p_rows[0].input_cost).toBeNull();
+    expect(calls[0].p_rows[0].selling_cost).toBe("100.00");
+  });
+  it("an unknown provider does not block the commit", async () => {
+    const header = HEADER.join(",");
+    const body = ["PID-TEST-003", "3", "2026", "Acme Test Co", "Synthetic Lab A", "VILT", "2026-03-01", "2026-03-31", "10", "100", "150", "OpenAI"].join(",");
+    const bytes = new TextEncoder().encode(`${header}\n${body}\n`);
+    const { deps, calls } = fakeDeps();
+    const r = await runCommit(deps, { filename: "f.csv", bytes, expectedSha256: await sha256Hex(bytes), importAnyway: false });
+    expect(r.inserted).toBe(1);
+    expect(calls[0].p_rows[0].cloud_provider).toBeNull();
+  });
+  it("an unknown extra column still never reaches the database", async () => {
+    const bad = new TextEncoder().encode(`${HEADER.join(",")},Notes\n${line("PID-TEST-003", "Acme Test Co", "1", "2")},x\n`);
+    const { deps, calls } = fakeDeps();
+    const err = await runCommit(deps, { filename: "f.csv", bytes: bad, expectedSha256: await sha256Hex(bad), importAnyway: false }).catch((e) => e);
     expect(err).toBeInstanceOf(StrictImportError);
     expect(err.code).toBe("blocked");
     expect(calls).toHaveLength(0);
   });
-  it("refuses unapproved new customers", async () => {
-    const { deps } = fakeDeps();
-    await expect(runCommit(deps, { ...(await base()), approvedNewCustomers: [] })).rejects.toMatchObject({ code: "blocked" });
+  it("creates new customers without an approval step", async () => {
+    const { deps, calls } = fakeDeps();
+    const r = await runCommit(deps, await base());
+    expect(r.inserted).toBe(3);
+    expect(calls[0].p_customer_names).toEqual(["Beta Test Ltd"]);
+  });
+  it("refuses a repeated file until Import anyway, then inserts another batch", async () => {
+    const prior = { id: "00000000-0000-4000-8000-000000000099", importedOn: "2026-09-01" };
+    const { deps, calls } = fakeDeps({ priorImport: async () => prior });
+    const preview = await runPreview(deps, { filename: "f.csv", bytes: GOOD });
+    expect(preview.priorImport).toEqual(prior);
+    expect(preview.blockers).toEqual([]);
+    const refused = await runCommit(deps, await base()).catch((e) => e);
+    expect(refused).toMatchObject({
+      code: "blocked",
+      reasons: ["This exact file was already imported on 2026-09-01 (batch 00000000-0000-4000-8000-000000000099)"],
+    });
+    expect(calls).toHaveLength(0);
+    const r = await runCommit(deps, { ...(await base()), importAnyway: true });
+    expect(r.inserted).toBe(3);
+    expect(calls).toHaveLength(1);
   });
   it("database errors are reported as 'nothing was saved'", async () => {
     const { deps } = fakeDeps({ callImport: vi.fn(async () => { throw new Error("duplicate key value violates unique constraint"); }) });

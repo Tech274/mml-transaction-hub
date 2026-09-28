@@ -1,16 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  LINE_OF_BUSINESS_OPTIONS,
-  PUBLIC_HEADERS,
-  PRIVATE_HEADERS,
-  TEMPLATE_VERSION,
-  getBulkTemplateSchema,
-} from "@/lib/bulk-template";
+import { TEMPLATE_VERSION, getBulkTemplateSchema } from "@/lib/bulk-template";
 import { dbError, logError } from "@/lib/app-error";
 import { cleanupExpiredArtifacts } from "@/lib/artifact-cleanup";
 import { requireRole } from "@/lib/require-role";
+import { parseLenientBulkRows } from "@/lib/bulk-import-lenient";
 
 // Public schema descriptor — read by the UI (and the E2E template-sync test)
 // to guarantee the downloadable template and the server validator stay in
@@ -19,16 +14,10 @@ export const getTemplateSchema = createServerFn({ method: "GET" }).handler(
   async () => getBulkTemplateSchema(),
 );
 
-// Server-side row validator for bulk-template uploads. Callers (both the
-// browser UI and the direct-API E2E test) POST parsed rows and receive a
-// structured, machine-readable error payload:
-//
-//   { template_version, kind, errors: [{ line, column, value, message, allowed_values? }] }
-//
-// This is the "server API" enforcement layer for the CSV template: it
-// mirrors the DB CHECK constraint so callers can never bypass validation by
-// skipping the client, and it always names the exact row, column, and the
-// allowed values.
+// Server re-check for bulk-template uploads. The same parser as the browser
+// preview. Nothing here rejects a row for a blank or unstorable cell: those
+// come back as warnings and NULL values. `errors` stays empty so older callers
+// that only looked at errors do not treat a warning as a block.
 export const validateBulkImportRows = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((raw) =>
@@ -38,45 +27,15 @@ export const validateBulkImportRows = createServerFn({ method: "POST" })
         rows: z
           .array(z.record(z.string(), z.string()))
           .max(50_000, "too many rows"),
+        lines: z.array(z.number().int().positive()).optional(),
         client_template_version: z.string().optional(),
       })
       .parse(raw),
   )
   .handler(async ({ data }) => {
-    const headers = data.kind === "public_cloud" ? PUBLIC_HEADERS : PRIVATE_HEADERS;
-    const errors: Array<{
-      line: number;
-      column: string;
-      value: string;
-      message: string;
-      allowed_values?: readonly string[];
-    }> = [];
-
-    data.rows.forEach((row, i) => {
-      const line = i + 2; // header is line 1
-      const lob = row["line_of_business"] ?? "";
-      if (!(LINE_OF_BUSINESS_OPTIONS as readonly string[]).includes(lob)) {
-        errors.push({
-          line,
-          column: "line_of_business",
-          value: lob,
-          message: `line_of_business must be exactly one of ${LINE_OF_BUSINESS_OPTIONS.join(", ")} (case-sensitive, no surrounding whitespace).`,
-          allowed_values: LINE_OF_BUSINESS_OPTIONS,
-        });
-      }
-      for (const h of headers) {
-        if (!(h in row) || String(row[h] ?? "").length === 0) {
-          if (h === "line_of_business") continue; // already reported above
-          errors.push({
-            line,
-            column: h,
-            value: String(row[h] ?? ""),
-            message: `${h} is required`,
-          });
-        }
-      }
-    });
-
+    const parsed = parseLenientBulkRows(data.rows, data.kind, data.lines);
+    const warnings = parsed.rows.flatMap((r) => r.warnings);
+    const notes = parsed.rows.flatMap((r) => r.notes);
     return {
       template_version: TEMPLATE_VERSION,
       kind: data.kind,
@@ -84,8 +43,14 @@ export const validateBulkImportRows = createServerFn({ method: "POST" })
       version_matches:
         !data.client_template_version || data.client_template_version === TEMPLATE_VERSION,
       total_rows: data.rows.length,
-      error_count: errors.length,
-      errors,
+      blank_rows_ignored: parsed.blankRowsIgnored,
+      rows_to_import: parsed.rowsToImport,
+      error_count: 0,
+      errors: [] as Array<{ line: number; column: string; value: string; message: string }>,
+      warning_count: warnings.length,
+      warnings,
+      notes,
+      rows: parsed.rows,
     };
   });
 

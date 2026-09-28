@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Download, ArrowUp, ArrowDown, AlertCircle, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { fmtCurrency, fmtNumber, MONTH_NAMES, YEARS } from "@/lib/format";
+import { addNullable } from "@/lib/nullable-sum";
 import {
   computeTotals, groupByKey, computeForecast, forecastByDimension, type ReportRow,
 } from "@/lib/reports-metrics";
@@ -74,7 +75,7 @@ export function ReportsView() {
         for (const p of providerSet) {
           rec[p] = filtered
             .filter((r) => r.month === i + 1 && r.cloud_provider === p)
-            .reduce((s, r) => s + Number(r.selling_cost ?? 0), 0);
+            .reduce((s, r) => addNullable(s, r.selling_cost), 0);
         }
         return rec;
       }),
@@ -86,8 +87,8 @@ export function ReportsView() {
     for (const r of filtered) {
       const key = `${r.lab_name}||${r.cloud_provider}`;
       const cur = map.get(key) ?? { lab: r.lab_name, provider: r.cloud_provider, spend: 0, users: 0 };
-      cur.spend += Number(r.selling_cost ?? 0);
-      cur.users += Number(r.total_users ?? 0);
+      cur.spend = addNullable(cur.spend, r.selling_cost);
+      cur.users = addNullable(cur.users, r.total_users);
       map.set(key, cur);
     }
     return Array.from(map.values()).sort((a, b) => b.spend - a.spend).slice(0, 10);
@@ -97,8 +98,8 @@ export function ReportsView() {
     const map = new Map<string, { provider: string; spend: number; cost: number; profit: number }>();
     for (const r of filtered) {
       const cur = map.get(r.cloud_provider) ?? { provider: r.cloud_provider, spend: 0, cost: 0, profit: 0 };
-      cur.spend += Number(r.selling_cost ?? 0);
-      cur.cost += Number(r.input_cost ?? 0);
+      cur.spend = addNullable(cur.spend, r.selling_cost);
+      cur.cost = addNullable(cur.cost, r.input_cost);
       cur.profit = cur.spend - cur.cost;
       map.set(r.cloud_provider, cur);
     }
@@ -110,10 +111,10 @@ export function ReportsView() {
     const map = new Map<string, { customer: string; revenue: number; cost: number; profit: number; margin: number; tx: number; users: number }>();
     for (const r of filtered) {
       const cur = map.get(r.customer_name) ?? { customer: r.customer_name, revenue: 0, cost: 0, profit: 0, margin: 0, tx: 0, users: 0 };
-      cur.revenue += Number(r.selling_cost ?? 0);
-      cur.cost += Number(r.input_cost ?? 0);
+      cur.revenue = addNullable(cur.revenue, r.selling_cost);
+      cur.cost = addNullable(cur.cost, r.input_cost);
       cur.tx += 1;
-      cur.users += Number(r.total_users ?? 0);
+      cur.users = addNullable(cur.users, r.total_users);
       cur.profit = cur.revenue - cur.cost;
       cur.margin = cur.revenue > 0 ? (cur.profit / cur.revenue) * 100 : 0;
       map.set(r.customer_name, cur);
@@ -126,8 +127,8 @@ export function ReportsView() {
     const map = new Map<string, { key: string; revenue: number; cost: number }>();
     for (const r of filtered) {
       const cur = map.get(r.line_of_business) ?? { key: r.line_of_business, revenue: 0, cost: 0 };
-      cur.revenue += Number(r.selling_cost ?? 0);
-      cur.cost += Number(r.input_cost ?? 0);
+      cur.revenue = addNullable(cur.revenue, r.selling_cost);
+      cur.cost = addNullable(cur.cost, r.input_cost);
       map.set(r.line_of_business, cur);
     }
     return Array.from(map.values()).map((x) => ({
@@ -513,8 +514,8 @@ function DrillTable({ rows }: { rows: Row[] }) {
     const map = new Map<string, { key: string; revenue: number; cost: number; count: number }>();
     for (const r of rows) {
       const cur = map.get(r.repository_type) ?? { key: r.repository_type, revenue: 0, cost: 0, count: 0 };
-      cur.revenue += Number(r.selling_cost ?? 0);
-      cur.cost += Number(r.input_cost ?? 0);
+      cur.revenue = addNullable(cur.revenue, r.selling_cost);
+      cur.cost = addNullable(cur.cost, r.input_cost);
       cur.count += 1;
       map.set(r.repository_type, cur);
     }
@@ -526,9 +527,9 @@ function DrillTable({ rows }: { rows: Row[] }) {
     lab_name: r.lab_name,
     cloud_provider: r.cloud_provider,
     line_of_business: r.line_of_business,
-    total_users: Number(r.total_users ?? 0),
-    selling_cost: Number(r.selling_cost ?? 0),
-    input_cost: Number(r.input_cost ?? 0),
+    total_users: r.total_users,
+    selling_cost: r.selling_cost,
+    input_cost: r.input_cost,
   })), [rows]);
 
   if (rows.length === 0) {

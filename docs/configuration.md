@@ -25,7 +25,7 @@ secrets today) and, for local development, in an uncommitted `.env.local`.
 | `FRESHDESK_STALE_SWEEP_ENABLED` | no | `src/lib/freshdesk-stale.ts` (SCRUM-92) | off | only the exact string `true` turns it on. After a complete full pass, tickets Freshdesk no longer returns get `stale_since` set (never deleted). **Turn on only after migration `20260925150000_scrum92_freshdesk_stale_marker.sql` is applied.** Refuses to mark more than half of all tickets in one run (over 50) |
 | `HOOK_TIMEOUT_SECONDS` | no | `src/lib/background-hook.ts` (SCRUM-72) | `25` | time budget for each scheduled hook job (Freshdesk sync, snapshot, bulk-import cleanup). Whole seconds, 5 to 900; a bad value is logged and 25 is used. See "Scheduled hooks" below |
 | `SNAPSHOT_CRON_UTC` | no | `app-config.ts`, shown on Sync Status | current schedule | label for the snapshot job time |
-| `STRICT_IMPORT_ENABLED` | no | `src/lib/strict-import/flag.ts` | off | `strict_import_enabled` flag; only the exact string `true` turns it on |
+| `STRICT_IMPORT_ENABLED` | no | `src/lib/strict-import/flag.ts` | unused | The Bulk Import tab no longer reads this flag. It is on for admin, ops_lead and ops_user. |
 
 Rules:
 - Anything prefixed `VITE_` is copied into the JavaScript sent to every browser. **Never** give a secret a `VITE_` name. The unit test `src/lib/__tests__/no-secrets-in-client.test.ts` fails if one appears.

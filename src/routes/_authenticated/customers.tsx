@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fmtCurrency, fmtNumber } from "@/lib/format";
+import { addNullable } from "@/lib/nullable-sum";
 import { exportToExcel } from "@/lib/export-xlsx";
 import { buildExcelBlobAsync, downloadBlob, type ExportProgress } from "@/lib/export-xlsx-async";
 import { startJob, updateJob, finishJob, registerRetryHandler } from "@/lib/export-jobs";
@@ -98,9 +99,9 @@ function CustomersPage() {
       for (const t of tx ?? []) {
         const e = map.get(t.customer_id) ?? { count: 0, users: 0, revenue: 0, cost: 0 };
         e.count += 1;
-        e.users += t.total_users ?? 0;
-        e.revenue += Number(t.selling_cost ?? 0);
-        e.cost += Number(t.input_cost ?? 0);
+        e.users = addNullable(e.users, t.total_users);
+        e.revenue = addNullable(e.revenue, t.selling_cost);
+        e.cost = addNullable(e.cost, t.input_cost);
         map.set(t.customer_id, e);
       }
       return (customers ?? []).map((c) => {

@@ -280,11 +280,29 @@ describe("MCP audit log (SCRUM-77, migration 20260928030000)", () => {
 });
 
 describe("existing sandbox SQL checks also pass locally", () => {
-  it.each(["supabase/tests/rls/scrum99_profiles_audit.sql", "supabase/tests/rls/scrum103_import_batch.sql"])("%s", async (file) => {
+  it("supabase/tests/rls/scrum99_profiles_audit.sql", async () => {
     const { readFileSync } = await import("node:fs");
     const path = await import("node:path");
-    const sql = readFileSync(path.resolve(__dirname, "../../..", file), "utf8");
+    const sql = readFileSync(path.resolve(__dirname, "../../..", "supabase/tests/rls/scrum99_profiles_audit.sql"), "utf8");
     await expect(db.exec(sql)).resolves.toBeDefined();
+    await db.exec("rollback").catch(() => undefined);
+  });
+
+  // The lenient rules live in migrations-pending and are not applied with the
+  // committed migrations. This check runs that file inside the sandbox script's
+  // own transaction, then rolls it back. It never touches a live database.
+  it("supabase/tests/rls/scrum103_import_batch.sql", async () => {
+    const { readFileSync } = await import("node:fs");
+    const path = await import("node:path");
+    const root = path.resolve(__dirname, "../../..");
+    const pending = readFileSync(path.join(root, "supabase/migrations-pending/scrum103_lenient_import.sql"), "utf8");
+    const sql = readFileSync(path.join(root, "supabase/tests/rls/scrum103_import_batch.sql"), "utf8");
+    const begin = sql.match(/^\s*BEGIN\s*;/m);
+    expect(begin).not.toBeNull();
+    // String#replace treats $$ in the replacement as a single $, which would
+    // break the function bodies. A function return value is inserted as-is.
+    const combined = sql.replace(begin![0], () => `${begin![0]}\n${pending}\n`);
+    await expect(db.exec(combined)).resolves.toBeDefined();
     await db.exec("rollback").catch(() => undefined);
   });
 });

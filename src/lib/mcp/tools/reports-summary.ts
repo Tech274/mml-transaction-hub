@@ -42,9 +42,10 @@ export default defineTool({
         hint: "Try a different year or clear filters.",
       });
     }
-    const revenue = rows.reduce((a, r) => a + Number(r.selling_cost ?? 0), 0);
-    const cost = rows.reduce((a, r) => a + Number(r.input_cost ?? 0), 0);
-    const users = rows.reduce((a, r) => a + Number(r.total_users ?? 0), 0);
+    const { addNullable } = await import("../../nullable-sum");
+    const revenue = rows.reduce((a, r) => addNullable(a, r.selling_cost), 0);
+    const cost = rows.reduce((a, r) => addNullable(a, r.input_cost), 0);
+    const users = rows.reduce((a, r) => addNullable(a, r.total_users), 0);
     const profit = revenue - cost;
     const margin_pct = revenue > 0 ? (profit / revenue) * 100 : 0;
     const summary = {

@@ -1,4 +1,8 @@
-"""E2E: validateBulkImportRows returns exact row/column/allowed_values for LOB."""
+"""E2E: validateBulkImportRows stores a bad line of business as blank and warns.
+
+SCRUM-103 (28 Sep): an unknown LOB does not block the import. A trailing space
+that trims to a known value is stored as that value.
+"""
 import asyncio, json, os
 from pathlib import Path
 from playwright.async_api import async_playwright
@@ -54,23 +58,23 @@ async def main():
 
         assert result["kind"] == "public_cloud"
         assert result["total_rows"] == 3
+        assert result["errors"] == []
+        assert result["rows_to_import"] == 3
 
-        lob_errors = [e for e in result["errors"] if e["column"] == "line_of_business"]
-        by_line = {e["line"]: e for e in lob_errors}
+        by_line = {r["line"]: r for r in result["rows"]}
+        assert by_line[2]["values"]["line_of_business"] == "VILT"
+        assert by_line[3]["values"]["line_of_business"] == "Standalone"
+        assert by_line[4]["values"]["line_of_business"] is None
 
-        assert 2 not in by_line, "line 2 (VILT) must be valid"
-        assert 3 in by_line and 4 in by_line, f"expected LOB errors on lines 3 and 4: {by_line}"
+        lob_warnings = [w for w in result["warnings"] if w["column"] == "line_of_business"]
+        assert len(lob_warnings) == 1, lob_warnings
+        w = lob_warnings[0]
+        assert w["line"] == 4 and w["value"] == "Training"
+        msg = w["message"].lower()
+        for tok in ["vilt", "standalone", "integrated"]:
+            assert tok in msg, f"warning missing {tok!r}: {w['message']}"
 
-        for line, expected in [(3, "Standalone "), (4, "Training")]:
-            e = by_line[line]
-            assert e["value"] == expected, f"line {line} value {e['value']!r}"
-            assert e["column"] == "line_of_business"
-            assert set(e["allowed_values"]) == {"VILT", "Standalone", "Integrated"}
-            msg = e["message"].lower()
-            for tok in ["vilt", "standalone", "integrated", "case-sensitive"]:
-                assert tok in msg, f"line {line} error missing {tok!r}: {e['message']}"
-
-        print("OK — server validator returns exact row/column/allowed_values for LOB failures")
+        print("OK — unknown LOB is a warning and a blank cell, not a block")
         await browser.close()
 
 

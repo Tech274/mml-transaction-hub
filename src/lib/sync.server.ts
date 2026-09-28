@@ -1,6 +1,8 @@
 // Snapshot pipeline: aggregates live customers/transactions into
 // public.report_snapshots and records the run in public.sync_runs.
 // Server-only (uses the service-role client) — never import from a component.
+// NULL costs are skipped in the snapshot totals. The transaction row is not updated.
+import { addNullable } from "@/lib/nullable-sum";
 
 export interface SyncRunResult {
   run_id: string;
@@ -167,9 +169,9 @@ export function aggregateSnapshots(rows: TxRow[]) {
         margin_pct: 0,
       };
     cur.transactions_count += 1;
-    cur.total_users += Number(r.total_users ?? 0);
-    cur.revenue += Number(r.selling_cost ?? 0);
-    cur.cost += Number(r.input_cost ?? 0);
+    cur.total_users = addNullable(cur.total_users, r.total_users);
+    cur.revenue = addNullable(cur.revenue, r.selling_cost);
+    cur.cost = addNullable(cur.cost, r.input_cost);
     map.set(key, cur);
   }
   return [...map.values()].map((v) => {

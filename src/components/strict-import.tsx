@@ -1,7 +1,6 @@
-// SCRUM-103: strict import screen ("what you upload is what you get").
-// Only rendered when strict_import_enabled is on (see entry.tsx). The server
-// re-parses and re-validates the same file on commit; this screen only
-// explains what will happen and collects the user's approvals.
+// SCRUM-103: Bulk Import tab. One non-blank row becomes one transaction.
+// The server re-parses and re-validates the same file on commit. New customers
+// are created automatically. A repeated file hash needs one Import anyway confirmation.
 import { useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
@@ -22,9 +21,8 @@ import type { RowIssue } from "@/lib/strict-import/validate";
 import {
   STRICT_TEMPLATE_BANNER,
   canCommit,
+  duplicateFileMessage,
   formatCents,
-  needsAcknowledgement,
-  pendingApprovals,
   strictTemplateCsv,
   strictTemplateFilename,
 } from "@/lib/strict-import/ui-state";
@@ -78,16 +76,14 @@ export function StrictImport() {
   const [file, setFile] = useState<{ name: string; base64: string } | null>(null);
   const [result, setResult] = useState<PreviewResult | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
-  const [approved, setApproved] = useState<Set<string>>(new Set());
-  const [acknowledged, setAcknowledged] = useState(false);
+  const [importAnyway, setImportAnyway] = useState(false);
   const [busy, setBusy] = useState<"preview" | "commit" | null>(null);
   const [done, setDone] = useState<CommitResult | null>(null);
 
   function reset() {
     setResult(null);
     setFailure(null);
-    setApproved(new Set());
-    setAcknowledged(false);
+    setImportAnyway(false);
     setDone(null);
   }
 
@@ -133,8 +129,7 @@ export function StrictImport() {
           filename: file.name,
           contentBase64: file.base64,
           expectedSha256: result.fileSha256,
-          warningsAcknowledged: acknowledged,
-          approvedNewCustomers: [...approved],
+          importAnyway,
         },
       });
       if (res.ok) {
@@ -152,16 +147,15 @@ export function StrictImport() {
   }
 
   const s = result?.summary;
-  const pending = result ? pendingApprovals(result, approved) : [];
-  const ready = result ? canCommit(result, approved, acknowledged) : false;
+  const ready = result ? canCommit(result, importAnyway) : false;
 
   return (
     <div className="space-y-4">
       <Alert>
         <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Strict import (preview feature)</AlertTitle>
+        <AlertTitle>Bulk import</AlertTitle>
         <AlertDescription>
-          One row in = one row out. Nothing is changed, merged or defaulted. {STRICT_TEMPLATE_BANNER}
+          One non-blank row in = one new transaction. Nothing is merged or skipped. {STRICT_TEMPLATE_BANNER}
         </AlertDescription>
       </Alert>
 
@@ -237,42 +231,27 @@ export function StrictImport() {
             )}
 
             <IssueTable issues={result.rowErrors} label="Errors (must be fixed in the file)" />
-            <IssueTable issues={result.warnings} label="Warnings (must be acknowledged)" />
+            <IssueTable issues={result.warnings} label="Notes (saved anyway — fix later by editing the transaction)" />
 
             {result.customers.newCustomers.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-medium">
-                    New customers to create ({result.customers.newCustomers.length}), approve each one
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => setApproved(new Set(result.customers.newCustomers))}>
-                    Approve all
-                  </Button>
-                </div>
-                <div className="max-h-60 space-y-1 overflow-auto rounded border p-2">
-                  {result.customers.newCustomers.map((name) => (
-                    <div key={name} className="flex items-center gap-2">
-                      <Checkbox
-                        id={`nc-${name}`}
-                        checked={approved.has(name)}
-                        onCheckedChange={(v) => {
-                          const next = new Set(approved);
-                          if (v === true) next.add(name);
-                          else next.delete(name);
-                          setApproved(next);
-                        }}
-                      />
-                      <Label htmlFor={`nc-${name}`} className="font-mono text-xs">{name}</Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
+              <Alert>
+                <AlertTitle>New customers</AlertTitle>
+                <AlertDescription>
+                  These names are created automatically.
+                  <ul className="list-disc pl-5 text-sm">
+                    {result.customers.newCustomers.map((name) => (
+                      <li key={name}>{name} — new customer</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
             )}
 
             {(result.customers.inFileVariants.length > 0 || result.customers.matchedWithDifferentSpelling.length > 0) && (
               <Alert>
                 <AlertTitle>Customer name variants</AlertTitle>
                 <AlertDescription>
+                  These do not block the import.
                   <ul className="list-disc pl-5 text-sm">
                     {result.customers.inFileVariants.map((v) => (
                       <li key={v.normalized}>
@@ -285,6 +264,19 @@ export function StrictImport() {
                       </li>
                     ))}
                   </ul>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {result.priorImport && (
+              <Alert>
+                <AlertTitle>File already imported</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>{duplicateFileMessage(result.priorImport)}</p>
+                  <div className="flex items-center gap-2">
+                    <Checkbox id="import-anyway" checked={importAnyway} onCheckedChange={(v) => setImportAnyway(v === true)} />
+                    <Label htmlFor="import-anyway">Import anyway</Label>
+                  </div>
                 </AlertDescription>
               </Alert>
             )}
@@ -302,20 +294,10 @@ export function StrictImport() {
               </Alert>
             )}
 
-            {needsAcknowledgement(result) && result.blockers.length === 0 && (
-              <div className="flex items-center gap-2">
-                <Checkbox id="si-ack" checked={acknowledged} onCheckedChange={(v) => setAcknowledged(v === true)} />
-                <Label htmlFor="si-ack">I have reviewed every warning and customer name variant above.</Label>
-              </div>
-            )}
-
             <div className="flex items-center gap-3">
               <Button onClick={() => void onCommit()} disabled={!ready || busy !== null}>
                 {busy === "commit" ? "Importing…" : `Import ${s.rowsToImport} rows (all or nothing)`}
               </Button>
-              {pending.length > 0 && result.blockers.length === 0 && (
-                <span className="text-sm text-muted-foreground">{pending.length} new customer(s) still need approval</span>
-              )}
             </div>
           </CardContent>
         </Card>

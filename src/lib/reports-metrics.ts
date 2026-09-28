@@ -1,5 +1,6 @@
 // Pure metric helpers for the Reports view. Kept dependency-free so they can be
 // unit-tested and reused by both the UI and Excel export.
+import { addNullable } from "@/lib/nullable-sum";
 
 export type ReportRow = {
   month: number;
@@ -9,16 +10,16 @@ export type ReportRow = {
   line_of_business: string;
   customer_name: string;
   lab_name: string;
-  total_users: number;
-  input_cost: number;
-  selling_cost: number;
+  total_users: number | null;
+  input_cost: number | null;
+  selling_cost: number | null;
   start_date?: string | null;
   end_date?: string | null;
 };
 
 export function computeTotals(rows: ReportRow[]) {
-  const revenue = rows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0);
-  const cost = rows.reduce((s, r) => s + Number(r.input_cost ?? 0), 0);
+  const revenue = rows.reduce((s, r) => addNullable(s, r.selling_cost), 0);
+  const cost = rows.reduce((s, r) => addNullable(s, r.input_cost), 0);
   const profit = revenue - cost;
   const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
   return { revenue, cost, profit, margin, count: rows.length };
@@ -33,8 +34,8 @@ export function groupByKey<T extends ReportRow>(
     const k = keyFn(r);
     const cur = map.get(k) ?? { key: k, rows: [], revenue: 0, cost: 0 };
     cur.rows.push(r);
-    cur.revenue += Number(r.selling_cost ?? 0);
-    cur.cost += Number(r.input_cost ?? 0);
+    cur.revenue = addNullable(cur.revenue, r.selling_cost);
+    cur.cost = addNullable(cur.cost, r.input_cost);
     map.set(k, cur);
   }
   return Array.from(map.values()).map((g) => ({
@@ -79,8 +80,8 @@ export function computeForecast(
         const sd = new Date(r.start_date);
         if (!isNaN(sd.getTime()) && sd > bEnd) continue;
       }
-      b.revenue += Number(r.selling_cost ?? 0);
-      b.cost += Number(r.input_cost ?? 0);
+      b.revenue = addNullable(b.revenue, r.selling_cost);
+      b.cost = addNullable(b.cost, r.input_cost);
     }
   }
 

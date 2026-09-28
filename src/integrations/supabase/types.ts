@@ -1201,6 +1201,7 @@ export type Database = {
           id: string
           import_batch_id: string | null
           input_cost: number
+          is_complete: boolean
           is_deleted: boolean
           lab_name: string
           lab_type: string

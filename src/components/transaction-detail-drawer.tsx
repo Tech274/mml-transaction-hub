@@ -5,10 +5,13 @@ import { fmtCurrency, fmtDate, fmtDateTime, fmtNumber, MONTH_NAMES } from "@/lib
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useAuth } from "@/lib/auth-context";
+import { TransactionEditForm } from "@/components/transaction-edit-form";
 
 export function TransactionDetailDrawer({
   transactionId, open, onOpenChange,
 }: { transactionId: string | null; open: boolean; onOpenChange: (b: boolean) => void }) {
+  const { canEditTransactions } = useAuth();
   const { data: tx } = useQuery({
     queryKey: ["transaction", transactionId],
     enabled: !!transactionId && open,
@@ -51,16 +54,29 @@ export function TransactionDetailDrawer({
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 <DL label="Customer" value={tx.customer_name} />
                 <DL label="Lab" value={tx.lab_name} />
-                <DL label="Period" value={`${MONTH_NAMES[tx.month - 1]} ${tx.year}`} />
+                <DL label="Period" value={tx.month ? `${MONTH_NAMES[tx.month - 1]} ${tx.year ?? ""}` : "—"} />
                 <DL label="Start date" value={fmtDate(tx.start_date)} />
                 <DL label="End date" value={fmtDate(tx.end_date)} />
                 <DL label="Total users" value={fmtNumber(tx.total_users)} />
-                <DL label="Input cost" value={fmtCurrency(tx.input_cost ?? 0)} />
+                <DL label="Input cost" value={fmtCurrency(tx.input_cost)} />
                 <DL label="Selling cost" value={fmtCurrency(tx.selling_cost)} />
-                <DL label="Profit" value={fmtCurrency(Number(tx.selling_cost) - Number(tx.input_cost ?? 0))} />
+                <DL label="Profit" value={
+                  tx.selling_cost == null && tx.input_cost == null
+                    ? "—"
+                    : fmtCurrency(Number(tx.selling_cost ?? 0) - Number(tx.input_cost ?? 0))
+                } />
                 <DL label="Created" value={fmtDateTime(tx.created_at)} />
                 <DL label="Last updated" value={fmtDateTime(tx.updated_at)} />
               </div>
+              {canEditTransactions && (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3">Edit transaction</h3>
+                    <TransactionEditForm tx={tx} />
+                  </div>
+                </>
+              )}
               <Separator />
               <div>
                 <h3 className="text-sm font-semibold mb-3">Activity history</h3>
