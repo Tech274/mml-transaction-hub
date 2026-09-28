@@ -29,11 +29,13 @@ function permissionCheckFailed(err: unknown, extra?: Record<string, unknown>): A
  * permission-check error (fail closed).
  */
 async function callerIsActive(ctx: RoleContext): Promise<boolean> {
-  const from = ctx.supabase?.from;
-  if (typeof from !== "function") {
+  // Call from() on the client itself. supabase-js's from() is a class method that uses
+  // `this`; a detached reference throws a TypeError on every real request.
+  const sb = ctx.supabase;
+  if (typeof sb?.from !== "function") {
     throw permissionCheckFailed(new Error("role client cannot read profiles"), { check: "is_active" });
   }
-  const { data, error } = await from("profiles").select("is_active").eq("id", ctx.userId).maybeSingle();
+  const { data, error } = await sb.from("profiles").select("is_active").eq("id", ctx.userId).maybeSingle();
   if (error) throw permissionCheckFailed(error, { check: "is_active" });
   if (!data) return false;
   if (data.is_active !== true) throw new AppError(ACCOUNT_DISABLED_MESSAGE, "account_disabled");

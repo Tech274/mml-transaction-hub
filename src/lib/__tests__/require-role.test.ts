@@ -71,6 +71,17 @@ describe("hasAnyRole / requireRole", () => {
     await expect(requireRole(ctx({ data: false, error: null }).ctx, ["admin"], "Forbidden: admin only")).rejects.toThrow("Forbidden: admin only");
     await expect(requireRole(ctx({ data: true, error: null }).ctx, ["admin"], "x")).resolves.toBeUndefined();
   });
+  it("calls from() on the client itself (supabase-js from() needs `this`)", async () => {
+    // Same shape as SupabaseClient: from() is a prototype method that reads this.rest.
+    class ClientLike {
+      rest = { from: (_t: string) => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { is_active: true }, error: null }) }) }) }) };
+      from(relation: string) { return this.rest.from(relation); }
+      async rpc() { return { data: true, error: null }; }
+    }
+    const c = { supabase: new ClientLike(), userId: "00000000-0000-0000-0000-000000000001" };
+    expect(await hasAnyRole(c, ["admin"])).toBe(true);
+    await expect(requireRole(c, ["admin"], "x")).resolves.toBeUndefined();
+  });
   it("an empty role list never grants access and does not call the database", async () => {
     const { ctx: c, rpc, from } = ctx({ data: true, error: null });
     expect(await hasAnyRole(c, [])).toBe(false);
