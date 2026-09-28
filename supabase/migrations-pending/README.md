@@ -12,4 +12,4 @@ To use one, after the named approver has approved it:
 | File | Ticket | What | Needs approval from |
 |---|---|---|---|
 | `scrum100_drop_duplicate_bulk_import_index.sql` | SCRUM-100 (G-23) | Drops `idx_bulk_import_runs_parent`, an exact duplicate of `bulk_import_runs_parent_run_id_idx` | Atlas + Vivek (destructive DDL, SCRUM-64 rule) |
-| `scrum103_lenient_import.sql` | SCRUM-103 | Nullable transaction fields, no input>selling check, lenient provider trigger and import RPC, plus `is_complete` for the All Transactions filter. Apply `20260925130000_scrum103_import_batches` first, then this, then publish | Atlas + Vivek (schema relaxation; not applied) |
+| `scrum103_lenient_import.sql` | SCRUM-103 | Nullable transaction fields, no input>selling check, private blank provider filled by the trigger, import RPC, non-unique `file_sha256` index, plus `is_complete` for the All Transactions filter. Apply `20260925130000_scrum103_import_batches` first, then this, then publish | Atlas + Vivek (schema relaxation; not applied) |

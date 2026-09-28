@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canCommit, formatCents, needsAcknowledgement, pendingApprovals, strictTemplateCsv, strictTemplateFilename } from "../ui-state";
+import { canCommit, duplicateFileMessage, formatCents, needsAcknowledgement, strictTemplateCsv, strictTemplateFilename } from "../ui-state";
 import { parseCsvText } from "../parse";
 import { matchHeaders } from "../validate";
 import type { PreviewResult } from "../service";
@@ -14,28 +14,32 @@ const preview = (over: Partial<PreviewResult> = {}): PreviewResult => ({
   rowErrors: [],
   warnings: [],
   customers: { newCustomers: ["Beta Test Ltd"], matchedWithDifferentSpelling: [], inFileVariants: [] },
-  alreadyImported: false,
+  priorImport: null,
   blockers: [],
   ...over,
 });
 
 describe("strict import screen state", () => {
-  it("needs every new customer approved", () => {
-    expect(pendingApprovals(preview(), new Set())).toEqual(["Beta Test Ltd"]);
-    expect(canCommit(preview(), new Set(), false)).toBe(false);
-    expect(canCommit(preview(), new Set(["Beta Test Ltd"]), false)).toBe(true);
+  it("new customers do not block commit", () => {
+    expect(canCommit(preview(), false)).toBe(true);
   });
-  it("notes about cost do not block; customer name variants still need acknowledgement", () => {
+  it("notes and customer name variants do not block", () => {
     const notes = preview({ warnings: [{ line: 2, column: "J", header: "Input Cost", value: "2.00", message: "Input Cost is higher than Selling Cost" }] });
     expect(needsAcknowledgement(notes)).toBe(false);
-    expect(canCommit(notes, new Set(["Beta Test Ltd"]), false)).toBe(true);
+    expect(canCommit(notes, false)).toBe(true);
     const variants = preview({ customers: { newCustomers: ["Beta Test Ltd"], matchedWithDifferentSpelling: [{ fileName: "beta", existingName: "Beta Test Ltd", lines: [2] }], inFileVariants: [] } });
-    expect(needsAcknowledgement(variants)).toBe(true);
-    expect(canCommit(variants, new Set(["Beta Test Ltd"]), false)).toBe(false);
-    expect(canCommit(variants, new Set(["Beta Test Ltd"]), true)).toBe(true);
+    expect(needsAcknowledgement(variants)).toBe(false);
+    expect(canCommit(variants, false)).toBe(true);
+  });
+  it("a repeated file needs one Import anyway confirmation", () => {
+    const prior = { id: "batch-1", importedOn: "2026-09-01" };
+    const p = preview({ priorImport: prior });
+    expect(duplicateFileMessage(prior)).toBe("This exact file was already imported on 2026-09-01 (batch batch-1)");
+    expect(canCommit(p, false)).toBe(false);
+    expect(canCommit(p, true)).toBe(true);
   });
   it("any server blocker disables commit", () => {
-    expect(canCommit(preview({ blockers: ["x"] }), new Set(["Beta Test Ltd"]), true)).toBe(false);
+    expect(canCommit(preview({ blockers: ["x"] }), true)).toBe(false);
   });
   it("formats money exactly from cents", () => {
     expect(formatCents(0)).toBe("₹0.00");

@@ -17,8 +17,11 @@
 --   * CHECK (cost >= 0) remains, and only applies when a value is present.
 --   * Any CHECK that compares input_cost to selling_cost is dropped (none on live today).
 --   * CHECK (end_date >= start_date) is dropped so a reversed pair does not abort the row.
---   * classify_transaction no longer raises on an unknown cloud provider and no longer
---     fills a blank provider with a default.
+--   * classify_transaction no longer raises on an unknown cloud provider.
+--     A private-cloud row with a blank cloud_provider is stored as
+--     'MakeMyLabs Private Cloud'. A non-blank provider is kept.
+--   * import_batches.file_sha256 is no longer unique. A non-unique index remains
+--     so a repeated file can be found. The app warns and asks for Import anyway.
 --   * import_transactions_batch stores NULL for a cell it cannot cast, and still inserts
 --     one transaction per input row (repeated Potential IDs included).
 --   * is_complete is a stored generated column: true only when every business field
@@ -64,6 +67,12 @@
 --
 --   DROP INDEX IF EXISTS public.transactions_is_complete_live_idx;
 --   ALTER TABLE public.transactions DROP COLUMN IF EXISTS is_complete;
+--
+--   DROP INDEX IF EXISTS public.import_batches_file_sha256_idx;
+--   ALTER TABLE public.import_batches
+--     ADD CONSTRAINT import_batches_file_sha256_key UNIQUE (file_sha256);
+--   -- The ADD fails if the same hash was imported more than once. Remove the
+--   -- extra batches first, or leave the non-unique index in place.
 
 -- Held SCRUM-103 migration must already be applied (import_batches exists).
 DO $$
@@ -129,13 +138,18 @@ AS $$
 BEGIN
   IF NEW.lab_type = 'private_cloud' THEN
     NEW.repository_type := 'private_cloud';
+    -- Reports and the provider filter expect this name when the cell was blank.
+    -- A non-blank provider is kept. is_complete for private rows still uses system_config.
+    IF NEW.cloud_provider IS NULL OR btrim(NEW.cloud_provider) = '' THEN
+      NEW.cloud_provider := 'MakeMyLabs Private Cloud';
+    END IF;
   ELSIF NEW.lab_type = 'public_cloud' THEN
     NEW.repository_type := 'public_cloud';
   ELSE
     RAISE EXCEPTION 'Invalid lab_type: %', NEW.lab_type;
   END IF;
-  -- A blank provider stays NULL. A value outside AWS/Azure/GCP is kept as given
-  -- when a caller sends it; the importer itself stores NULL and warns instead.
+  -- A public provider outside AWS/Azure/GCP is kept as given when a caller sends
+  -- it; the importer itself stores NULL and warns instead.
   NEW.updated_at := now();
   RETURN NEW;
 END;
@@ -345,3 +359,24 @@ ALTER TABLE public.transactions
 CREATE INDEX transactions_is_complete_live_idx
   ON public.transactions (is_complete, created_at DESC)
   WHERE is_deleted = false;
+
+-- 6) The same file may be imported again after the user confirms Import anyway.
+--    Drop the unique constraint created by 20260925130000 (column UNIQUE) and
+--    keep a non-unique index for the "already imported" lookup.
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT c.conname
+    FROM pg_constraint c
+    JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = ANY (c.conkey)
+    WHERE c.conrelid = 'public.import_batches'::regclass
+      AND c.contype = 'u'
+      AND a.attname = 'file_sha256'
+  LOOP
+    EXECUTE format('ALTER TABLE public.import_batches DROP CONSTRAINT %I', r.conname);
+  END LOOP;
+END $$;
+
+CREATE INDEX IF NOT EXISTS import_batches_file_sha256_idx
+  ON public.import_batches (file_sha256);

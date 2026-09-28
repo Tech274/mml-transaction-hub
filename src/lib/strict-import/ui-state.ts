@@ -1,22 +1,19 @@
-// SCRUM-103: small pure helpers for the strict import screen (unit-tested).
+// SCRUM-103: small pure helpers for the bulk import screen (unit-tested).
 import { PUBLIC_STRICT_COLUMNS, STRICT_TEMPLATE_STATUS, STRICT_TEMPLATE_VERSION } from "./template";
-import { centsToDecimalString } from "./commit-plan";
+import { centsToDecimalString, duplicateFileMessage } from "./commit-plan";
 import type { PreviewResult } from "./service";
 
-export function needsAcknowledgement(p: PreviewResult): boolean {
-  // Warnings (unstorable cells, selling below cost) do not block. Name variants still do.
-  return p.customers.inFileVariants.length > 0 || p.customers.matchedWithDifferentSpelling.length > 0;
+export { duplicateFileMessage };
+
+/** Name variants and new customers are shown. They never block the import. */
+export function needsAcknowledgement(_p: PreviewResult): boolean {
+  return false;
 }
 
-export function pendingApprovals(p: PreviewResult, approved: ReadonlySet<string>): string[] {
-  return p.customers.newCustomers.filter((n) => !approved.has(n));
-}
-
-/** Mirrors the server's commit blockers so the button state matches; the server still re-checks everything. */
-export function canCommit(p: PreviewResult, approved: ReadonlySet<string>, acknowledged: boolean): boolean {
+/** Mirrors the server's commit blockers, plus the single Import anyway confirmation. */
+export function canCommit(p: PreviewResult, importAnyway: boolean): boolean {
   if (p.blockers.length > 0) return false;
-  if (pendingApprovals(p, approved).length > 0) return false;
-  if (needsAcknowledgement(p) && !acknowledged) return false;
+  if (p.priorImport && !importAnyway) return false;
   return true;
 }
 

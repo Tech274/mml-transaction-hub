@@ -13,7 +13,7 @@ export interface ExistingCustomer {
 }
 
 export interface CustomerPlan {
-  /** Customers that do not exist yet. They are created only if the user approves each one. */
+  /** Customers that do not exist yet. They are created automatically and listed in the preview. */
   newCustomers: string[];
   /** File spelling differs from the existing customer it will be linked to (case/spacing). */
   matchedWithDifferentSpelling: { fileName: string; existingName: string; lines: number[] }[];
@@ -102,17 +102,25 @@ export function buildRpcRows(records: StrictRecord[]): RpcRow[] {
   }));
 }
 
-export interface CommitDecision {
-  warningsAcknowledged: boolean;
-  approvedNewCustomers: string[];
+/** Earliest batch that already stored this file hash. Not a hard block. */
+export interface PriorImport {
+  id: string;
+  /** Calendar date (YYYY-MM-DD) from that batch's created_at. */
+  importedOn: string;
 }
 
-/** Every reason the commit must not run. Empty list = allowed. */
+export function duplicateFileMessage(prior: PriorImport): string {
+  return `This exact file was already imported on ${prior.importedOn} (batch ${prior.id})`;
+}
+
+/**
+ * Every reason the commit must not run. Empty list = allowed.
+ * New customers are created automatically. Name variants are warnings.
+ * A repeated file hash blocks only until the user confirms Import anyway.
+ */
 export function commitBlockers(
   validation: StrictValidationResult,
-  plan: CustomerPlan,
-  decision: CommitDecision,
-  opts: { alreadyImported: boolean | null },
+  opts: { priorImport: PriorImport | null; importAnyway: boolean },
 ): string[] {
   const reasons: string[] = [];
   if (!validation.ok) reasons.push(`The file has ${validation.summary.errorCount} error(s). Fix them and upload again.`);
@@ -120,16 +128,6 @@ export function commitBlockers(
   if (validation.summary.rowsToImport > MAX_ROWS_PER_BATCH) {
     reasons.push(`Too many rows in one file (${validation.summary.rowsToImport} > ${MAX_ROWS_PER_BATCH}). Split the file.`);
   }
-  if (opts.alreadyImported === null) reasons.push("Could not check whether this file was already imported (import tables not available).");
-  if (opts.alreadyImported === true) reasons.push("This exact file was already imported. Re-uploads are not allowed (append-only).");
-  // Cell warnings (blank, unstorable, selling below cost) are informational and do not block.
-  const needsAck = plan.inFileVariants.length > 0 || plan.matchedWithDifferentSpelling.length > 0;
-  if (needsAck && !decision.warningsAcknowledged) reasons.push("Customer name variants must be acknowledged.");
-  const want = new Set(plan.newCustomers);
-  const got = new Set(decision.approvedNewCustomers);
-  const missing = [...want].filter((n) => !got.has(n));
-  const extra = [...got].filter((n) => !want.has(n));
-  if (missing.length > 0) reasons.push(`Approve each new customer before importing: ${missing.join(", ")}`);
-  if (extra.length > 0) reasons.push(`These approved customers are not new in this file (run preview again): ${extra.join(", ")}`);
+  if (opts.priorImport && !opts.importAnyway) reasons.push(duplicateFileMessage(opts.priorImport));
   return reasons;
 }

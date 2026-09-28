@@ -50,9 +50,29 @@ export const createAdrTransaction = createServerFn({ method: "POST" })
       const [field, msg] = Object.entries(errs)[0] ?? ["_", "Invalid entry"];
       throw new AppError(`${field === "_" ? "" : `${field.replace(/_/g, " ")}: `}${msg}`, "validation");
     }
+    const insert = toTransactionInsert(parsed.data, context.userId);
+    if (insert.customer_name) {
+      const normalized = insert.customer_name.trim().replace(/\s+/g, " ").toLowerCase();
+      const { data: existing } = await context.supabase
+        .from("customers").select("id, customer_name").eq("normalized_name", normalized).maybeSingle();
+      if (existing) {
+        insert.customer_id = existing.id;
+        insert.customer_name = existing.customer_name;
+      } else {
+        const { data: created, error } = await context.supabase
+          .from("customers")
+          .insert({ customer_name: insert.customer_name, normalized_name: normalized, created_by: context.userId })
+          .select("id, customer_name").single();
+        if (error) throw dbError(error, "transactions.createAdrTransaction.customer");
+        insert.customer_id = created.id;
+        insert.customer_name = created.customer_name;
+      }
+    } else {
+      insert.customer_id = null;
+    }
     const { data: row, error } = await context.supabase
       .from("transactions")
-      .insert(toTransactionInsert(parsed.data, context.userId))
+      .insert(insert as never)
       .select("id")
       .single();
     if (error) throw dbError(error, "transactions.createAdrTransaction");

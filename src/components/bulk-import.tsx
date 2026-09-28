@@ -21,6 +21,7 @@ import {
   SYSTEM_CONFIG_OPTIONS,
   type LenientValues,
 } from "@/lib/bulk-import-lenient";
+import { PRIVATE_CLOUD_PROVIDER } from "@/lib/adr-entry";
 import { useAuth } from "@/lib/auth-context";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 
@@ -806,7 +807,9 @@ export function BulkImport() {
             lab_name: p.lab_name,
             lab_type: kind,
             repository_type: kind,
-            cloud_provider: p.cloud_provider,
+            cloud_provider: kind === "private_cloud"
+              ? (p.cloud_provider && p.cloud_provider.trim() !== "" ? p.cloud_provider : PRIVATE_CLOUD_PROVIDER)
+              : p.cloud_provider,
             system_config: kind === "private_cloud" ? p.system_config : null,
             line_of_business: p.line_of_business,
             start_date: p.start_date,
@@ -817,70 +820,15 @@ export function BulkImport() {
             created_by: user.id,
           };
 
-          // Duplicate match is the NATURAL KEY (potential_id + month + year +
-          // lab_name), never potential_id alone — one Potential ID can hold
-          // several ADR lines, and those extra lines must insert as new ADRs.
-          // A blank key is not a match: the row is inserted on its own.
-          const potentialId = fullPayload.potential_id;
-          const month = fullPayload.month;
-          const year = fullPayload.year;
-          const labName = fullPayload.lab_name;
-          const keyComplete = potentialId != null && month != null && year != null && labName != null;
-          const { data: match, error: matchErr } = keyComplete
-            ? await supabase
-              .from("transactions")
-              .select("id")
-              .eq("potential_id", potentialId)
-              .eq("month", month)
-              .eq("year", year)
-              .eq("lab_name", labName)
-              .eq("is_deleted", false)
-              .limit(1)
-              .maybeSingle()
-            : { data: null, error: null };
-          if (matchErr) {
-            // SCRUM-96: a failed lookup used to look like "no match" and the row was
-            // inserted again (possible duplicate ADR). Mark the row failed instead.
-            const ref = logIfError({ error: matchErr }, "bulk-import:match_lookup");
-            throw new Error(`Could not check for an existing ADR, so this row was not imported (ref ${ref}). Retry the import.`);
-          }
-
-          if (match?.id) {
-            matchedIds.add(match.id);
-            if (dupStrategy === "skip") {
-              updated[idx] = { ...r, errors: [`skipped: existing ADR for potential_id+month+year+lab_name (${String(fullPayload.potential_id)} · ${String(fullPayload.month)}/${String(fullPayload.year)} · ${String(fullPayload.lab_name)}) — nothing changed`] };
-              rowStatus = "skipped"; skipped++; txId = match.id;
-            } else if (dupStrategy === "update") {
-              // Only overwrite the fields the user opted into; preserve the rest.
-              // Update THIS matched row by id — never every txn sharing the PID.
-              const partial: Record<string, unknown> = {};
-              for (const f of updateFields) if (f in fullPayload) partial[f] = fullPayload[f];
-              if (kind === "private_cloud") partial.system_config = fullPayload.system_config;
-              const { error: updErr } = await supabase
-                .from("transactions")
-                .update(partial as never)
-                .eq("id", match.id);
-              if (updErr) {
-                const enriched = enrichPgConstraintError(updErr.message, (updErr as { code?: string }).code);
-                rowStatus = "error"; rowError = enriched.message;
-                updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
-              } else {
-                rowStatus = "updated"; updatedCount++; txId = match.id;
-              }
-            } else { // link
-              // Link = read-only association, no fields overwritten.
-              rowStatus = "linked"; linked++; txId = match.id;
-              updated[idx] = { ...r, errors: [`linked to existing ADR ${String(fullPayload.potential_id)} (no fields changed)`] };
-            }
-          } else {
-            const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
-            if (error) {
-              const enriched = enrichPgConstraintError(error.message, (error as { code?: string }).code);
-              rowStatus = "error"; rowError = enriched.message;
-              updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
-            }
-            else { imported++; txId = ins?.id ?? null; }
-          }
+          // Every non-blank row is a new transaction. Identical rows, and rows
+          // that match an existing potential_id + month + year + lab_name, are
+          // inserted too. Nothing is merged, skipped, updated or linked.
+          const { data: ins, error } = await supabase.from("transactions").insert(fullPayload as never).select("id").single();
+          if (error) {
+            const enriched = enrichPgConstraintError(error.message, (error as { code?: string }).code);
+            rowStatus = "error"; rowError = enriched.message;
+            updated[idx] = { ...r, errors: [enriched.column ? `${enriched.column}: ${enriched.message}` : enriched.message] };
+          } else { imported++; txId = ins?.id ?? null; }
         } catch (err) {
           rowStatus = "error"; rowError = (err as Error).message;
           updated[idx] = { ...r, errors: [rowError] };
@@ -944,7 +892,7 @@ export function BulkImport() {
         },
       } as never), "audit:import_completed");
       toast.success(
-        `Done · ${imported} new · ${updatedCount} updated (${matchedIds.size} existing matches of ${valid.length} valid rows) · ${skipped} skipped · ${linked} linked`,
+        `Done · ${imported} inserted · ${skipped} skipped on retry · ${valid.length} non-blank rows`,
       );
       qc.invalidateQueries({ queryKey: ["transactions"] });
       qc.invalidateQueries({ queryKey: ["dashboard"] });
@@ -1041,17 +989,6 @@ export function BulkImport() {
           <div className="flex flex-col gap-1">
             <Label className="text-xs">CSV file</Label>
             <Input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} className="max-w-sm" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs">If potential_id already exists</Label>
-            <Select value={dupStrategy} onValueChange={(v) => setDupStrategy(v as DupStrategy)}>
-              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="skip">Skip the row</SelectItem>
-                <SelectItem value="update">Update existing record</SelectItem>
-                <SelectItem value="link">Link only (no write)</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
           {fileName && <span className="text-xs text-muted-foreground self-end pb-2">{fileName}</span>}
           {rows.length > 0 && (
@@ -1208,47 +1145,8 @@ export function BulkImport() {
           </div>
         )}
 
-        {/* Duplicate handling explainer + per-field selector */}
-        <div className="rounded-md border p-3 text-xs space-y-2">
-          <div className="font-medium text-foreground">Duplicate handling: <span className="uppercase">{dupStrategy}</span></div>
-          <div className="text-muted-foreground">
-            Skip / Update / Link match on <span className="font-medium text-foreground">potential_id + month + year + lab_name</span>.
-            Rows that do not match insert as new ADRs — including extra lines for an existing Potential ID and brand-new Potential IDs.
-            Update only ever touches the one matched ADR; it never blasts every transaction sharing a Potential ID.
-          </div>
-          {dupStrategy === "skip" && (
-            <div className="text-muted-foreground">An existing ADR with the same potential_id + month + year + lab_name is left unchanged and the incoming row is ignored (not an error).</div>
-          )}
-          {dupStrategy === "link" && (
-            <div className="text-muted-foreground">No fields are written. All existing fields are preserved as-is. The audit log records a link reference only.</div>
-          )}
-          {dupStrategy === "update" && (
-            <div className="space-y-2">
-              <div className="text-muted-foreground">Pick which fields overwrite the matched ADR. Unchecked fields are preserved.</div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-1">
-                {UPDATABLE_FIELDS.map((f) => {
-                  const disabled = (f === "cloud_provider" && kind === "private_cloud")
-                    || (f === "system_config" && kind === "public_cloud");
-                  if (disabled) return null;
-                  return (
-                    <label key={f} className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={updateFields.has(f)}
-                        onCheckedChange={(c) => {
-                          setUpdateFields((prev) => {
-                            const next = new Set(prev);
-                            if (c) next.add(f); else next.delete(f);
-                            return next;
-                          });
-                        }}
-                      />
-                      <span>{f}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+        <div className="rounded-md border p-3 text-xs text-muted-foreground">
+          Every non-blank row is inserted as a new transaction, including rows that match an existing one or each other. Nothing is merged or skipped.
         </div>
 
         <div className="rounded-md border text-xs text-muted-foreground p-3">
@@ -1259,7 +1157,8 @@ export function BulkImport() {
           ) : (
             <div className="mt-1">A system_config outside {SYSTEM_CONFIG_OPTIONS.join(", ")} is saved blank and listed as a note. It does not block the import.</div>
           )}
-          <div>Blank cells stay blank (they are not stored as 0). Dates use YYYY-MM-DD. A potential_id may repeat — several transactions can belong to one Potential ID. Column order is flexible; header names ignore case and spaces.</div>
+          <div>Blank cells stay blank (they are not stored as 0). Dates use YYYY-MM-DD. A potential_id may repeat — several transactions can belong to one Potential ID, and identical rows are all inserted. Column order is flexible; header names ignore case and spaces.</div>
+          {kind === "private_cloud" && <div>A blank cloud provider is stored as {PRIVATE_CLOUD_PROVIDER}.</div>}
         </div>
 
         {rows.length > 0 && (

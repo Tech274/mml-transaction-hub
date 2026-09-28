@@ -26,13 +26,10 @@ BEGIN
   IF (res->>'inserted')::int <> 2 THEN RAISE EXCEPTION 'FAIL: expected 2 inserted, got %', res; END IF;
   RAISE NOTICE 'PASS: 2 lines with the same Potential ID -> 2 transactions (%)', res;
 
-  -- 2) Same file hash again -> rejected, nothing written
-  BEGIN
-    PERFORM public.import_transactions_batch('public_cloud', 'synthetic.xlsx', repeat('a', 64), '2.0.0-proposed', rows_ok, '[]');
-    RAISE EXCEPTION 'FAIL: same file committed twice';
-  EXCEPTION WHEN unique_violation THEN
-    RAISE NOTICE 'PASS: same file hash rejected';
-  END;
+  -- 2) Same file hash again is allowed. Another 2 rows (the unique constraint is dropped).
+  res := public.import_transactions_batch('public_cloud', 'synthetic.xlsx', repeat('a', 64), '2.0.0-proposed', rows_ok, '[]');
+  IF (res->>'inserted')::int <> 2 THEN RAISE EXCEPTION 'FAIL: re-import of the same file should insert 2, got %', res; END IF;
+  RAISE NOTICE 'PASS: same file hash inserted again';
 
   -- 3) Unknown provider is stored NULL and the row is still inserted (28 Sep). Blank cost stays NULL, not 0.
   res := public.import_transactions_batch(
@@ -83,8 +80,8 @@ BEGIN
   RAISE NOTICE 'PASS: unknown provider and blank costs imported as NULL without blocking';
 
   SELECT count(*) INTO after_count FROM public.transactions;
-  IF after_count <> before_count + 4 THEN RAISE EXCEPTION 'FAIL: expected exactly 4 new rows, got %', after_count - before_count; END IF;
-  RAISE NOTICE 'PASS: exactly 4 rows added overall';
+  IF after_count <> before_count + 6 THEN RAISE EXCEPTION 'FAIL: expected exactly 6 new rows, got %', after_count - before_count; END IF;
+  RAISE NOTICE 'PASS: exactly 6 rows added overall';
 
   -- Completeness: public rows need cloud_provider; private rows need system_config.
   -- 0 is a value. Blank text is empty. Filter is the is_complete column.
@@ -136,11 +133,21 @@ BEGIN
      NULL, '8GB 2vCPUs', 'VILT', '2026-03-01', '2026-03-31', 1, 0, 0, u),
     ('PID-PRIV-2', 3, 2026, 'Synthetic Test Customer', 'Priv Lab', 'private_cloud', 'private_cloud',
      'AWS', NULL, 'VILT', '2026-03-01', '2026-03-31', 1, 0, 0, u);
-  IF NOT EXISTS (SELECT 1 FROM public.transactions WHERE potential_id = 'PID-PRIV' AND is_complete) THEN
-    RAISE EXCEPTION 'FAIL: private row with system_config should be complete without a provider';
+  IF NOT EXISTS (
+    SELECT 1 FROM public.transactions
+    WHERE potential_id = 'PID-PRIV'
+      AND cloud_provider = 'MakeMyLabs Private Cloud'
+      AND is_complete
+  ) THEN
+    RAISE EXCEPTION 'FAIL: blank private provider should be filled, and the row stay complete via system_config';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.transactions WHERE potential_id = 'PID-PRIV-2' AND is_complete) THEN
-    RAISE EXCEPTION 'FAIL: private row without system_config should be incomplete';
+  IF NOT EXISTS (
+    SELECT 1 FROM public.transactions
+    WHERE potential_id = 'PID-PRIV-2'
+      AND cloud_provider = 'AWS'
+      AND is_complete IS NOT TRUE
+  ) THEN
+    RAISE EXCEPTION 'FAIL: a set private provider must be kept, and missing system_config stays incomplete';
   END IF;
 
   -- Incomplete filter plus most-recent sort: newest incomplete row first.

@@ -11,7 +11,7 @@ import { parseStrictBytes, type XlsxLike } from "./parse";
 import { validateStrict, type HeaderError, type RowIssue, type StrictSummary } from "./validate";
 import { STRICT_TEMPLATE_STATUS, STRICT_TEMPLATE_VERSION } from "./template";
 import { sha256Hex } from "./hash";
-import { buildRpcRows, commitBlockers, planCustomers, type CustomerPlan, type ExistingCustomer, type RpcRow } from "./commit-plan";
+import { buildRpcRows, commitBlockers, planCustomers, type CustomerPlan, type ExistingCustomer, type PriorImport, type RpcRow } from "./commit-plan";
 
 export interface ImportRpcPayload {
   p_kind: "public_cloud";
@@ -30,11 +30,10 @@ export interface ImportRpcResult {
 }
 
 export interface StrictImportDeps {
-  enabled: boolean;
   hasImportRole: () => Promise<boolean>;
   findCustomers: (normalizedNames: string[]) => Promise<ExistingCustomer[]>;
-  /** true = already imported, false = not imported, null = could not check (e.g. migration not applied). */
-  isFileImported: (sha256: string) => Promise<boolean | null>;
+  /** Earliest batch with this hash, or null when the file is new or the lookup failed. A failed lookup does not block. */
+  priorImport: (sha256: string) => Promise<PriorImport | null>;
   callImport: (payload: ImportRpcPayload) => Promise<ImportRpcResult>;
   loadXlsx: () => Promise<XlsxLike>;
 }
@@ -54,8 +53,9 @@ export interface PreviewResult {
   rowErrors: RowIssue[];
   warnings: RowIssue[];
   customers: CustomerPlan;
-  alreadyImported: boolean | null;
-  /** Reasons a commit would be refused right now, before the user's approvals. */
+  /** Set when this exact file was imported before. The user confirms with Import anyway. */
+  priorImport: PriorImport | null;
+  /** Reasons a commit would be refused even after Import anyway (file errors, empty file, too many rows). */
   blockers: string[];
 }
 
@@ -71,7 +71,6 @@ export class StrictImportError extends Error {
 }
 
 async function guard(deps: StrictImportDeps) {
-  if (!deps.enabled) throw new StrictImportError("The strict importer is turned off (strict_import_enabled = false).", "disabled");
   if (!(await deps.hasImportRole())) throw new StrictImportError("Only Admin, Ops Lead or Ops User can import transactions.", "forbidden");
 }
 
@@ -87,15 +86,15 @@ async function analyse(deps: StrictImportDeps, input: StrictFileInput) {
   const norms = [...new Set(validation.records.map((r) => r.customer_name).filter((n): n is string => !!n).map(normalizeName))];
   const existing = norms.length > 0 ? await deps.findCustomers(norms) : [];
   const customers = planCustomers(validation.records, existing);
-  const alreadyImported = await deps.isFileImported(fileSha256);
-  return { fileSha256, sheet, validation, customers, alreadyImported };
+  const priorImport = await deps.priorImport(fileSha256);
+  return { fileSha256, sheet, validation, customers, priorImport };
 }
 
 export async function runPreview(deps: StrictImportDeps, input: StrictFileInput): Promise<PreviewResult> {
   await guard(deps);
-  const { fileSha256, sheet, validation, customers, alreadyImported } = await analyse(deps, input);
-  // Blockers that do not depend on the user's choices (approvals/acknowledgement are made in the UI).
-  const blockers = commitBlockers(validation, customers, { warningsAcknowledged: true, approvedNewCustomers: customers.newCustomers }, { alreadyImported });
+  const { fileSha256, sheet, validation, customers, priorImport } = await analyse(deps, input);
+  // Duplicate-file confirmation is separate from these blockers.
+  const blockers = commitBlockers(validation, { priorImport, importAnyway: true });
   return {
     templateVersion: STRICT_TEMPLATE_VERSION,
     templateStatus: STRICT_TEMPLATE_STATUS,
@@ -106,15 +105,15 @@ export async function runPreview(deps: StrictImportDeps, input: StrictFileInput)
     rowErrors: validation.rowErrors,
     warnings: validation.warnings,
     customers,
-    alreadyImported,
+    priorImport,
     blockers,
   };
 }
 
 export interface CommitInput extends StrictFileInput {
   expectedSha256: string;
-  warningsAcknowledged: boolean;
-  approvedNewCustomers: string[];
+  /** Required when this file hash was imported before. */
+  importAnyway: boolean;
 }
 
 export interface CommitResult {
@@ -137,11 +136,11 @@ function toCentsExact(v: number | string): number {
 
 export async function runCommit(deps: StrictImportDeps, input: CommitInput): Promise<CommitResult> {
   await guard(deps);
-  const { fileSha256, validation, customers, alreadyImported } = await analyse(deps, input);
+  const { fileSha256, validation, customers, priorImport } = await analyse(deps, input);
   if (fileSha256 !== input.expectedSha256) {
     throw new StrictImportError("The file is not the one you previewed. Run preview again.", "file_changed");
   }
-  const reasons = commitBlockers(validation, customers, input, { alreadyImported });
+  const reasons = commitBlockers(validation, { priorImport, importAnyway: input.importAnyway });
   if (reasons.length > 0) throw new StrictImportError("Import refused", "blocked", reasons);
 
   const payload: ImportRpcPayload = {

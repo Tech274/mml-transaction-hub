@@ -81,4 +81,14 @@ describe("legacy bulk import is lenient (production path)", () => {
     expect(batch.rowsToImport).toBe(3);
     expect(batch.rows.filter((r) => !r.blank).map((r) => r.values?.potential_id)).toEqual(["PID-SYN-1", "PID-SYN-1", "PID-SYN-2"]);
   });
+
+  it("identical non-blank rows are not merged: N rows give N records", () => {
+    const blank = Object.fromEntries(Object.keys(full).map((k) => [k, ""]));
+    const batch = parseLenientBulkRows([full, full, blank, full], "public_cloud");
+    const kept = batch.rows.filter((r) => !r.blank);
+    expect(batch.blankRowsIgnored).toBe(1);
+    expect(batch.rowsToImport).toBe(3);
+    expect(kept).toHaveLength(3);
+    expect(kept.every((r) => r.values?.lab_name === full.lab_name && r.values?.potential_id === full.potential_id)).toBe(true);
+  });
 });

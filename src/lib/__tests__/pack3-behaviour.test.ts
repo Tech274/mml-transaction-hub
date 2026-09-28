@@ -45,16 +45,13 @@ describe("3A: RBAC admin permission group", () => {
   });
 });
 
-describe("3B: legacy bulk import duplicate matching", () => {
+describe("3B: legacy bulk import is insert-only", () => {
   const code = src["/src/components/bulk-import.tsx"];
-  it("matches existing ADRs on potential_id + month + year + lab_name among live rows only", () => {
-    const m = code.match(/const \{ data: match[^;]*?;/s);
-    expect(m).not.toBeNull();
-    const q = m![0];
-    for (const col of ['"potential_id"', '"month"', '"year"', '"lab_name"', '"is_deleted", false']) expect(q).toContain(`.eq(${col}`);
-  });
-  it("'update' writes only the chosen fields to the one matched row (by id)", () => {
-    expect(code).toMatch(/for \(const f of updateFields\) if \(f in fullPayload\) partial\[f\] = fullPayload\[f\];/);
-    expect(code).toMatch(/\.update\(partial as never\)\s*\.eq\("id", match\.id\)/);
+  it("inserts every non-blank row and does not match on potential_id + month + year + lab_name", () => {
+    expect(code).not.toMatch(/const \{ data: match/);
+    expect(code).not.toMatch(/\.eq\("potential_id"/);
+    expect(code).not.toMatch(/\.update\(partial as never\)/);
+    expect(code).toMatch(/from\("transactions"\)\.insert\(fullPayload as never\)/);
+    expect(code).toMatch(/Every non-blank row is a new transaction/);
   });
 });

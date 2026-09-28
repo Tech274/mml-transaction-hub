@@ -119,9 +119,11 @@ Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
 - `scrum103_lenient_import.sql` (SCRUM-103, 28 Sep). Drops NOT NULL on the transaction
   fields that may be blank, keeps `CHECK (>= 0)` only when a cost is present, drops any
   input-vs-selling check and the end-date order check, and relaxes `classify_transaction`
-  plus `import_transactions_batch`, and adds stored generated `is_complete` (plus an
+  plus `import_transactions_batch`, fills a blank private `cloud_provider` with
+  MakeMyLabs Private Cloud, drops the unique constraint on `import_batches.file_sha256`
+  (a non-unique index remains), and adds stored generated `is_complete` (plus an
   index) for the All Transactions filter. Rollback is in the file header, including
-  `DROP COLUMN is_complete`. Live order: apply register #4, then move this file into
+  `DROP COLUMN is_complete` and restoring the unique hash. Live order: apply register #4, then move this file into
   `supabase/migrations/` with a fresh timestamp and apply it, then publish. Do not backfill 0.
 
 Files 1–6 were merged before rule 3 existed, so their rollback lives here instead of in the file.
