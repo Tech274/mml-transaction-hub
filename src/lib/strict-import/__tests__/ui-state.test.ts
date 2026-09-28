@@ -10,7 +10,6 @@ const preview = (over: Partial<PreviewResult> = {}): PreviewResult => ({
   fileSha256: "a".repeat(64),
   sheetName: null,
   summary: { rowsInFile: 1, blankRowsIgnored: 0, rowsToImport: 1, errorCount: 0, warningCount: 0, totalSellingCents: 100, totalInputCents: 50, distinctCustomers: 1 },
-  headerErrors: [],
   rowErrors: [],
   warnings: [],
   customers: { newCustomers: ["Beta Test Ltd"], matchedWithDifferentSpelling: [], inFileVariants: [] },

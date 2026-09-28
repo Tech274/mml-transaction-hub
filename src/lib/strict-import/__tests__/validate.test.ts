@@ -20,7 +20,6 @@ describe("headers", () => {
   it("a missing column is stored blank, warned, and does not block", () => {
     const r = validateStrict(HEADER.slice(0, 11), [row(2)]);
     expect(r.ok).toBe(true);
-    expect(r.headerErrors).toEqual([]);
     expect(r.records[0].cloud_provider).toBeNull();
     expect(r.warnings).toEqual([
       expect.objectContaining({ header: "Cloud Provider", message: 'Column "Cloud Provider" is missing. Those cells are stored blank.' }),
@@ -32,7 +31,6 @@ describe("headers", () => {
     const cells = [...row(2).cells, "4", "bring laptop"];
     const r = validateStrict(header, [{ line: 2, cells }]);
     expect(r.ok).toBe(true);
-    expect(r.headerErrors).toEqual([]);
     expect(r.records).toHaveLength(1);
     expect(r.records[0].cloud_provider).toBe("AWS");
     expect(r.records[0].potential_id).toBe("PID-TEST-001");
@@ -45,7 +43,6 @@ describe("headers", () => {
     const header = ["Potential ID", "", ...HEADER.slice(2)];
     const r = validateStrict(header, [row(2)]);
     expect(r.ok).toBe(true);
-    expect(r.headerErrors).toEqual([]);
     expect(r.records[0].month).toBeNull();
     expect(r.records[0].year).toBe(2026);
     expect(r.records[0].lab_name).toBe("Synthetic Lab A");
@@ -53,7 +50,6 @@ describe("headers", () => {
   });
   it("an explicitly ignored column produces no warning", () => {
     const r = validateStrict([...HEADER, "S.No"], [row(2)], { rules: { ...PROPOSED_RULES, ignoredHeaders: ["s.no"] } });
-    expect(r.headerErrors).toEqual([]);
     expect(r.warnings.filter((w) => w.header === "S.No")).toEqual([]);
     expect(r.ok).toBe(true);
   });
@@ -81,8 +77,8 @@ describe("headers", () => {
   });
 });
 
-function commitReady(r: { ok: boolean; headerErrors: unknown[] }) {
-  return r.ok && r.headerErrors.length === 0;
+function commitReady(r: { ok: boolean }) {
+  return r.ok;
 }
 
 describe("one row in = one row out", () => {

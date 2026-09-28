@@ -544,8 +544,6 @@ export function BulkImport() {
     setProgress({ done: 0, total: valid.length, succeeded: 0, failed: 0, isRetry: isRetryRun });
     const updated = [...rows];
     let imported = 0, skipped = 0, updatedCount = 0, linked = 0;
-    // Distinct existing transactions matched by the natural key across this file.
-    const matchedIds = new Set<string>();
 
     // Create run header
     const { data: run, error: runErr } = await supabase
@@ -555,7 +553,10 @@ export function BulkImport() {
         user_email: user.email ?? null,
         kind,
         filename: fileName,
-        duplicate_strategy: "skip",
+        // Every non-blank row is inserted; nothing is skipped, updated or linked as a
+        // duplicate. Needs 'insert' in bulk_import_runs_duplicate_strategy_check
+        // (scrum103_customer_name_normalize.sql), so apply that before publishing.
+        duplicate_strategy: "insert",
         total_rows: rows.length,
         valid_rows: valid.length,
         invalid_rows: rows.length - valid.length,
@@ -790,7 +791,6 @@ export function BulkImport() {
         details: {
           kind, filename: fileName, strategy: "insert",
           imported, updated: updatedCount, skipped, linked,
-          unique_matched: matchedIds.size,
           valid: valid.length, invalid: rows.length - valid.length,
           claimed_valid: valid.length,
         },
@@ -816,7 +816,6 @@ export function BulkImport() {
         details: {
           kind, filename: fileName, strategy: "insert",
           imported, updated: updatedCount, skipped, linked,
-          unique_matched: matchedIds.size,
           valid: valid.length, invalid: rows.length - valid.length,
           error: (e as Error).message,
         },

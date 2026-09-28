@@ -307,3 +307,75 @@ describe("existing sandbox SQL checks also pass locally", () => {
     await db.exec("rollback").catch(() => undefined);
   });
 });
+
+// SCRUM-103: the pending customer-name file revokes EXECUTE on its two helpers from
+// PUBLIC and anon. The import RPC (SECURITY DEFINER) and the customer trigger (runs as
+// the caller) must still work for an ops user, and anon must not call the helpers.
+describe("pending scrum103_customer_name_normalize.sql: helper grants", () => {
+  let cdb: PGlite;
+  beforeAll(async () => {
+    cdb = await createLocalDb({ extraSqlFiles: ["supabase/migrations-pending/scrum103_customer_name_normalize.sql"] });
+    await cdb.query("insert into auth.users (id, email) values ($1, 'ops@example.test'), ($2, 'viewer@example.test')", [U.opsUser, U.viewer]);
+    await cdb.exec("delete from public.user_roles");
+    await cdb.query("insert into public.user_roles (user_id, role) values ($1, 'ops_user'::app_role), ($2, 'viewer'::app_role)", [U.opsUser, U.viewer]);
+  }, 120_000);
+
+  it("anon and PUBLIC cannot execute the helpers; authenticated and service_role can", async () => {
+    const r = await cdb.query<{ fn: string; anon: boolean; auth: boolean; svc: boolean; pub: boolean }>(
+      `select p.proname fn,
+              has_function_privilege('anon', p.oid, 'EXECUTE') anon,
+              has_function_privilege('authenticated', p.oid, 'EXECUTE') auth,
+              has_function_privilege('service_role', p.oid, 'EXECUTE') svc,
+              coalesce(p.proacl::text, '') ~ '(^|[{,])=X/' pub
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname in ('clean_customer_name', 'normalize_customer_name')
+        order by 1`,
+    );
+    expect(r.rows).toEqual([
+      { fn: "clean_customer_name", anon: false, auth: true, svc: true, pub: false },
+      { fn: "normalize_customer_name", anon: false, auth: true, svc: true, pub: false },
+    ]);
+    expect(await asActor(cdb, { role: "anon" }, (q) => outcome(q.query("select public.normalize_customer_name('x')")))).toBe("42501");
+    expect(await asActor(cdb, { role: "anon" }, (q) => outcome(q.query("select public.clean_customer_name('x')")))).toBe("42501");
+  });
+
+  it("an ops user creating a customer directly goes through the trigger with the new key", async () => {
+    const got = await asActor(cdb, as(U.opsUser), async (q) => {
+      await q.query("insert into public.customers (customer_name, created_by) values ($1, $2)", ["Grant" + String.fromCharCode(160) + "  Test   Co", U.opsUser]);
+      return (await q.query<{ normalized_name: string }>("select normalized_name from public.customers where created_by = $1", [U.opsUser])).rows;
+    });
+    expect(got).toEqual([{ normalized_name: "grant test co" }]);
+  });
+
+  it("an ops user calling import_transactions_batch creates a missing customer (RPC caller path)", async () => {
+    const got = await asActor(cdb, as(U.opsUser), async (q) => {
+      const res = await q.query<{ r: { inserted: number } }>(
+        `select public.import_transactions_batch('public_cloud', 'grants.xlsx', $1, '2.0.0-proposed',
+           jsonb_build_array(jsonb_build_object('source_line', 2, 'customer_name', 'Rpc' || chr(160) || ' Grant  Labs', 'lab_name', 'Lab G')),
+           '[]'::jsonb) r`,
+        ["e".repeat(64)],
+      );
+      const c = await q.query<{ n: number }>("select count(*)::int n from public.customers where normalized_name = 'rpc grant labs'");
+      const t = await q.query<{ n: number }>(
+        "select count(*)::int n from public.transactions t join public.customers c on c.id = t.customer_id where c.normalized_name = 'rpc grant labs'",
+      );
+      return { inserted: res.rows[0].r.inserted, customers: c.rows[0].n, linked: t.rows[0].n };
+    });
+    expect(got).toEqual({ inserted: 1, customers: 1, linked: 1 });
+  });
+
+  it("a viewer still cannot call import_transactions_batch", async () => {
+    const got = await asActor(cdb, as(U.viewer), (q) =>
+      outcome(q.query("select public.import_transactions_batch('public_cloud', 'v.xlsx', $1, '2.0.0-proposed', jsonb_build_array(jsonb_build_object('source_line', 2, 'customer_name', 'V Co')), '[]'::jsonb)", ["f".repeat(64)])),
+    );
+    expect(got).toBe("42501");
+  });
+
+  it("bulk_import_runs accepts duplicate_strategy 'insert' and still rejects unknown values", async () => {
+    const def = await cdb.query<{ d: string }>(
+      "select pg_get_constraintdef(oid) d from pg_constraint where conname = 'bulk_import_runs_duplicate_strategy_check'",
+    );
+    expect(def.rows[0].d).toContain("'insert'");
+    expect(def.rows[0].d).not.toContain("'merge'");
+  });
+});

@@ -2,30 +2,58 @@
 -- approval-required: SCRUM-103. NOT APPROVED. Do not move into supabase/migrations/ until approved.
 -- Status: REPO ONLY, NOT APPLIED. Waiting in supabase/migrations-pending/.
 --
--- The app key is trim, collapse internal whitespace, lowercase, and treat NBSP
--- (and the other unicode spaces JavaScript counts as whitespace) as a normal space.
--- import_transactions_batch creates any missing customer itself. It does not raise
--- when the name was not passed in p_customer_names.
+-- Apply AFTER 20260928031000_scrum103_lenient_import.sql (applied to live 28 Sep 2026).
+-- This file replaces import_transactions_batch; its body is the applied 20260928031000
+-- body with only the customer lookup changed. When approved, move it into
+-- supabase/migrations/ with a timestamp later than 20260928031000 and add an
+-- '-- approved-destructive:' line (the CHECK in section 4 is dropped and re-added).
+-- Apply the migration BEFORE publishing the app code that needs it (the legacy bulk
+-- import writes duplicate_strategy = 'insert', and the strict import relies on the RPC
+-- creating a missing customer). Old app code keeps working on this schema.
 --
--- Safe to apply after 20260925130000_scrum103_import_batches.sql. If
--- scrum103_lenient_import.sql is also applied, either order is fine: both install
--- these same functions. This file does not change columns.
+-- What changes:
+--   1. clean_customer_name / normalize_customer_name: the app key. Trim, collapse
+--      internal whitespace, lowercase, and treat NBSP (and the other unicode spaces
+--      JavaScript counts as whitespace) as a normal space. EXECUTE is revoked from
+--      PUBLIC and anon, and granted to authenticated and service_role only, because
+--      set_normalized_customer runs as the calling user when a customer row is written.
+--      import_transactions_batch is SECURITY DEFINER (owner postgres) and needs nothing extra.
+--   2. set_normalized_customer uses normalize_customer_name.
+--   3. import_transactions_batch creates any missing customer itself. It does not raise
+--      when the name was not passed in p_customer_names.
+--   4. bulk_import_runs.duplicate_strategy also accepts 'insert' (the legacy bulk import
+--      inserts every row; nothing is skipped, updated or linked).
+--   No transaction or customer column changes. No data is rewritten.
 --
--- Rollback:
+-- Rollback (in this order):
+--   a) Restore the trigger function exactly as live had it before this file:
 --   CREATE OR REPLACE FUNCTION public.set_normalized_customer()
---   RETURNS TRIGGER LANGUAGE plpgsql AS $$
+--   RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
 --   BEGIN
 --     NEW.normalized_name := lower(regexp_replace(trim(NEW.customer_name), '\s+', ' ', 'g'));
 --     NEW.updated_at := now();
 --     RETURN NEW;
 --   END;
 --   $$;
---   Re-apply import_transactions_batch from
---   supabase/migrations/20260925130000_scrum103_import_batches.sql
---   (or from scrum103_lenient_import.sql if that file was applied and this one was not).
+--   b) Restore the applied import_transactions_batch body: re-run section 4 of
+--      supabase/migrations/20260928031000_scrum103_lenient_import.sql, from
+--      "CREATE OR REPLACE FUNCTION public.import_transactions_batch(" through its
+--      REVOKE ALL / GRANT EXECUTE lines (lines 159-333 of that file, md5 of those lines
+--      1bdf3b8af414b3b1b41754e02d5f4b1f). Do not use the 20260925130000 body: that
+--      one is strict and would undo the lenient import.
+--   c) Only after a) and b), drop the helpers:
 --   DROP FUNCTION IF EXISTS public.normalize_customer_name(text);
 --   DROP FUNCTION IF EXISTS public.clean_customer_name(text);
+--   d) Revert the app code that writes 'insert' first. Then, only if
+--      SELECT count(*) FROM public.bulk_import_runs WHERE duplicate_strategy = 'insert'
+--      returns 0:
+--   ALTER TABLE public.bulk_import_runs
+--     DROP CONSTRAINT IF EXISTS bulk_import_runs_duplicate_strategy_check,
+--     ADD CONSTRAINT bulk_import_runs_duplicate_strategy_check
+--       CHECK (duplicate_strategy IN ('skip', 'update', 'link'));
+--      If 'insert' rows exist, leave the wider CHECK in place (do not rewrite run history).
 
+-- 1) Customer-name helpers.
 CREATE OR REPLACE FUNCTION public.clean_customer_name(p_name text)
 RETURNS text
 LANGUAGE sql
@@ -63,6 +91,12 @@ AS $$
   SELECT lower(public.clean_customer_name(p_name));
 $$;
 
+REVOKE ALL ON FUNCTION public.clean_customer_name(text) FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION public.normalize_customer_name(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.clean_customer_name(text) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.normalize_customer_name(text) TO authenticated, service_role;
+
+-- 2) The customer trigger uses the same key.
 CREATE OR REPLACE FUNCTION public.set_normalized_customer()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -75,7 +109,8 @@ BEGIN
 END;
 $$;
 
--- 5) All-or-nothing batch, now null-safe. A bad cell becomes NULL; the row is still inserted.
+-- 3) All-or-nothing batch (applied 20260928031000 body). Only the customer lookup differs:
+--    a customer that is not found is created instead of raising.
 CREATE OR REPLACE FUNCTION public.import_transactions_batch(
   p_kind text,
   p_filename text,
@@ -259,3 +294,9 @@ $$;
 
 REVOKE ALL ON FUNCTION public.import_transactions_batch(text, text, text, text, jsonb, jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.import_transactions_batch(text, text, text, text, jsonb, jsonb) TO authenticated;
+
+-- 4) Legacy bulk import records what it does: every row is inserted.
+ALTER TABLE public.bulk_import_runs
+  DROP CONSTRAINT IF EXISTS bulk_import_runs_duplicate_strategy_check,
+  ADD CONSTRAINT bulk_import_runs_duplicate_strategy_check
+    CHECK (duplicate_strategy IN ('skip', 'update', 'link', 'insert'));

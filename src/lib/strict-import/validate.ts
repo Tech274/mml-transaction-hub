@@ -10,12 +10,6 @@
 import { isBlankCell, isExcelDate, isIsoDate, type RawCell, type RawRow } from "./cells";
 import { PROPOSED_RULES, columnLetter, normalizeHeader, type StrictColumn, type StrictField, type StrictRules } from "./template";
 
-export interface HeaderError {
-  column: string | null;
-  header: string | null;
-  message: string;
-}
-
 export interface RowIssue {
   line: number;
   column: string | null;
@@ -53,7 +47,6 @@ export interface StrictSummary {
 }
 
 export interface StrictValidationResult {
-  headerErrors: HeaderError[];
   rowErrors: RowIssue[];
   warnings: RowIssue[];
   records: StrictRecord[];
@@ -145,7 +138,6 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
   const { map, warnings: headerWarnings } = matchHeaders(header, rules);
   const rowErrors: RowIssue[] = [];
   const warnings: RowIssue[] = [...headerWarnings];
-  const headerErrors: HeaderError[] = [];
   const records: StrictRecord[] = [];
   let blankRows = opts?.blankRowsIgnored ?? 0;
 
@@ -279,7 +271,6 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
   const customers = new Set(records.map((r) => r.customer_name).filter((x): x is string => !!x));
 
   return {
-    headerErrors,
     rowErrors,
     warnings,
     records,
