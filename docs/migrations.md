@@ -9,8 +9,10 @@ rollback. Merging a migration to `main` **does not apply it**.
   lenient follow-up. 8 register migrations were applied on 28 Sep 2026 between 04:22 and 04:50 IST;
   register #4 `20260925130000_scrum103_import_batches` at ~07:40 IST and
   `20260928031000_scrum103_lenient_import` (moved from `supabase/migrations-pending/`) at ~07:50 IST,
-  with Vivek's GO (28 Sep 06:35 IST) and Atlas's review of PR #39. Each is recorded in
-  `supabase_migrations.schema_migrations` (45 rows, latest `20260928031000`).
+  with Vivek's GO (28 Sep 06:35 IST) and Atlas's review of PR #39. Register #10
+  `20260928040000_scrum103_customer_name_normalize` was applied at ~09:58 IST with Vivek's GO
+  (28 Sep 09:51 IST), after a backup (`backup-2026-09-28c`) and a read-only drift check (0 of 23).
+  Each is recorded in `supabase_migrations.schema_migrations` (46 rows, latest `20260928040000`).
 - The app code from `main` 3ab3bc7e (PR #39) was pushed to `Tech274/mml-internal` (commit
   `aa5c1f4`) after both migrations and then published through Lovable at ~07:55 IST (deploy `77d2bf72`, bundle `index-D_tFFzDm.js`).
   That repository does not carry the register migrations, `supabase/migrations-pending/` or
@@ -31,7 +33,6 @@ rollback. Merging a migration to `main` **does not apply it**.
 | 7 | A migration PR needs a second reviewer (not the author) before merge, even when CI is green | Review (PR template checklist) |
 | 8 | Sandbox first: each migration is applied and verified on sandbox before live | Register below |
 | 9 | Live apply needs Atlas's engineering go-ahead **and** Vivek's approval, a fresh backup (SCRUM-62), and follows the release order | Register below |
-| 10 | `20260928040000_scrum103_customer_name_normalize` | SCRUM-103 | `clean_customer_name` / `normalize_customer_name` (EXECUTE: authenticated + service_role only); customer trigger uses that key; `import_transactions_batch` creates a missing customer instead of raising "not approved"; `bulk_import_runs_duplicate_strategy_check` also allows `'insert'`. Locks `customers` and stops on any key drift (preflight) | After `20260928031000`. Backup, read-only drift check = 0, then apply, then publish PR #41 code (the code writes `'insert'`) | File header: restore the trigger (with `SET search_path = public`) and the 20260928031000 `import_transactions_batch` body, drop the helpers, then the old CHECK only if no `'insert'` rows | skipped (Vivek GO direct to live, 28 Sep 09:51 IST) | pending apply (Vivek GO 28 Sep 09:51 IST) |
 
 A destructive change waiting for approval sits in `supabase/migrations-pending/`, outside the path
 that any tool applies (see the README there).
@@ -116,6 +117,7 @@ migration.
 | 7 | `20260928010000_scrum57_revoke_unused_write_grants` | SCRUM-57 | Removes write grants that no policy uses. No behaviour change | Drift check first (`docs/rls-audit.md`) | GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:50 IST |
 | 8 | `20260928020000_scrum102_agent_identities_server_writes` | SCRUM-102 | `agent_identities` becomes read-own for users; the server writes it after its check | **Publish the app code first**, then apply (before the code, "link my agent" fails with an error, no data lost) | Policy + GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:47 IST |
 | 9 | `20260928030000_scrum77_mcp_audit_server_writes` | SCRUM-77 | MCP audit rows written by the server only (users lose INSERT) | **Publish the app code first**, then apply (before the code, audit rows fail to save, logged) | Policy + GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:47 IST |
+| 10 | `20260928040000_scrum103_customer_name_normalize` | SCRUM-103 | `clean_customer_name` / `normalize_customer_name` (EXECUTE: authenticated + service_role only); customer trigger uses that key; `import_transactions_batch` creates a missing customer instead of raising "not approved"; `bulk_import_runs_duplicate_strategy_check` also allows `'insert'`. Locks `customers` and stops on any key drift (preflight) | After `20260928031000`. Backup, read-only drift check = 0, then apply, then publish PR #41 code (the code writes `'insert'`) | File header: restore the trigger (with `SET search_path = public`) and the 20260928031000 `import_transactions_batch` body, drop the helpers, then the old CHECK only if no `'insert'` rows | skipped (Vivek GO direct to live, 28 Sep 09:51 IST) | 28 Sep ~09:58 IST |
 
 Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
 
