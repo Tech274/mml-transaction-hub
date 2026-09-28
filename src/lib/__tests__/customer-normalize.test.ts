@@ -99,12 +99,12 @@ describe("duplicate detection logic", () => {
 // SCRUM-103: the app key and the SQL key must treat the same unicode spaces as a space.
 // Parse both lists from source so a change on one side fails here.
 describe("TS and SQL unicode space lists match", () => {
-  it("UNICODE_SPACES in customer-normalize.ts equals the translate() list in the pending SQL", async () => {
+  it("UNICODE_SPACES in customer-normalize.ts equals the translate() list in the SQL migration", async () => {
     const { readFileSync } = await import("node:fs");
     const path = await import("node:path");
     const root = path.resolve(__dirname, "../../..");
     const ts = readFileSync(path.join(root, "src/lib/customer-normalize.ts"), "utf8");
-    const sql = readFileSync(path.join(root, "supabase/migrations-pending/scrum103_customer_name_normalize.sql"), "utf8");
+    const sql = readFileSync(path.join(root, "supabase/migrations/20260928040000_scrum103_customer_name_normalize.sql"), "utf8");
 
     const cls = ts.match(/const UNICODE_SPACES = \/\[([^\]]+)\]\/g;/);
     expect(cls).not.toBeNull();

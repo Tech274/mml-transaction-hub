@@ -288,33 +288,26 @@ describe("existing sandbox SQL checks also pass locally", () => {
     await db.exec("rollback").catch(() => undefined);
   });
 
-  // The lenient rules are in supabase/migrations/20260928031000_scrum103_lenient_import.sql
-  // (applied to live 28 Sep), so the local database already has them. Only the
-  // pending scrum103_customer_name_normalize.sql is injected, inside the sandbox
-  // script's own transaction, and rolled back. It never touches live.
+  // 20260928031000_scrum103_lenient_import and 20260928040000_scrum103_customer_name_normalize
+  // are both in supabase/migrations, so the local database already has them. The sandbox
+  // script runs inside its own transaction and is rolled back. It never touches live.
   it("supabase/tests/rls/scrum103_import_batch.sql", async () => {
     const { readFileSync } = await import("node:fs");
     const path = await import("node:path");
     const root = path.resolve(__dirname, "../../..");
-    const customer = readFileSync(path.join(root, "supabase/migrations-pending/scrum103_customer_name_normalize.sql"), "utf8");
     const sql = readFileSync(path.join(root, "supabase/tests/rls/scrum103_import_batch.sql"), "utf8");
-    const begin = sql.match(/^\s*BEGIN\s*;/m);
-    expect(begin).not.toBeNull();
-    // String#replace treats $$ in the replacement as a single $, which would
-    // break the function bodies. A function return value is inserted as-is.
-    const combined = sql.replace(begin![0], () => `${begin![0]}\n${customer}\n`);
-    await expect(db.exec(combined)).resolves.toBeDefined();
+    await expect(db.exec(sql)).resolves.toBeDefined();
     await db.exec("rollback").catch(() => undefined);
   });
 });
 
-// SCRUM-103: the pending customer-name file revokes EXECUTE on its two helpers from
+// SCRUM-103: 20260928040000_scrum103_customer_name_normalize revokes EXECUTE on its two helpers from
 // PUBLIC and anon. The import RPC (SECURITY DEFINER) and the customer trigger (runs as
 // the caller) must still work for an ops user, and anon must not call the helpers.
-describe("pending scrum103_customer_name_normalize.sql: helper grants", () => {
+describe("20260928040000_scrum103_customer_name_normalize: helper grants", () => {
   let cdb: PGlite;
   beforeAll(async () => {
-    cdb = await createLocalDb({ extraSqlFiles: ["supabase/migrations-pending/scrum103_customer_name_normalize.sql"] });
+    cdb = await createLocalDb();
     await cdb.query("insert into auth.users (id, email) values ($1, 'ops@example.test'), ($2, 'viewer@example.test')", [U.opsUser, U.viewer]);
     await cdb.exec("delete from public.user_roles");
     await cdb.query("insert into public.user_roles (user_id, role) values ($1, 'ops_user'::app_role), ($2, 'viewer'::app_role)", [U.opsUser, U.viewer]);
@@ -398,17 +391,25 @@ describe("pending scrum103_customer_name_normalize.sql: helper grants", () => {
 
   it("the preflight stops the file when a stored customer key differs from the new key", async () => {
     const sql = (await import("node:fs")).readFileSync(
-      (await import("node:path")).resolve(__dirname, "../../..", "supabase/migrations-pending/scrum103_customer_name_normalize.sql"),
+      (await import("node:path")).resolve(__dirname, "../../..", "supabase/migrations/20260928040000_scrum103_customer_name_normalize.sql"),
       "utf8",
     );
     const fresh = await createLocalDb();
     await fresh.query("insert into auth.users (id, email) values ($1, 'ops@example.test')", [U.opsUser]);
-    // Old trigger key keeps the NBSP; the new key turns it into a space.
-    await fresh.query("insert into public.customers (customer_name, created_by) values ($1, $2)", ["Drift" + String.fromCharCode(160) + "Co", U.opsUser]);
+    // Build a row with the OLD key (NBSP kept), as a customer saved before this file would have.
+    const nbsp = String.fromCharCode(160);
+    await fresh.exec("alter table public.customers disable trigger customers_normalize");
+    await fresh.query("insert into public.customers (customer_name, normalized_name, created_by) values ($1, $2, $3)", [`Drift${nbsp}Co`, `drift${nbsp}co`, U.opsUser]);
+    await fresh.exec("alter table public.customers enable trigger customers_normalize");
+    // Marker: the file GRANTs this before the preflight; a full rollback leaves it revoked.
+    await fresh.exec("revoke execute on function public.clean_customer_name(text) from authenticated");
     await expect(fresh.exec(sql)).rejects.toThrow(/SCRUM-103 preflight: 1 customers row\(s\)/);
-    // Nothing from the file stayed behind.
-    const left = await fresh.query<{ n: number }>("select count(*)::int n from pg_proc where proname in ('clean_customer_name', 'normalize_customer_name')");
-    expect(left.rows[0].n).toBe(0);
+    const after = await fresh.query<{ granted: boolean; key: string }>(
+      `select has_function_privilege('authenticated', 'public.clean_customer_name(text)', 'EXECUTE') granted,
+              (select normalized_name from public.customers where customer_name = $1) key`,
+      [`Drift${nbsp}Co`],
+    );
+    expect(after.rows[0]).toEqual({ granted: false, key: `drift${nbsp}co` });
     await fresh.close();
   }, 120_000);
 });

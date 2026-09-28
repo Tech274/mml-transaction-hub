@@ -555,7 +555,7 @@ export function BulkImport() {
         filename: fileName,
         // Every non-blank row is inserted; nothing is skipped, updated or linked as a
         // duplicate. Needs 'insert' in bulk_import_runs_duplicate_strategy_check
-        // (scrum103_customer_name_normalize.sql), so apply that before publishing.
+        // (migration 20260928040000_scrum103_customer_name_normalize).
         duplicate_strategy: "insert",
         total_rows: rows.length,
         valid_rows: valid.length,

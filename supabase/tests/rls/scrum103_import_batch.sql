@@ -1,9 +1,8 @@
 -- SCRUM-103 checks for import_transactions_batch(). SANDBOX ONLY, never live.
 -- Run after BOTH 20260925130000_scrum103_import_batches.sql AND
 -- 20260928031000_scrum103_lenient_import.sql (both applied to live 28 Sep 2026).
--- The customer-name section at the end also needs the pending
--- supabase/migrations-pending/scrum103_customer_name_normalize.sql (the local test
--- injects it inside this transaction).
+-- The customer-name section at the end also needs
+-- 20260928040000_scrum103_customer_name_normalize.sql.
 -- Everything is inside a transaction that is rolled back. Synthetic values only.
 BEGIN;
 

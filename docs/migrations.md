@@ -31,6 +31,7 @@ rollback. Merging a migration to `main` **does not apply it**.
 | 7 | A migration PR needs a second reviewer (not the author) before merge, even when CI is green | Review (PR template checklist) |
 | 8 | Sandbox first: each migration is applied and verified on sandbox before live | Register below |
 | 9 | Live apply needs Atlas's engineering go-ahead **and** Vivek's approval, a fresh backup (SCRUM-62), and follows the release order | Register below |
+| 10 | `20260928040000_scrum103_customer_name_normalize` | SCRUM-103 | `clean_customer_name` / `normalize_customer_name` (EXECUTE: authenticated + service_role only); customer trigger uses that key; `import_transactions_batch` creates a missing customer instead of raising "not approved"; `bulk_import_runs_duplicate_strategy_check` also allows `'insert'`. Locks `customers` and stops on any key drift (preflight) | After `20260928031000`. Backup, read-only drift check = 0, then apply, then publish PR #41 code (the code writes `'insert'`) | File header: restore the trigger (with `SET search_path = public`) and the 20260928031000 `import_transactions_batch` body, drop the helpers, then the old CHECK only if no `'insert'` rows | skipped (Vivek GO direct to live, 28 Sep 09:51 IST) | pending apply (Vivek GO 28 Sep 09:51 IST) |
 
 A destructive change waiting for approval sits in `supabase/migrations-pending/`, outside the path
 that any tool applies (see the README there).
@@ -124,7 +125,8 @@ Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
   Nullable transaction fields, no input-vs-selling or end-date order check, lenient
   `classify_transaction` (blank private provider filled) and `import_transactions_batch`,
   non-unique `import_batches.file_sha256` index, stored generated `is_complete`.
-- `scrum103_customer_name_normalize.sql` (SCRUM-103). Installs `clean_customer_name` /
+- `scrum103_customer_name_normalize.sql` moved to `supabase/migrations/20260928040000_scrum103_customer_name_normalize.sql`
+  (register #10) with Vivek's GO 28 Sep 09:51 IST. Installs `clean_customer_name` /
   `normalize_customer_name` (EXECUTE revoked from PUBLIC/anon), points the customer
   trigger at that key, and replaces `import_transactions_batch` so a missing customer is
   created instead of raising "not approved". The rest of the import function body is the
@@ -132,7 +134,7 @@ Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
   A preflight stops the file if any `customers.normalized_name` differs from the new key
   (read-only check on live 28 Sep ~08:47 IST: 0 of 23 rows differ). Also adds `'insert'` to
   `bulk_import_runs_duplicate_strategy_check`.
-  Rollback is in the file header and restores the applied 20260928031000 body. Not applied.
+  Rollback is in the file header and restores the applied 20260928031000 body.
 
 Files 1–6 were merged before rule 3 existed, so their rollback lives here instead of in the file.
 Rule 6 means the files themselves are not edited.

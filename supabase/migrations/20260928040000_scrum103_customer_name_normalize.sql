@@ -1,12 +1,11 @@
 -- SCRUM-103: align customer-name normalisation and stop 'customer not approved'.
--- approval-required: SCRUM-103. NOT APPROVED. Do not move into supabase/migrations/ until approved.
--- Status: REPO ONLY, NOT APPLIED. Waiting in supabase/migrations-pending/.
+-- approved-destructive: Vivek GO 28 Sep 09:51 IST
+-- (SCRUM-103, PR #41 head f3a4dd5; the CHECK in section 4 is dropped and re-added.)
+-- Status: moved from supabase/migrations-pending/ and recorded as version 20260928040000.
 --
 -- Apply AFTER 20260928031000_scrum103_lenient_import.sql (applied to live 28 Sep 2026).
 -- This file replaces import_transactions_batch; its body is the applied 20260928031000
--- body with only the customer lookup changed. When approved, move it into
--- supabase/migrations/ with a timestamp later than 20260928031000 and add an
--- '-- approved-destructive:' line (the CHECK in section 4 is dropped and re-added).
+-- body with only the customer lookup changed.
 -- Apply the migration BEFORE publishing the app code that needs it (the legacy bulk
 -- import writes duplicate_strategy = 'insert', and the strict import relies on the RPC
 -- creating a missing customer). Old app code keeps working on this schema.
@@ -97,6 +96,10 @@ REVOKE ALL ON FUNCTION public.clean_customer_name(text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.normalize_customer_name(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.clean_customer_name(text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.normalize_customer_name(text) TO authenticated, service_role;
+
+-- Hold customers still (reads allowed, writes wait) from the preflight to COMMIT, so no
+-- row can change between the check and the trigger swap.
+LOCK TABLE public.customers IN SHARE ROW EXCLUSIVE MODE;
 
 -- Preflight: every stored key must already equal the new key. If one differs, the
 -- next UPDATE of that customer would change its normalized_name (and could collide
