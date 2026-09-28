@@ -10,8 +10,19 @@ const SCRIPT = path.resolve(__dirname, "../../../scripts/ci/migration-lint.sh");
 const hasGit = spawnSync("git", ["--version"]).status === 0;
 
 let dir: string;
+/** Pin git to the throwaway repo. A parent GIT_DIR (this workspace) would otherwise lint the real tree. */
+const gitEnv = () => ({
+  ...process.env,
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_DIR: path.join(dir, ".git"),
+  GIT_WORK_TREE: dir,
+});
 const git = (...args: string[]) =>
-  execFileSync("git", args, { cwd: dir, stdio: "pipe", env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1" } }).toString();
+  execFileSync("git", args, {
+    cwd: dir,
+    stdio: "pipe",
+    env: gitEnv(),
+  }).toString();
 const write = (rel: string, body: string) => {
   mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
   writeFileSync(path.join(dir, rel), body);
@@ -22,7 +33,10 @@ const commit = (msg: string) => {
 };
 /** Runs the lint the way CI does for a PR: HEAD compared with origin/main. */
 const lint = () => {
-  const r = spawnSync("bash", [SCRIPT], { cwd: dir, env: { ...process.env, GITHUB_BASE_REF: "main" } });
+  const r = spawnSync("bash", [SCRIPT], {
+    cwd: dir,
+    env: { ...gitEnv(), GITHUB_BASE_REF: "main" },
+  });
   return { code: r.status, out: `${r.stdout}${r.stderr}` };
 };
 
@@ -37,7 +51,14 @@ beforeEach(() => {
   git("init", "-q", "-b", "main");
   git("config", "user.email", "ci@example.invalid");
   git("config", "user.name", "ci");
-  write("supabase/migrations/20260925120000_existing.sql", "-- SCRUM-1: old\nCREATE TABLE public.t (id int);\n");
+  // The agent image signs every commit and enables fsmonitor. Either one can stall a throwaway repo.
+  git("config", "commit.gpgsign", "false");
+  git("config", "core.fsmonitor", "false");
+  git("config", "core.untrackedcache", "false");
+  write(
+    "supabase/migrations/20260925120000_existing.sql",
+    "-- SCRUM-1: old\nCREATE TABLE public.t (id int);\n",
+  );
   commit("base");
   // Simulate the PR checkout: origin/main = base commit, HEAD = feature branch.
   git("update-ref", "refs/remotes/origin/main", "HEAD");
@@ -45,7 +66,7 @@ beforeEach(() => {
 });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
-describe.skipIf(!hasGit)("migration lint (SCRUM-64)", () => {
+(hasGit ? describe.sequential : describe.skip)("migration lint (SCRUM-64)", () => {
   it("passes when no migration changes", () => {
     write("README.md", "x");
     commit("docs");
@@ -73,7 +94,10 @@ describe.skipIf(!hasGit)("migration lint (SCRUM-64)", () => {
     commit("add");
     expect(lint()).toMatchObject({ code: 1, out: expect.stringMatching(/rollback section/) });
 
-    write("supabase/migrations/20260928010000_x.sql", `${GOOD.replace(/^-- Rollback.*$/m, "-- Rollback: none needed, comment only")}`);
+    write(
+      "supabase/migrations/20260928010000_x.sql",
+      `${GOOD.replace(/^-- Rollback.*$/m, "-- Rollback: none needed, comment only")}`,
+    );
     commit("fix");
     expect(lint().code).toBe(0);
   });
@@ -84,7 +108,10 @@ describe.skipIf(!hasGit)("migration lint (SCRUM-64)", () => {
     commit("add");
     expect(lint()).toMatchObject({ code: 1, out: expect.stringMatching(/approved-destructive/) });
 
-    write("supabase/migrations/20260928010000_drop.sql", `-- approved-destructive: SCRUM-100 Vivek 2026-09-30\n${body}`);
+    write(
+      "supabase/migrations/20260928010000_drop.sql",
+      `-- approved-destructive: SCRUM-100 Vivek 2026-09-30\n${body}`,
+    );
     commit("approve");
     expect(lint().code).toBe(0);
   });
@@ -98,9 +125,15 @@ describe.skipIf(!hasGit)("migration lint (SCRUM-64)", () => {
   it("fails a timestamp that is not later than the latest migration on main", () => {
     write("supabase/migrations/20260920000000_older.sql", GOOD);
     commit("add");
-    expect(lint()).toMatchObject({ code: 1, out: expect.stringMatching(/not later than the latest migration.*20260925120000/) });
+    expect(lint()).toMatchObject({
+      code: 1,
+      out: expect.stringMatching(/not later than the latest migration.*20260925120000/),
+    });
 
-    write("supabase/migrations/20260920000000_older.sql", `-- out-of-order-approved: SCRUM-64 Atlas\n${GOOD}`);
+    write(
+      "supabase/migrations/20260920000000_older.sql",
+      `-- out-of-order-approved: SCRUM-64 Atlas\n${GOOD}`,
+    );
     commit("approve");
     expect(lint().code).toBe(0);
   });
@@ -115,7 +148,10 @@ describe.skipIf(!hasGit)("migration lint (SCRUM-64)", () => {
     const f = path.join(dir, "supabase/migrations/20260925120000_existing.sql");
     writeFileSync(f, `${readFileSync(f, "utf8")}ALTER TABLE public.t ADD COLUMN x int;\n`);
     commit("edit");
-    expect(lint()).toMatchObject({ code: 1, out: expect.stringMatching(/never edit, rename or delete/) });
+    expect(lint()).toMatchObject({
+      code: 1,
+      out: expect.stringMatching(/never edit, rename or delete/),
+    });
   });
 
   it("fails when a committed migration is renamed or deleted", () => {
@@ -124,11 +160,17 @@ describe.skipIf(!hasGit)("migration lint (SCRUM-64)", () => {
       path.join(dir, "supabase/migrations/20260925120000_renamed.sql"),
     );
     commit("rename");
-    expect(lint()).toMatchObject({ code: 1, out: expect.stringMatching(/was changed \(git status R/) });
+    expect(lint()).toMatchObject({
+      code: 1,
+      out: expect.stringMatching(/was changed \(git status R/),
+    });
 
     rmSync(path.join(dir, "supabase/migrations/20260925120000_renamed.sql"));
     commit("delete");
-    expect(lint()).toMatchObject({ code: 1, out: expect.stringMatching(/was changed \(git status D\)/) });
+    expect(lint()).toMatchObject({
+      code: 1,
+      out: expect.stringMatching(/was changed \(git status D\)/),
+    });
   });
 
   it("ignores files outside supabase/migrations (e.g. migrations-pending)", () => {
@@ -149,7 +191,11 @@ describe.skipIf(!hasGit)("migration lint (SCRUM-64)", () => {
 
 describe("repo migrations follow the rules that apply to them", () => {
   it("every migration added since SCRUM-64 has ticket + rollback headers", () => {
-    const files = import.meta.glob("/supabase/migrations/*.sql", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+    const files = import.meta.glob("/supabase/migrations/*.sql", {
+      query: "?raw",
+      import: "default",
+      eager: true,
+    }) as Record<string, string>;
     const recent = Object.entries(files).filter(([p]) => path.basename(p) >= "20260928010000");
     expect(recent.length).toBeGreaterThan(0);
     for (const [p, src] of recent) {

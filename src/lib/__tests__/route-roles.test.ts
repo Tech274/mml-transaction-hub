@@ -10,6 +10,11 @@ describe("ROUTE_ROLES", () => {
     expect(ROUTE_ROLES["/entry"]).not.toContain("viewer");
     expect(ROUTE_ROLES["/entry"]).not.toContain("finance");
   });
+  it("hides the cost catalog from viewer and shows the lab pages to signed-in roles", () => {
+    expect(ROUTE_ROLES["/mml-lab/cost-catalog"]).not.toContain("viewer");
+    expect(ROUTE_ROLES["/mml-lab/lab-catalog"]).toContain("viewer");
+    expect(ROUTE_ROLES["/mml-lab/batches"]).toContain("finance");
+  });
   it("returns a copy, not the shared constant", () => {
     const a = rolesFor("/admin");
     a.push("viewer");
