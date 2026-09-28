@@ -3,7 +3,8 @@
 // permission lookup as "allowed".
 // SCRUM-78: the caller must also have profiles.is_active = true. That row is read
 // with the caller's own RLS client (users can read their own profile). The SQL
-// helpers learn the same rule in supabase/migrations-pending/ (not applied yet).
+// helpers apply the same rule (supabase/migrations/20260928090500_scrum78_role_check_respects_active.sql,
+// applied to live 28 Sep 2026).
 import { AppError, logError } from "@/lib/app-error";
 
 export const APP_ROLES = ["admin", "leadership", "finance", "ops_lead", "ops_user", "viewer"] as const;

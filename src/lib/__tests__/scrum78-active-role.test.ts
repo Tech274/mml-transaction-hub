@@ -1,5 +1,6 @@
-// SCRUM-78: the pending role-check migration is not on the live path. This applies it
-// to the in-process Postgres (synthetic users only) and checks the rollback.
+// SCRUM-78: the role-check migration (applied to live 28 Sep 2026) is in supabase/migrations/,
+// so the in-process Postgres already has it. This checks it (synthetic users only), then the
+// rollback, then re-applies the migration.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -7,7 +8,7 @@ import type { PGlite } from "@electric-sql/pglite";
 import { createLocalDb } from "@/test-support/local-db";
 
 const ROOT = path.resolve(__dirname, "../../..");
-const PENDING = path.join(ROOT, "supabase/migrations-pending/scrum78_role_check_respects_active.sql");
+const MIGRATION = path.join(ROOT, "supabase/migrations/20260928090500_scrum78_role_check_respects_active.sql");
 const ROLLBACK = path.join(ROOT, "supabase/migrations-pending/scrum78_role_check_respects_active.rollback.sql");
 
 const ACTIVE = "00000000-0000-4000-8000-0000000000a1";
@@ -41,17 +42,27 @@ beforeAll(async () => {
   await db.query("update public.profiles set is_active = false where id = $1", [INACTIVE]);
 }, 120_000);
 
-describe("pending has_role / has_any_role active check", () => {
+describe("has_role / has_any_role active check", () => {
   it("denies an inactive user, leaves an active user unchanged, and rollback restores the old check", async () => {
     const beforeRole = await grants("has_role(uuid, public.app_role)");
     const beforeAny = await grants("has_any_role(uuid, public.app_role[])");
+
+    // The migration is already applied by createLocalDb.
+    expect(await flag(ACTIVE, "has_any_role", "viewer")).toBe(true);
+    expect(await flag(INACTIVE, "has_any_role", "viewer")).toBe(false);
+    expect(await flag(ACTIVE, "has_role", "viewer")).toBe(true);
+    expect(await flag(INACTIVE, "has_role", "viewer")).toBe(false);
+
+    await db.exec(readFileSync(ROLLBACK, "utf8"));
 
     expect(await flag(ACTIVE, "has_any_role", "viewer")).toBe(true);
     expect(await flag(INACTIVE, "has_any_role", "viewer")).toBe(true);
     expect(await flag(ACTIVE, "has_role", "viewer")).toBe(true);
     expect(await flag(INACTIVE, "has_role", "viewer")).toBe(true);
+    expect(await grants("has_any_role(uuid, public.app_role[])")).toEqual(beforeAny);
 
-    await db.exec(readFileSync(PENDING, "utf8"));
+    // Re-applying is idempotent (CREATE OR REPLACE + restated grants).
+    await db.exec(readFileSync(MIGRATION, "utf8"));
 
     expect(await flag(ACTIVE, "has_any_role", "viewer")).toBe(true);
     expect(await flag(INACTIVE, "has_any_role", "viewer")).toBe(false);
@@ -75,13 +86,5 @@ describe("pending has_role / has_any_role active check", () => {
     expect(await grants("has_any_role(uuid, public.app_role[])")).toEqual(beforeAny);
     expect(beforeAny.anon).toBe(false);
     expect(beforeAny.authenticated).toBe(true);
-
-    await db.exec(readFileSync(ROLLBACK, "utf8"));
-
-    expect(await flag(ACTIVE, "has_any_role", "viewer")).toBe(true);
-    expect(await flag(INACTIVE, "has_any_role", "viewer")).toBe(true);
-    expect(await flag(ACTIVE, "has_role", "viewer")).toBe(true);
-    expect(await flag(INACTIVE, "has_role", "viewer")).toBe(true);
-    expect(await grants("has_any_role(uuid, public.app_role[])")).toEqual(beforeAny);
   });
 });

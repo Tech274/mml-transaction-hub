@@ -20,7 +20,9 @@ export default defineTool({
     const build = () => {
       let q = supabase
         .from("transactions")
-        .select("selling_cost, input_cost, total_users, start_date, cloud_provider, line_of_business")
+        .select(
+          "selling_cost, input_cost, input_cost_auto, input_cost_actual_alloc, total_users, start_date, cloud_provider, line_of_business",
+        )
         .eq("is_deleted", false)
         .gte("start_date", `${year}-01-01`)
         .lte("start_date", `${year}-12-31`);
@@ -28,7 +30,13 @@ export default defineTool({
       if (line_of_business) q = q.eq("line_of_business", line_of_business);
       return q.order("id");
     };
-    type Row = { selling_cost: number | null; input_cost: number | null; total_users: number | null };
+    type Row = {
+      selling_cost: number | null;
+      input_cost: number | null;
+      input_cost_auto?: number | null;
+      input_cost_actual_alloc?: number | null;
+      total_users: number | null;
+    };
     let rows: Row[];
     try {
       // SCRUM-70: all matching rows, not just the first 1,000.
@@ -43,8 +51,9 @@ export default defineTool({
       });
     }
     const { addNullable } = await import("../../nullable-sum");
+    const { effectiveCost } = await import("../../cost-calculator");
     const revenue = rows.reduce((a, r) => addNullable(a, r.selling_cost), 0);
-    const cost = rows.reduce((a, r) => addNullable(a, r.input_cost), 0);
+    const cost = rows.reduce((a, r) => addNullable(a, effectiveCost(r).amount), 0);
     const users = rows.reduce((a, r) => addNullable(a, r.total_users), 0);
     const profit = revenue - cost;
     const margin_pct = revenue > 0 ? (profit / revenue) * 100 : 0;

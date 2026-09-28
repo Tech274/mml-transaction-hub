@@ -3,6 +3,7 @@
 // Server-only (uses the service-role client) — never import from a component.
 // NULL costs are skipped in the snapshot totals. The transaction row is not updated.
 import { addNullable } from "@/lib/nullable-sum";
+import { effectiveCost } from "@/lib/cost-calculator";
 
 export interface SyncRunResult {
   run_id: string;
@@ -24,6 +25,8 @@ type TxRow = {
   total_users: number | null;
   selling_cost: number | null;
   input_cost: number | null;
+  input_cost_auto?: number | null;
+  input_cost_actual_alloc?: number | null;
 };
 
 const PAGE = 1000;
@@ -66,7 +69,7 @@ export async function runSnapshotSync(opts: {
       const { data, error } = await admin
         .from("transactions")
         .select(
-          "year, month, customer_name, lab_name, cloud_provider, line_of_business, total_users, selling_cost, input_cost",
+          "year, month, customer_name, lab_name, cloud_provider, line_of_business, total_users, selling_cost, input_cost, input_cost_auto, input_cost_actual_alloc",
         )
         .eq("is_deleted", false)
         .order("id", { ascending: true })
@@ -151,27 +154,32 @@ export function aggregateSnapshots(rows: TxRow[]) {
     }
   >();
   for (const r of rows) {
-    const key = [r.year, r.month, r.customer_name, r.lab_name, r.cloud_provider, r.line_of_business].join("||");
-    const cur =
-      map.get(key) ??
-      {
-        year: r.year,
-        month: r.month,
-        customer_name: r.customer_name,
-        lab_name: r.lab_name,
-        cloud_provider: r.cloud_provider,
-        line_of_business: r.line_of_business,
-        transactions_count: 0,
-        total_users: 0,
-        revenue: 0,
-        cost: 0,
-        profit: 0,
-        margin_pct: 0,
-      };
+    const key = [
+      r.year,
+      r.month,
+      r.customer_name,
+      r.lab_name,
+      r.cloud_provider,
+      r.line_of_business,
+    ].join("||");
+    const cur = map.get(key) ?? {
+      year: r.year,
+      month: r.month,
+      customer_name: r.customer_name,
+      lab_name: r.lab_name,
+      cloud_provider: r.cloud_provider,
+      line_of_business: r.line_of_business,
+      transactions_count: 0,
+      total_users: 0,
+      revenue: 0,
+      cost: 0,
+      profit: 0,
+      margin_pct: 0,
+    };
     cur.transactions_count += 1;
     cur.total_users = addNullable(cur.total_users, r.total_users);
     cur.revenue = addNullable(cur.revenue, r.selling_cost);
-    cur.cost = addNullable(cur.cost, r.input_cost);
+    cur.cost = addNullable(cur.cost, effectiveCost(r).amount);
     map.set(key, cur);
   }
   return [...map.values()].map((v) => {

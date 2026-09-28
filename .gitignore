@@ -8,6 +8,10 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+supabase/.temp/
+supabase/.branches/
+scripts/demo-local/supabase/.temp/
+scripts/demo-local/supabase/.branches/
 dist
 dist-ssr
 .output
