@@ -2,7 +2,8 @@
 -- Status: REPO ONLY / NOT APPLIED. This file is not in supabase/migrations/, so nothing applies it.
 -- Release order: publish the app code first (server role checks already reject a disabled
 -- account). Then, after Atlas's engineering go-ahead and Vivek's approval, move this file
--- into supabase/migrations/ with a fresh timestamp, apply on sandbox, then live.
+-- into supabase/migrations/ with a fresh timestamp later than 20260928040000,
+-- apply on sandbox, then live.
 -- Once applied, RLS that calls these functions blocks a disabled user's still-open session
 -- (the access token lasts up to about 1 hour). Active users are unchanged.
 -- Safe with the current live app: old code keeps working for active users. Disabled users

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { SupabaseClient } from "@supabase/supabase-js";
 import { hasAnyRole, requireRole, PERMISSION_CHECK_FAILED, ACCOUNT_DISABLED_MESSAGE } from "../require-role";
 import { AppError, setErrorLogger } from "../app-error";
 
@@ -71,16 +72,34 @@ describe("hasAnyRole / requireRole", () => {
     await expect(requireRole(ctx({ data: false, error: null }).ctx, ["admin"], "Forbidden: admin only")).rejects.toThrow("Forbidden: admin only");
     await expect(requireRole(ctx({ data: true, error: null }).ctx, ["admin"], "x")).resolves.toBeUndefined();
   });
-  it("calls from() on the client itself (supabase-js from() needs `this`)", async () => {
-    // Same shape as SupabaseClient: from() is a prototype method that reads this.rest.
-    class ClientLike {
-      rest = { from: (_t: string) => ({ select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { is_active: true }, error: null }) }) }) }) };
-      from(relation: string) { return this.rest.from(relation); }
-      async rpc() { return { data: true, error: null }; }
+  it("calls SupabaseClient.from on the instance; a detached from() throws", async () => {
+    // Real SupabaseClient.from / rpc read `this.rest`. A subclass only stubs rest
+    // so the methods under test are the library's, not a lookalike.
+    class TestClient extends SupabaseClient {
+      readonly fromSpy = vi.fn((_relation: string) => ({
+        select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { is_active: true }, error: null }) }) }),
+      }));
+      constructor() {
+        super("http://127.0.0.1:54321", "public-anon-key-test", {
+          auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+        });
+        const rest = this.rest as unknown as { from: TestClient["fromSpy"]; rpc: () => Promise<{ data: boolean; error: null }> };
+        rest.from = this.fromSpy;
+        rest.rpc = async () => ({ data: true, error: null });
+      }
     }
-    const c = { supabase: new ClientLike(), userId: "00000000-0000-0000-0000-000000000001" };
-    expect(await hasAnyRole(c, ["admin"])).toBe(true);
-    await expect(requireRole(c, ["admin"], "x")).resolves.toBeUndefined();
+    const client = new TestClient();
+    try {
+      expect(client.from).toBe(SupabaseClient.prototype.from);
+      const detached = client.from;
+      expect(() => detached("profiles")).toThrow(TypeError);
+      const c = { supabase: client, userId: "00000000-0000-0000-0000-000000000001" };
+      expect(await hasAnyRole(c, ["admin"])).toBe(true);
+      expect(client.fromSpy).toHaveBeenCalledWith("profiles");
+      await expect(requireRole(c, ["admin"], "x")).resolves.toBeUndefined();
+    } finally {
+      client.realtime.disconnect();
+    }
   });
   it("an empty role list never grants access and does not call the database", async () => {
     const { ctx: c, rpc, from } = ctx({ data: true, error: null });

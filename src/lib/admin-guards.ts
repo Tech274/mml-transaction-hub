@@ -5,11 +5,23 @@ import { AppError, dbError, logError } from "@/lib/app-error";
 
 type Sb = any;
 
-/** Ids of all admins. Throws if the lookup fails (an empty list would make the guard pass). */
+/**
+ * Ids of admins whose profile is active. A disabled admin does not count.
+ * Throws if either lookup fails (an empty list would make the guard pass).
+ * A missing profile row is not an active admin.
+ */
 export async function adminUserIds(sb: Sb): Promise<Set<string>> {
   const { data, error } = await sb.from("user_roles").select("user_id").eq("role", "admin");
   if (error) throw dbError(error, "admin.adminUserIds");
-  return new Set<string>(((data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id));
+  const ids = ((data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id);
+  if (ids.length === 0) return new Set();
+  const { data: profiles, error: pErr } = await sb.from("profiles").select("id, is_active").in("id", ids);
+  if (pErr) throw dbError(pErr, "admin.adminUserIds");
+  return new Set(
+    ((profiles ?? []) as Array<{ id: string; is_active: boolean | null }>)
+      .filter((p) => p.is_active === true)
+      .map((p) => p.id),
+  );
 }
 
 /** Pure rule: would this change leave no admin at all? */
@@ -47,34 +59,63 @@ export async function syncRoles(sb: Sb, userId: string, roles: string[]) {
   }
 }
 
-/** Profile flag off and an auth ban. Does not apply the last-admin guard. */
-export async function disableAccount(sb: Sb, userId: string): Promise<void> {
-  const { error: pErr } = await sb.from("profiles").update({ is_active: false }).eq("id", userId);
-  if (pErr) throw dbError(pErr, "admin.disableAccount");
-  const { error: aErr } = await sb.auth.admin.updateUserById(userId, { ban_duration: "876000h" });
-  if (aErr) throw dbError(aErr, "admin.disableAccount");
+export const ACCOUNT_MAY_STILL_BE_ACTIVE =
+  "The new account could not be fully disabled and may still be active.";
+
+/**
+ * Sets is_active false and bans sign-in. The ban always runs, even when the
+ * profile update throws or returns an error. Does not apply the last-admin guard.
+ */
+export async function disableAccount(sb: Sb, userId: string): Promise<{ profileError: unknown; banError: unknown }> {
+  let profileError: unknown = null;
+  try {
+    const updated = await sb.from("profiles").update({ is_active: false }).eq("id", userId);
+    profileError = updated?.error ?? null;
+  } catch (e) {
+    profileError = e;
+  }
+  let banError: unknown = null;
+  try {
+    const banned = await sb.auth.admin.updateUserById(userId, { ban_duration: "876000h" });
+    banError = banned?.error ?? null;
+  } catch (e) {
+    banError = e;
+  }
+  return { profileError, banError };
 }
 
 /**
  * Role setup for a user auth.admin.createUser just created. The trigger has
  * already inserted the profile (and, on older databases, a default viewer role).
  * Requested roles are inserted before any other role is removed. If that sync
- * fails, the new account is disabled and banned, then the role error is rethrown
- * so the admin sees it. A last-admin refusal happens before any write, so that
- * account is left as the trigger created it.
+ * fails, the new account is disabled and banned, then the role error is rethrown.
+ * If the profile update or the ban fails, the admin gets an explicit error that
+ * the account may still be active (with a ref). A last-admin refusal happens
+ * before any write, so that account is left as the trigger created it.
  */
 export async function assignCreatedUserRoles(sb: Sb, userId: string, roles: string[]): Promise<void> {
   try {
     await syncRoles(sb, userId, roles);
   } catch (err) {
     if (err instanceof AppError && err.code === "last_admin") throw err;
-    try {
-      await disableAccount(sb, userId);
-    } catch (disableErr) {
-      logError(disableErr, "admin.assignCreatedUserRoles:disable");
+    const { profileError, banError } = await disableAccount(sb, userId);
+    if (profileError || banError) {
+      const ref = logError(err, "admin.assignCreatedUserRoles:disable", {
+        profileError: errorBrief(profileError),
+        banError: errorBrief(banError),
+      });
+      throw new AppError(`${ACCOUNT_MAY_STILL_BE_ACTIVE} (ref ${ref})`, "account_may_be_active");
     }
     throw err;
   }
+}
+
+function errorBrief(err: unknown): string | null {
+  if (!err) return null;
+  if (typeof err === "object" && err && "message" in err && typeof (err as { message: unknown }).message === "string") {
+    return (err as { message: string }).message;
+  }
+  return String(err);
 }
 
 export async function applyActive(sb: Sb, userId: string, active: boolean, callerId: string) {

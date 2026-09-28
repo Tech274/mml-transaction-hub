@@ -12,4 +12,4 @@ To use one, after the named approver has approved it:
 | File | Ticket | What | Needs approval from |
 |---|---|---|---|
 | `scrum100_drop_duplicate_bulk_import_index.sql` | SCRUM-100 (G-23) | Drops `idx_bulk_import_runs_parent`, an exact duplicate of `bulk_import_runs_parent_run_id_idx` | Atlas + Vivek (destructive DDL, SCRUM-64 rule) |
-| `scrum78_role_check_respects_active.sql` | SCRUM-78 (G-11) | `has_role` / `has_any_role` return false when `profiles.is_active` is not true. Rollback file sits beside it. Not applied. | Atlas + Vivek, then move into `supabase/migrations/` |
+| `scrum78_role_check_respects_active.sql` | SCRUM-78 (G-11) | `has_role` / `has_any_role` return false when `profiles.is_active` is not true. Rollback file sits beside it. Not applied. When promoted, the filename timestamp must be later than `20260928040000`. | Atlas + Vivek, then move into `supabase/migrations/` |

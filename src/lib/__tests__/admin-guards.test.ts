@@ -1,23 +1,42 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { adminUserIds, applyActive, assignCreatedUserRoles, removesLastAdmin, syncRoles } from "../admin-guards";
+import { ACCOUNT_MAY_STILL_BE_ACTIVE, adminUserIds, applyActive, assignCreatedUserRoles, removesLastAdmin, syncRoles } from "../admin-guards";
 import { setErrorLogger } from "../app-error";
 
 // Tiny in-memory stand-in for the service-role client (synthetic data only).
-function fakeSb(init: { roles: Array<{ id: string; user_id: string; role: string }>; failAdminLookup?: boolean; failInsert?: boolean }) {
+function fakeSb(init: {
+  roles: Array<{ id: string; user_id: string; role: string }>;
+  failAdminLookup?: boolean;
+  failProfileLookup?: boolean;
+  failInsert?: boolean;
+  failProfileUpdate?: boolean | "throw";
+  failBan?: boolean;
+  /** Missing key means active. */
+  active?: Record<string, boolean>;
+}) {
   const roles = [...init.roles];
   const calls: string[] = [];
+  const isActive = (id: string) => init.active?.[id] !== false;
   const sb = {
     from(table: string) {
-      const q: any = { table, filters: [] as Array<[string, unknown]> };
+      const q: any = { table, filters: [] as Array<unknown[]> };
       q.select = () => q;
-      q.eq = (col: string, val: unknown) => { q.filters.push([col, val]); return q; };
+      q.eq = (col: string, val: unknown) => { q.filters.push(["eq", col, val]); return q; };
+      q.in = (col: string, vals: unknown[]) => { q.filters.push(["in", col, vals]); return q; };
       q.then = (res: any) => {
         if (table === "user_roles") {
-          if (init.failAdminLookup && q.filters.some(([c, v]: any) => c === "role" && v === "admin")) return res({ data: null, error: { message: "boom" } });
-          const rows = roles.filter((r) => q.filters.every(([c, v]: any) => (r as any)[c] === v));
+          if (init.failAdminLookup && q.filters.some((f: unknown[]) => f[0] === "eq" && f[1] === "role" && f[2] === "admin")) {
+            return res({ data: null, error: { message: "boom" } });
+          }
+          const rows = roles.filter((r) => q.filters.every((f: unknown[]) => f[0] !== "eq" || (r as any)[f[1] as string] === f[2]));
           return res({ data: rows, error: null });
+        }
+        if (table === "profiles") {
+          if (init.failProfileLookup) return res({ data: null, error: { message: "profiles down" } });
+          const inF = q.filters.find((f: unknown[]) => f[0] === "in" && f[1] === "id");
+          const ids = (inF ? inF[2] : []) as string[];
+          return res({ data: ids.map((id) => ({ id, is_active: isActive(id) })), error: null });
         }
         return res({ data: null, error: null });
       };
@@ -28,10 +47,21 @@ function fakeSb(init: { roles: Array<{ id: string; user_id: string; role: string
         rows.forEach((r, i) => roles.push({ id: `n${i}`, ...r }));
         return { error: null };
       };
-      q.update = (v: any) => ({ eq: async () => { calls.push(`update:${table}:${JSON.stringify(v)}`); return { error: null }; } });
+      q.update = (v: any) => ({
+        eq: async () => {
+          calls.push(`update:${table}:${JSON.stringify(v)}`);
+          if (table === "profiles" && init.failProfileUpdate === "throw") throw new Error("profile update threw");
+          if (table === "profiles" && init.failProfileUpdate) return { error: { message: "profile update failed" } };
+          return { error: null };
+        },
+      });
       return q;
     },
-    auth: { admin: { updateUserById: async (_id: string, v: any) => { calls.push(`ban:${v.ban_duration}`); return { error: null }; } } },
+    auth: { admin: { updateUserById: async (_id: string, v: any) => {
+      calls.push(`ban:${v.ban_duration}`);
+      if (init.failBan) return { error: { message: "ban failed" } };
+      return { error: null };
+    } } },
   };
   return { sb, roles, calls };
 }
@@ -88,6 +118,64 @@ describe("admin guards", () => {
     await expect(assignCreatedUserRoles(sb, "n", ["finance"])).rejects.toThrow(/A required value is missing/);
     expect(calls).toEqual(["insert:finance", 'update:profiles:{"is_active":false}', "ban:876000h"]);
     expect(roles.filter((r) => r.user_id === "n").map((r) => r.role)).toEqual(["viewer"]);
+  });
+
+  it.each([
+    ["returns an error", true as const],
+    ["throws", "throw" as const],
+  ])("still bans when the inactive update %s, and says the account may still be active", async (_label, failProfileUpdate) => {
+    const { sb, calls, roles } = fakeSb({
+      roles: [{ id: "1", user_id: "a", role: "admin" }, { id: "3", user_id: "n", role: "viewer" }],
+      failInsert: true,
+      failProfileUpdate,
+    });
+    const pending = assignCreatedUserRoles(sb, "n", ["finance"]);
+    await expect(pending).rejects.toThrow(ACCOUNT_MAY_STILL_BE_ACTIVE);
+    await expect(pending).rejects.toThrow(/\(ref [0-9A-F]+\)/);
+    expect(calls).toEqual(["insert:finance", 'update:profiles:{"is_active":false}', "ban:876000h"]);
+    expect(roles.filter((r) => r.user_id === "n").map((r) => r.role)).toEqual(["viewer"]);
+  });
+
+  it("says the account may still be active when the ban fails after the profile update", async () => {
+    const { sb, calls } = fakeSb({
+      roles: [{ id: "1", user_id: "a", role: "admin" }, { id: "3", user_id: "n", role: "viewer" }],
+      failInsert: true,
+      failBan: true,
+    });
+    const pending = assignCreatedUserRoles(sb, "n", ["finance"]);
+    await expect(pending).rejects.toThrow(ACCOUNT_MAY_STILL_BE_ACTIVE);
+    await expect(pending).rejects.toThrow(/\(ref [0-9A-F]+\)/);
+    expect(calls).toEqual(["insert:finance", 'update:profiles:{"is_active":false}', "ban:876000h"]);
+  });
+
+  it("counts only active admins, and refuses to demote or disable the last active one with no writes", async () => {
+    const roles = [
+      { id: "1", user_id: "active", role: "admin" },
+      { id: "2", user_id: "disabled", role: "admin" },
+    ];
+    const active = { disabled: false };
+    const listed = fakeSb({ roles, active });
+    expect([...(await adminUserIds(listed.sb))]).toEqual(["active"]);
+
+    const demote = fakeSb({ roles, active });
+    await expect(syncRoles(demote.sb, "active", ["viewer"])).rejects.toThrow("Cannot remove the last Super Admin.");
+    expect(demote.calls).toEqual([]);
+    expect(demote.roles).toEqual(roles);
+
+    const disable = fakeSb({ roles, active });
+    await expect(applyActive(disable.sb, "active", false, "someone")).rejects.toThrow("Cannot disable the last Super Admin.");
+    expect(disable.calls).toEqual([]);
+    expect(disable.roles).toEqual(roles);
+  });
+
+  it("a failed active-admin profile lookup blocks the change and writes nothing", async () => {
+    const { sb, calls } = fakeSb({
+      roles: [{ id: "1", user_id: "a", role: "admin" }, { id: "2", user_id: "b", role: "admin" }],
+      failProfileLookup: true,
+    });
+    await expect(syncRoles(sb, "b", ["viewer"])).rejects.toThrow(/Something went wrong/);
+    await expect(applyActive(sb, "b", false, "a")).rejects.toThrow(/Something went wrong/);
+    expect(calls).toEqual([]);
   });
 
   it("assignCreatedUserRoles does not disable when the last-admin guard refuses before any write", async () => {
