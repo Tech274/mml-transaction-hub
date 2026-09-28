@@ -51,7 +51,14 @@ export const Route = createFileRoute("/_authenticated/tickets")({
   }),
 });
 
-const COLORS = ["hsl(var(--primary))", "hsl(var(--chart-2, 173 58% 39%))", "hsl(var(--chart-3, 197 37% 24%))", "hsl(var(--chart-4, 43 74% 66%))", "hsl(var(--chart-5, 27 87% 67%))", "hsl(var(--muted-foreground))"];
+const COLORS = [
+  "hsl(var(--primary))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
+  "hsl(var(--muted-foreground))",
+];
 
 const OPEN_LIKE = ["Open", "Waiting on Customer", "Waiting on Third Party"];
 const STATUS_OPTIONS = ["Open", "Pending", "Waiting on Customer", "Waiting on Third Party", "Resolved", "Closed"];

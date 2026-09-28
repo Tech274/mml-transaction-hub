@@ -32,7 +32,7 @@ All PRs below must remain open and unmerged until the full set is complete.
 ## Single combined deploy step (after all PRs merge)
 
 1. Confirm CI green for all merged PRs and final `main`.
-2. Keep all new feature flags OFF (`AI_CC_AUTO_ASSIGN_ENABLED=false`, UI flags OFF).
+2. Keep all new feature flags OFF (`AI_CC_AUTO_ASSIGN_ENABLED=false`, `VITE_SCRUM44_UI_REVIEW_ENABLED=false`).
 3. Apply approved migrations one-by-one to sandbox first; run verification tests/check queries.
 4. After explicit GO, apply same migrations one-by-one to live.
 5. Deploy application code from GitHub main.
