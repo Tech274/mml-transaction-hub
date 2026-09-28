@@ -21,7 +21,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { RefreshCw, LifeBuoy, AlertTriangle, Eye, Loader2, CheckCircle2, X, UserCheck, History, Flame } from "lucide-react";
+import { RefreshCw, LifeBuoy, AlertTriangle, Eye, Loader2, CheckCircle2, X, UserCheck, History, Flame, Bot } from "lucide-react";
+import { runModelAgent } from "@/lib/ai/agent.functions";
 import { useAuth } from "@/lib/auth-context";
 import {
   getTicketsOverview, syncFreshdeskNow, getAgentDirectory, setMyAgentIdentity,
@@ -573,6 +574,12 @@ function TicketDetailSheet({
   const qc = useQueryClient();
   const historyFn = useServerFn(getTicketHistory);
   const resolveFn = useServerFn(resolveTicket);
+  const draftFn = useServerFn(runModelAgent);
+  const draft = useMutation({
+    mutationFn: () => draftFn({ data: { agentKey: "ticket_triage", hint: `Ticket ${ticket?.id}` } }),
+    onSuccess: (result) => toast.success(result.status === "done" ? "Draft is in the Inbox. Nothing was sent." : (result.error ?? "The agent did not finish")),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not draft a reply"),
+  });
 
   const [assignee, setAssignee] = useState<string>("");
   const [nextStatus, setNextStatus] = useState<string>("");
@@ -634,6 +641,12 @@ function TicketDetailSheet({
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4 text-sm">
+              {canAct && (
+                <Button size="sm" variant="outline" data-testid="draft-with-ai" disabled={draft.isPending} onClick={() => draft.mutate()}>
+                  {draft.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Bot className="mr-1 h-3.5 w-3.5" />}
+                  Draft with AI
+                </Button>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Status" value={ticket.status} />
                 <Field label="Priority" value={ticket.priority} />

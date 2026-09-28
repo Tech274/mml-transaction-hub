@@ -27,10 +27,14 @@ import {
 } from "@/lib/ai-command-center.functions";
 
 const AGENT_KEYS: AgentKey[] = ["generalist", "support", "cost_adr"];
+const EXTRA_AGENTS = [
+  { key: "ticket_triage", name: "Support ticket triage" },
+  { key: "dashboard_qa", name: "Dashboard Q&A" },
+];
 
 export const Route = createFileRoute("/_authenticated/ai-command-center/inbox")({
   validateSearch: (search: Record<string, unknown>) => ({
-    agent: AGENT_KEYS.includes(search.agent as AgentKey) ? (search.agent as AgentKey) : undefined,
+    agent: typeof search.agent === "string" && /^[a-z][a-z0-9_]{0,63}$/.test(search.agent) ? search.agent : undefined,
   }),
   component: InboxPage,
 });
@@ -40,6 +44,10 @@ const TYPE_LABEL: Record<string, string> = {
   email_draft: "Email draft",
   ticket_proposal: "Ticket proposal",
   adr_field_map: "ADR field map",
+  triage_note: "Triage note",
+  qa_answer: "Dashboard answer",
+  report: "Report",
+  margin_alert: "Margin alert",
 };
 
 function InboxPage() {
@@ -138,7 +146,7 @@ function InboxPage() {
                 <SelectTrigger className="w-52"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All agents</SelectItem>
-                  {AGENTS.map((a) => (
+                  {[...AGENTS, ...EXTRA_AGENTS].map((a) => (
                     <SelectItem key={a.key} value={a.key}>{a.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -185,10 +193,14 @@ function InboxPage() {
                 type="button"
                 onClick={() => openItem(it)}
                 className="w-full text-left rounded-lg border p-3 hover:bg-accent transition-colors"
+                data-testid="inbox-item"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{AGENTS.find((a) => a.key === it.agent_key)?.name ?? it.agent_key}</Badge>
                   <Badge variant="secondary">{TYPE_LABEL[it.item_type] ?? it.item_type}</Badge>
+                  {(it.payload?.ai_generated || it.item_type === "triage_note" || it.item_type === "qa_answer") && (
+                    <Badge>AI-generated draft</Badge>
+                  )}
                   <Badge
                     variant={it.status === "pending" ? "destructive" : it.status === "confirmed" ? "default" : "outline"}
                   >
@@ -396,6 +408,20 @@ function ItemBody({
               <AlertDescription className="text-xs font-mono">{JSON.stringify(p['write_result'])}</AlertDescription>
             </Alert>
           ) : null}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (item.item_type === "triage_note" || item.item_type === "qa_answer" || item.item_type === "report") {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm">{TYPE_LABEL[item.item_type] ?? item.item_type}</CardTitle>
+          <CardDescription className="text-xs">Draft only. Nothing is sent or written automatically.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <pre className="whitespace-pre-wrap text-xs leading-relaxed" data-testid="inbox-draft">{JSON.stringify(p, null, 2)}</pre>
         </CardContent>
       </Card>
     );

@@ -9,17 +9,21 @@ branch. Values are **not** recorded here, only names and locations.
 |---|---|---|---|---|
 | `SUPABASE_SERVICE_ROLE_KEY` | hosting env secrets (Lovable Cloud) | `src/integrations/supabase/client.server.ts` | no, server module only | Supabase project owner |
 | `FRESHDESK_API_KEY` | hosting env secrets | `src/lib/freshdesk.server.ts` | no | Freshdesk admin + Supabase project owner |
+| `OPENAI_API_KEY` | hosting env secrets (Lovable Cloud) | `src/lib/ai/providers/env.server.ts` | no | Project owner |
+| `ANTHROPIC_API_KEY` | hosting env secrets (Lovable Cloud) | `src/lib/ai/providers/env.server.ts` | no | Project owner |
+| `GEMINI_API_KEY` | hosting env secrets (Lovable Cloud) | `src/lib/ai/providers/env.server.ts` | no | Project owner |
+| `OPENAI_COMPAT_API_KEY` | hosting env secrets (Lovable Cloud), optional | `src/lib/ai/providers/env.server.ts` | no | Project owner |
 | `cron_secret` | Supabase Vault | pg_cron job headers; checked by `verify_cron_secret()` | no | Atlas (runbook SCRUM-89) |
 | Supabase publishable/anon key | env (`VITE_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PUBLISHABLE_KEY`) | browser client, per-user server clients | **yes, by design**; not a secret, data is protected by RLS | n/a |
 | User sessions (Supabase JWTs) | browser storage | auth attacher / middleware | yes (the user's own) | n/a |
 
-No other API keys (AI providers, email, payment) are read by the code.
+Provider keys are read only in `src/lib/ai/providers/env.server.ts`. They are not stored in the database, not sent to the browser, and not written to logs. `OPENAI_COMPAT_BASE_URL` is a URL, not a secret. `AI_AGENTS_DEMO=1` turns on the local mock provider and must stay unset in production.
 
 ## Checks in place
 
 - **CI secret scan** (`scripts/ci/secret-scan.sh`, SCRUM-83): fails a PR that adds
   private keys, GitHub/AWS/Slack tokens, `sk-` keys, JWT-shaped strings or `.env` files.
-- **Unit test** `src/lib/__tests__/no-secrets-in-client.test.ts`: the two secret env
+- **Unit test** `src/lib/__tests__/no-secrets-in-client.test.ts`: secret env
   names may only be read in their `*.server.ts` modules; no `VITE_*` name may look
   like a secret; no JWT, `sb_secret_` or private-key text in `src/` source.
 - **Not yet confirmed:** GitHub secret scanning and push protection for the repository.

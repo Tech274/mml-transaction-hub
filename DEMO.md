@@ -46,6 +46,10 @@ Passwords (local only): `DemoLocal!2026`
 8. **Dashboard** and **Reports**. The cost note names actual, entered and auto-filled counts. As admin, the reports page shows the hybrid solution count (3 tagged programs).
 9. **All transactions → Hybrid only**. The filter lists the tagged lines. `DEMO-HYB-SUGGEST` is untagged and is listed as a suggestion on the reports card.
 10. Sign out. Sign in as **ops.demo@mml.local**. Lab catalog shows published rows only. Cost catalog has no Edit prices button. Batches have no invoice form. The hybrid checkbox and the hybrid filter are absent.
+11. Sign back in as **admin.demo@mml.local**. Open **AI Command Center → Agents**. Generalist and Cost / ADR show paused. Support stays active. Ticket triage and Dashboard Q&A are drafts.
+12. Open **Ticket triage** (or **New agent**). The builder lists providers as configured or not. With `AI_AGENTS_DEMO=1` and no vendor key, a banner says the mock provider is in use. Pick tools, then **Test run** with sample text `Ticket 9001001 cannot access the lab portal`. The trace finishes. It does not appear in the Inbox.
+13. **Activate** ticket triage after the built-in check passes, then **Run now** (or open ticket `9001001` on **Tickets** and choose **Draft with AI**). The Inbox gains a triage note and an email draft. Nothing is sent to Freshdesk.
+14. **AI Command Center → Usage**. The page shows spend against the $10 monthly cap, the kill switch, and per-agent rows. Switching agents off blocks the next run.
 
 ## Sample batches
 

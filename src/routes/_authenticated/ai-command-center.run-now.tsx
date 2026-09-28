@@ -14,14 +14,13 @@ import {
 import { toast } from "sonner";
 import { Loader2, Play, Bot } from "lucide-react";
 import {
-  runAgent, listLabRequests, AGENTS, type AgentKey, type LabRequest,
+  runAgent, listLabRequests, listAgents, AGENTS, type AgentKey, type AgentSummary, type LabRequest,
 } from "@/lib/ai-command-center.functions";
-
-const AGENT_KEYS: AgentKey[] = ["generalist", "support", "cost_adr"];
+import { runModelAgent } from "@/lib/ai/agent.functions";
 
 export const Route = createFileRoute("/_authenticated/ai-command-center/run-now")({
   validateSearch: (search: Record<string, unknown>) => ({
-    agent: AGENT_KEYS.includes(search.agent as AgentKey) ? (search.agent as AgentKey) : ("generalist" as AgentKey),
+    agent: typeof search.agent === "string" && /^[a-z][a-z0-9_]{0,63}$/.test(search.agent) ? search.agent : "support",
   }),
   component: RunNowPage,
 });
@@ -36,10 +35,15 @@ function RunNowPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const [agent, setAgent] = useState<AgentKey>(search.agent);
+  const [agent, setAgent] = useState(search.agent);
   const [hint, setHint] = useState("");
   const runFn = useServerFn(runAgent);
+  const modelFn = useServerFn(runModelAgent);
+  const agentsFn = useServerFn(listAgents);
   const labsFn = useServerFn(listLabRequests);
+  const agents = useQuery({ queryKey: ["ai-cc", "agents"], queryFn: () => agentsFn() as Promise<AgentSummary[]> });
+  const selected = (agents.data ?? []).find((item) => item.key === agent);
+  const runnable = !selected || selected.config_status === "active" || selected.config_status === "legacy" || !selected.config_status;
 
   const labs = useQuery({
     queryKey: ["ai-cc", "lab-requests"],
@@ -47,7 +51,14 @@ function RunNowPage() {
   });
 
   const run = useMutation({
-    mutationFn: () => runFn({ data: { agent_key: agent, job_hint: hint.trim() || undefined } }),
+    mutationFn: async () => {
+      if (selected?.engine === "model") {
+        const result = await modelFn({ data: { agentKey: agent, hint: hint.trim() || undefined } });
+        if (result.status !== "done") throw new Error(result.error ?? "The run did not finish");
+        return { items: result.inbox };
+      }
+      return runFn({ data: { agent_key: agent as AgentKey, job_hint: hint.trim() || undefined } });
+    },
     onSuccess: (r) => {
       toast.success(`Run complete — ${r.items} proposal(s) waiting in the Inbox`);
       qc.invalidateQueries({ queryKey: ["ai-cc"] });
@@ -71,7 +82,7 @@ function RunNowPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid gap-2 sm:grid-cols-3">
-              {AGENTS.map((a) => (
+              {(agents.data ?? AGENTS).map((a) => (
                 <button
                   key={a.key}
                   type="button"
@@ -87,7 +98,7 @@ function RunNowPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">Job hint (optional)</Label>
-              <Input value={hint} onChange={(e) => setHint(e.target.value)} placeholder={HINT_PLACEHOLDER[agent]} />
+              <Input value={hint} onChange={(e) => setHint(e.target.value)} placeholder={HINT_PLACEHOLDER[agent as AgentKey] ?? "Ticket number or question"} />
             </div>
             <div className="flex justify-end gap-2">
               <Button asChild variant="outline">
@@ -95,7 +106,7 @@ function RunNowPage() {
                   Go to Inbox
                 </Link>
               </Button>
-              <Button onClick={() => run.mutate()} disabled={run.isPending}>
+              <Button onClick={() => run.mutate()} disabled={run.isPending || !runnable}>
                 {run.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Play className="h-4 w-4 mr-1" />}
                 Run
               </Button>

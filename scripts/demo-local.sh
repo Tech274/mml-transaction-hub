@@ -50,6 +50,8 @@ VITE_SUPABASE_PROJECT_ID=local
 SUPABASE_URL=${API_URL}
 SUPABASE_PUBLISHABLE_KEY=${ANON_KEY}
 SUPABASE_SERVICE_ROLE_KEY=${SERVICE_ROLE_KEY}
+# Local demo only. Uses the mock model provider when no vendor key is set. Never set this in production.
+AI_AGENTS_DEMO=1
 EOF
 
 echo "Demo users: admin.demo@mml.local / ops.demo@mml.local  password DemoLocal!2026"

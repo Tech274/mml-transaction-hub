@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, AlertTriangle, Bot, Inbox, Play, CheckCircle2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { listAgents, type AgentSummary } from "@/lib/ai-command-center.functions";
+import { useAuth } from "@/lib/auth-context";
 
 export const Route = createFileRoute("/_authenticated/ai-command-center/agents")({
   component: AgentsPage,
@@ -36,15 +37,23 @@ function StatusBadge({ status }: { status: AgentSummary["status"] }) {
 
 function AgentsPage() {
   const fn = useServerFn(listAgents);
+  const { hasAnyRole } = useAuth();
+  const isAdmin = hasAnyRole(["admin"]);
   const q = useQuery({ queryKey: ["ai-cc", "agents"], queryFn: () => fn() as Promise<AgentSummary[]>, refetchInterval: 15000 });
 
   return (
     <AppShell title="AI Command Center — Agents">
       <div className="space-y-4">
-        <p className="text-sm text-muted-foreground max-w-3xl">
-          Three agents work alongside the team. They read live platform data and always stop for a human decision — nothing
-          is sent, closed or saved without your confirmation in the Inbox.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <p className="text-sm text-muted-foreground max-w-3xl">
+            Agents read data you are allowed to see and leave drafts in the Inbox. Nothing is sent or written automatically.
+          </p>
+          {isAdmin && (
+            <Button asChild size="sm">
+              <Link to="/ai-command-center/agents/$agentId" params={{ agentId: "new" }}>New agent</Link>
+            </Button>
+          )}
+        </div>
 
         {q.isLoading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -66,13 +75,18 @@ function AgentsPage() {
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {(q.data ?? []).map((a) => (
-            <Card key={a.key} className="flex flex-col">
+            <Card key={a.key} className="flex flex-col" data-testid={`agent-card-${a.key}`}>
               <CardHeader>
                 <div className="flex items-start justify-between gap-2">
                   <CardTitle className="text-base flex items-center gap-2">
                     <Bot className="h-4 w-4 text-primary" /> {a.name}
                   </CardTitle>
-                  <StatusBadge status={a.status} />
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusBadge status={a.status} />
+                    {a.config_status && a.config_status !== "legacy" && (
+                      <Badge variant={a.config_status === "active" ? "default" : "outline"}>{a.config_status}</Badge>
+                    )}
+                  </div>
                 </div>
                 <CardDescription>{a.blurb}</CardDescription>
               </CardHeader>
@@ -86,17 +100,26 @@ function AgentsPage() {
                   {a.pending > 0 ? `${a.pending} item(s) awaiting review · ` : "Nothing awaiting review · "}
                   {a.last_run_at ? `last run ${formatDistanceToNow(new Date(a.last_run_at))} ago` : "never run"}
                 </div>
-                <div className="mt-auto flex gap-2 pt-2">
-                  <Button asChild size="sm">
-                    <Link to="/ai-command-center/run-now" search={{ agent: a.key }}>
-                      <Play className="h-3.5 w-3.5 mr-1" /> Run now
-                    </Link>
-                  </Button>
+                <div className="mt-auto flex flex-wrap gap-2 pt-2">
+                  {a.config_status === "paused" || a.config_status === "draft" || a.config_status === "archived" ? (
+                    <Button size="sm" disabled>Run now</Button>
+                  ) : (
+                    <Button asChild size="sm">
+                      <Link to="/ai-command-center/run-now" search={{ agent: a.key }}>
+                        <Play className="h-3.5 w-3.5 mr-1" /> Run now
+                      </Link>
+                    </Button>
+                  )}
                   <Button asChild size="sm" variant="outline">
                     <Link to="/ai-command-center/inbox" search={{ agent: a.key }}>
                       <Inbox className="h-3.5 w-3.5 mr-1" /> Inbox
                     </Link>
                   </Button>
+                  {isAdmin && (
+                    <Button asChild size="sm" variant="outline">
+                      <Link to="/ai-command-center/agents/$agentId" params={{ agentId: a.key }} data-testid={`open-builder-${a.key}`}>Edit</Link>
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -21,7 +21,15 @@ import {
  * ------------------------------------------------------------------------- */
 
 export type AgentKey = "generalist" | "support" | "cost_adr";
-export type InboxType = "solution_guide" | "email_draft" | "ticket_proposal" | "adr_field_map";
+export type InboxType =
+  | "solution_guide"
+  | "email_draft"
+  | "ticket_proposal"
+  | "adr_field_map"
+  | "triage_note"
+  | "qa_answer"
+  | "report"
+  | "margin_alert";
 export type AgentStatus = "idle" | "running" | "needs confirm";
 
 export interface AgentSummary {
@@ -33,12 +41,15 @@ export interface AgentSummary {
   pending: number;
   last_run_at: string | null;
   owns_email_draft: boolean;
+  engine?: "rules" | "model";
+  config_status?: "draft" | "active" | "paused" | "archived" | "legacy";
+  model_id?: string | null;
 }
 
 export interface InboxItem {
   id: string;
   run_id: string | null;
-  agent_key: AgentKey;
+  agent_key: string;
   item_type: InboxType;
   title: string;
   summary: string | null;
@@ -53,7 +64,7 @@ export interface InboxItem {
 export interface AuditItem {
   id: string;
   actor_email: string | null;
-  agent_key: AgentKey | null;
+  agent_key: string | null;
   action: "run" | "propose" | "confirm" | "reject";
   run_id: string | null;
   inbox_id: string | null;
@@ -136,7 +147,7 @@ async function writeAudit(
   row: {
     actor_id: string;
     actor_email: string | null;
-    agent_key: AgentKey | null;
+    agent_key: string | null;
     action: "run" | "propose" | "confirm" | "reject";
     run_id?: string | null;
     inbox_id?: string | null;
@@ -171,17 +182,65 @@ export const listAgents = createServerFn({ method: "GET" })
       sb.from("ai_cc_runs").select("agent_key, status, created_at").order("created_at", { ascending: false }).limit(200),
     ]);
 
-    return AGENTS.map((a) => {
+    let configs: { key: string; name: string; status: string; engine: string; model_id: string | null; purpose: string | null }[] = [];
+    try {
+      const cfg = await admin();
+      const { data, error } = await cfg.from("ai_agents").select("key, name, status, engine, current_version_id");
+      if (!error && data) {
+        const ids = (data as { current_version_id: string | null }[]).map((row) => row.current_version_id).filter(Boolean);
+        const versions = ids.length
+          ? await cfg.from("ai_agent_versions").select("id, model_id, purpose").in("id", ids)
+          : { data: [] };
+        const byId = new Map(((versions.data ?? []) as { id: string; model_id: string | null; purpose: string | null }[]).map((row) => [row.id, row]));
+        configs = (data as { key: string; name: string; status: string; engine: string; current_version_id: string | null }[]).map((row) => ({
+          key: row.key,
+          name: row.name,
+          status: row.status,
+          engine: row.engine,
+          model_id: byId.get(row.current_version_id ?? "")?.model_id ?? null,
+          purpose: byId.get(row.current_version_id ?? "")?.purpose ?? null,
+        }));
+      }
+    } catch {
+      configs = [];
+    }
+    const byKey = new Map(configs.map((row) => [row.key, row]));
+
+    const cards: AgentSummary[] = AGENTS.map((a) => {
       const pendingCount = (pending ?? []).filter((p: { agent_key: string }) => p.agent_key === a.key).length;
       const agentRuns = (runs ?? []).filter((r: { agent_key: string }) => r.agent_key === a.key);
       const running = agentRuns.some((r: { status: string }) => r.status === "running");
+      const cfg = byKey.get(a.key);
       return {
         ...a,
+        engine: (cfg?.engine as "rules" | "model" | undefined) ?? "rules",
+        config_status: (cfg?.status as AgentSummary["config_status"]) ?? "legacy",
+        model_id: cfg?.model_id ?? null,
         pending: pendingCount,
         status: running ? "running" : pendingCount > 0 ? "needs confirm" : "idle",
         last_run_at: (agentRuns[0] as { created_at?: string } | undefined)?.created_at ?? null,
-      } as AgentSummary;
+      };
     });
+
+    for (const cfg of configs) {
+      if (cards.some((card) => card.key === cfg.key)) continue;
+      const pendingCount = (pending ?? []).filter((p: { agent_key: string }) => p.agent_key === cfg.key).length;
+      const agentRuns = (runs ?? []).filter((r: { agent_key: string }) => r.agent_key === cfg.key);
+      cards.push({
+        key: cfg.key as AgentKey,
+        name: cfg.name,
+        blurb: cfg.purpose || "Model-backed agent. Results are drafts in the Inbox.",
+        capabilities: cfg.engine === "model" ? ["Uses a configured model", "Read-only tools", "Drafts only, nothing is sent"] : [],
+        owns_email_draft: cfg.key === "ticket_triage",
+        engine: cfg.engine as "rules" | "model",
+        config_status: cfg.status as AgentSummary["config_status"],
+        model_id: cfg.model_id,
+        pending: pendingCount,
+        status: agentRuns.some((r: { status: string }) => r.status === "running") ? "running" : pendingCount > 0 ? "needs confirm" : "idle",
+        last_run_at: (agentRuns[0] as { created_at?: string } | undefined)?.created_at ?? null,
+      });
+    }
+    return cards;
   });
 
 export const listInbox = createServerFn({ method: "GET" })
@@ -453,6 +512,14 @@ export const runAgent = createServerFn({ method: "POST" })
     const email = actorEmail(ctx);
     const sb = await admin();
     const read = context.supabase as unknown as { from: (t: string) => any };
+    const gate = await sb.from("ai_settings").select("agents_enabled").eq("id", 1).maybeSingle();
+    if (!gate.error && gate.data && gate.data.agents_enabled === false) {
+      throw new AppError("AI agents are switched off by the kill switch.", "kill_switch");
+    }
+    const configured = await sb.from("ai_agents").select("status").eq("key", data.agent_key).maybeSingle();
+    if (!configured.error && configured.data && configured.data.status !== "active") {
+      throw new AppError(`The ${data.agent_key} agent is ${configured.data.status}. Nothing was run.`, "agent_paused");
+    }
 
     const { data: run, error: runErr } = await sb
       .from("ai_cc_runs")
@@ -521,15 +588,24 @@ export const runAgent = createServerFn({ method: "POST" })
       const { data: inserted, error: inboxErr } = await sb
         .from("ai_cc_inbox")
         .insert(
-          proposals.map((p) => ({
-            run_id: runId,
-            agent_key: p.agent_key,
-            item_type: p.item_type,
-            title: p.title,
-            summary: p.summary,
-            payload: p.payload,
-            status: "pending",
-          })),
+          proposals.map((p) => {
+            const text = JSON.stringify(p.payload);
+            const containsMoney = p.item_type === "adr_field_map" || p.item_type === "solution_guide" || /INR\s|input_cost|selling_cost|margin/.test(text);
+            return {
+              run_id: runId,
+              agent_key: p.agent_key,
+              item_type: p.item_type,
+              title: p.title,
+              summary: p.summary,
+              payload: p.payload,
+              status: "pending",
+              contains_money: containsMoney,
+              ai_generated: false,
+              view_roles: containsMoney
+                ? ["admin", "ops_lead", "ops_user", "leadership", "finance"]
+                : ["admin", "ops_lead", "ops_user", "leadership", "finance", "viewer"],
+            };
+          }),
         )
         .select("id, item_type, title");
       if (inboxErr) throw dbError(inboxErr, "ai-command-center.runAgent");

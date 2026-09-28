@@ -11,6 +11,7 @@ import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
 import { addNullable } from "@/lib/nullable-sum";
 import { costBasisCounts, reportLineCost, type ReportRow } from "@/lib/reports-metrics";
 import { COST_BASIS_LABEL } from "@/lib/cost-calculator";
+import { DashboardAskBox } from "@/components/ai-command-center/ask-box";
 import { usePermissions, setPreviewRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -230,6 +231,7 @@ function DashboardPage() {
           {basis.none ? ` · ${COST_BASIS_LABEL.none} ${basis.none}` : ""}.
         </p>
 
+        <DashboardAskBox />
         <MyAgentTicketKpis />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

@@ -413,3 +413,58 @@ describe("20260928040000_scrum103_customer_name_normalize: helper grants", () =>
     await fresh.close();
   }, 120_000);
 });
+
+describe("AI agents Phase 1 (SCRUM-64)", () => {
+  it("an active viewer reads a non-money inbox row and not a money row", async () => {
+    await db.exec(`
+      insert into public.ai_cc_inbox (agent_key, item_type, title, contains_money)
+      values
+        ('support', 'email_draft', 'Plain draft', false),
+        ('cost_adr', 'adr_field_map', 'Money draft', true)
+    `);
+    const titles = async (userId: string) =>
+      asActor(db, as(userId), async (q) => {
+        const r = await q.query<{ title: string }>("select title from public.ai_cc_inbox order by title");
+        return r.rows.map((row) => row.title);
+      });
+    expect(await titles(U.viewer)).toEqual(["Plain draft"]);
+    expect(await titles(U.opsLead)).toEqual(["Money draft", "Plain draft"]);
+    expect(await titles(U.admin)).toEqual(["Money draft", "Plain draft"]);
+    expect(await titles(U.finance)).toEqual(["Money draft", "Plain draft"]);
+  });
+
+  it("a disabled account cannot read ai command center rows", async () => {
+    await db.query("update public.profiles set is_active = false where id = $1", [U.viewer]);
+    const seen = await asActor(db, as(U.viewer), async (q) => {
+      const inbox = await count(q, "ai_cc_inbox");
+      const runs = await count(q, "ai_cc_runs");
+      const audit = await count(q, "ai_cc_audit");
+      const labs = await count(q, "ai_cc_lab_requests");
+      return { inbox, runs, audit, labs };
+    });
+    expect(seen).toEqual({ inbox: 0, runs: 0, audit: 0, labs: 0 });
+    await db.query("update public.profiles set is_active = true where id = $1", [U.viewer]);
+    expect(await asActor(db, as(U.viewer), (q) => count(q, "ai_cc_inbox"))).toBe(1);
+  });
+
+  it("ticket reads under the invoking user follow ticket RLS, and a role outside ops is refused before the client", async () => {
+    expect(await asActor(db, as(U.opsUser), (q) => count(q, "freshdesk_tickets"))).toBe(1);
+    expect(await asActor(db, as(U.noRole), (q) => count(q, "freshdesk_tickets"))).toBe(0);
+    const { executeTool } = await import("@/lib/ai/tools/execute");
+    let called = false;
+    const blocked = await executeTool("tickets.get", { ticket_id: 1001 }, {
+      access: { async read() { called = true; return { rows: [] }; } },
+      roles: ["viewer"],
+      moneyVisible: false,
+      pinnedCompany: null,
+    });
+    expect(blocked.access).toBe("no_access");
+    expect(called).toBe(false);
+  });
+
+  it("ai agent config is admin-only and anon has no grant", async () => {
+    expect(await asActor(db, as(U.admin), (q) => count(q, "ai_agents"))).toBe(5);
+    expect(await asActor(db, as(U.opsLead), (q) => count(q, "ai_agents"))).toBe(0);
+    expect(await asActor(db, { role: "anon" }, (q) => outcome(q.query("select * from public.ai_agents")))).toBe("42501");
+  });
+});
