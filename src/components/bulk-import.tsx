@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert, Save, Bookmark, Ban, Sparkles, Eye, Settings2, Pencil, Trash2 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Download, Upload, CheckCircle2, AlertTriangle, X, FileWarning, RotateCw, ShieldAlert, Ban, Sparkles, Eye } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
@@ -26,16 +25,6 @@ import { useAuth } from "@/lib/auth-context";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 type CloudKind = "public_cloud" | "private_cloud";
-type DupStrategy = "skip" | "update" | "link";
-
-interface Preset {
-  id: string;
-  name: string;
-  kind: CloudKind;
-  column_mapping: Record<string, number>;
-  duplicate_strategy: DupStrategy;
-  update_fields: string[] | null;
-}
 
 import {
   LINE_OF_BUSINESS_OPTIONS,
@@ -227,13 +216,7 @@ export function BulkImport() {
   >(null);
   const [isRetryRun, setIsRetryRun] = useState(false);
   const [parentRunId, setParentRunId] = useState<string | null>(null);
-  const [dupStrategy, setDupStrategy] = useState<DupStrategy>("skip");
-  const [presetName, setPresetName] = useState("");
-  const [selectedPresetId, setSelectedPresetId] = useState<string>("");
-  // Preview suggested corrections + preset manager dialogs
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [presetMgrOpen, setPresetMgrOpen] = useState(false);
-  const [editingPreset, setEditingPreset] = useState<{ id: string; name: string; is_shared: boolean } | null>(null);
   // Per-row / per-field selection for suggested corrections in the Preview dialog.
   // Keyed by `${line}:${field}`; if a key is absent it defaults to selected.
   const [suggestionSelection, setSuggestionSelection] = useState<Record<string, boolean>>({});
@@ -253,15 +236,6 @@ export function BulkImport() {
     body: string[][];
     colIdx: Record<string, number>;
   } | null>(null);
-  // Fields the user opts to update when duplicate strategy = update
-  const UPDATABLE_FIELDS = [
-    "month", "year", "customer_name", "lab_name", "line_of_business",
-    "start_date", "end_date", "total_users", "input_cost", "selling_cost",
-    "cloud_provider", "system_config",
-  ] as const;
-  const [updateFields, setUpdateFields] = useState<Set<string>>(
-    new Set(UPDATABLE_FIELDS),
-  );
   const fileRef = useRef<HTMLInputElement>(null);
   const findOrCreate = useServerFn(findOrCreateCustomer);
   
@@ -332,20 +306,6 @@ export function BulkImport() {
     },
   });
   const retryBlocked = !!retryStats && (retryStats.retry_count ?? 0) >= (retryStats.max_retries ?? MAX_RETRIES);
-
-  // Presets (shared with all users)
-  const { data: presets = [] } = useQuery({
-    queryKey: ["bulk_import_presets", kind],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("bulk_import_presets")
-        .select("id,name,kind,column_mapping,duplicate_strategy,update_fields,is_shared,created_by,created_by_email")
-        .eq("kind", kind)
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as Preset[];
-    },
-  });
 
   const headers = kind === "public_cloud" ? PUBLIC_HEADERS : PRIVATE_HEADERS;
   const sample = kind === "public_cloud" ? PUBLIC_SAMPLE : PRIVATE_SAMPLE;
@@ -562,62 +522,6 @@ export function BulkImport() {
     toast.success(`Applied suggestions · ${fixed}/${next.length} now valid. Click "Import valid rows" to retry.`);
   }
 
-  // --- Presets ---
-  async function saveAsPreset() {
-    if (!mapping) { toast.error("Upload a CSV first"); return; }
-    if (!presetName.trim()) { toast.error("Enter a preset name"); return; }
-    if (!user) return;
-    const { error } = await supabase.from("bulk_import_presets").insert({
-      name: presetName.trim(),
-      kind,
-      column_mapping: mapping.colIdx,
-      duplicate_strategy: dupStrategy,
-      update_fields: dupStrategy === "update" ? Array.from(updateFields) : null,
-      is_shared: true,
-      created_by: user.id,
-      created_by_email: user.email ?? null,
-    });
-    if (error) { toast.error(error.message); return; }
-    toast.success(`Preset "${presetName.trim()}" saved`);
-    setPresetName("");
-    qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
-  }
-
-  async function renamePreset(id: string, name: string, is_shared: boolean) {
-    const { error } = await supabase
-      .from("bulk_import_presets")
-      .update({ name: name.trim(), is_shared })
-      .eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success("Preset updated");
-    setEditingPreset(null);
-    qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
-  }
-
-  async function deletePreset(id: string) {
-    if (!confirm("Delete this preset? This cannot be undone.")) return;
-    const { error } = await supabase.from("bulk_import_presets").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    if (selectedPresetId === id) setSelectedPresetId("");
-    toast.success("Preset deleted");
-    qc.invalidateQueries({ queryKey: ["bulk_import_presets", kind] });
-  }
-
-  function applyPreset(id: string) {
-    setSelectedPresetId(id);
-    const p = presets.find((x) => x.id === id);
-    if (!p) return;
-    setDupStrategy(p.duplicate_strategy);
-    if (p.update_fields) setUpdateFields(new Set(p.update_fields));
-    if (mapping) {
-      const colIdx = p.column_mapping;
-      const matched = headers.filter((h) => h in colIdx);
-      const missing = headers.filter((h) => !(h in colIdx));
-      setMapping({ ...mapping, colIdx, matched, missing });
-    }
-    toast.success(`Loaded preset "${p.name}"`);
-  }
-
   async function importValid() {
     const valid = rows.filter((r) => r.errors.length === 0 && r.parsed);
     if (!valid.length) { toast.error("No valid rows to import"); return; }
@@ -640,8 +544,6 @@ export function BulkImport() {
     setProgress({ done: 0, total: valid.length, succeeded: 0, failed: 0, isRetry: isRetryRun });
     const updated = [...rows];
     let imported = 0, skipped = 0, updatedCount = 0, linked = 0;
-    // Distinct existing transactions matched by the natural key across this file.
-    const matchedIds = new Set<string>();
 
     // Create run header
     const { data: run, error: runErr } = await supabase
@@ -651,13 +553,16 @@ export function BulkImport() {
         user_email: user.email ?? null,
         kind,
         filename: fileName,
-        duplicate_strategy: dupStrategy,
+        // Every non-blank row is inserted; nothing is skipped, updated or linked as a
+        // duplicate. Needs 'insert' in bulk_import_runs_duplicate_strategy_check
+        // (migration 20260928040000_scrum103_customer_name_normalize).
+        duplicate_strategy: "insert",
         total_rows: rows.length,
         valid_rows: valid.length,
         invalid_rows: rows.length - valid.length,
         status: "pending",
         column_mapping: mapping?.colIdx ?? null,
-        update_fields: dupStrategy === "update" ? Array.from(updateFields) : null,
+        update_fields: null,
         parent_run_id: isRetryRun ? parentRunId : null,
         retry_count: isRetryRun ? ((retryStats?.retry_count ?? 0) + 1) : 0,
         max_retries: MAX_RETRIES,
@@ -679,7 +584,7 @@ export function BulkImport() {
       actor_id: user.id,
       actor_email: user.email ?? null,
       details: {
-        kind, filename: fileName, strategy: dupStrategy,
+        kind, filename: fileName, strategy: "insert",
         valid: valid.length, invalid: rows.length - valid.length,
       },
     } as never), "audit:import_started");
@@ -884,9 +789,8 @@ export function BulkImport() {
         actor_id: user.id,
         actor_email: user.email ?? null,
         details: {
-          kind, filename: fileName, strategy: dupStrategy,
+          kind, filename: fileName, strategy: "insert",
           imported, updated: updatedCount, skipped, linked,
-          unique_matched: matchedIds.size,
           valid: valid.length, invalid: rows.length - valid.length,
           claimed_valid: valid.length,
         },
@@ -910,9 +814,8 @@ export function BulkImport() {
         actor_id: user.id,
         actor_email: user.email ?? null,
         details: {
-          kind, filename: fileName, strategy: dupStrategy,
+          kind, filename: fileName, strategy: "insert",
           imported, updated: updatedCount, skipped, linked,
-          unique_matched: matchedIds.size,
           valid: valid.length, invalid: rows.length - valid.length,
           error: (e as Error).message,
         },
@@ -956,34 +859,6 @@ export function BulkImport() {
             ({retryStats?.retry_count}/{retryStats?.max_retries ?? MAX_RETRIES}). Start a fresh import to continue.
           </div>
         )}
-
-        {/* Preset bar */}
-        <div className="flex flex-wrap items-end gap-2 rounded-md border p-2 bg-muted/30">
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs flex items-center gap-1"><Bookmark className="h-3 w-3" />Use a saved preset</Label>
-            <Select value={selectedPresetId} onValueChange={applyPreset}>
-              <SelectTrigger className="w-[240px] h-9"><SelectValue placeholder={presets.length ? "Choose preset…" : "No presets yet"} /></SelectTrigger>
-              <SelectContent>
-                {presets.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <Label className="text-xs">Save current mapping + duplicate choices as…</Label>
-            <div className="flex gap-1">
-              <Input value={presetName} onChange={(e) => setPresetName(e.target.value)} placeholder="Preset name" className="h-9 w-[200px]" />
-              <Button size="sm" variant="outline" onClick={saveAsPreset} disabled={!mapping || !presetName.trim()}>
-                <Save className="h-4 w-4 mr-1" />Save preset
-              </Button>
-            </div>
-          </div>
-          <div className="text-[11px] text-muted-foreground ml-auto self-end">
-            Presets are shared with all Ops/Manager/Admin users in this workspace.
-          </div>
-          <Button size="sm" variant="ghost" onClick={() => setPresetMgrOpen(true)} className="self-end">
-            <Settings2 className="h-4 w-4 mr-1" />Manage
-          </Button>
-        </div>
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex flex-col gap-1">
@@ -1038,7 +913,7 @@ export function BulkImport() {
                     ? `Retry limit reached (${retryStats?.max_retries ?? MAX_RETRIES})`
                     : lastRunInFlight
                       ? "Wait for the previous import to finish"
-                      : "Keep only invalid rows; current mapping & duplicate strategy will be reused"}
+                      : "Keep only invalid rows; the current column mapping will be reused"}
                 >
                   <RotateCw className="h-4 w-4 mr-1" />Retry invalid rows
                 </Button>
@@ -1319,96 +1194,6 @@ export function BulkImport() {
               <Button onClick={applySuggestedAndRetry} disabled={submitting || lastRunInFlight || retryBlocked}>
                 <Sparkles className="h-4 w-4 mr-1" />Apply &amp; retry
               </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Preset management — create/edit/rename/delete + sharing toggle */}
-        <Dialog open={presetMgrOpen} onOpenChange={(o) => { setPresetMgrOpen(o); if (!o) setEditingPreset(null); }}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Manage presets — {kind === "public_cloud" ? "Public" : "Private"} Cloud</DialogTitle>
-              <DialogDescription>
-                Saved header mappings and duplicate-handling choices. Shared presets are visible to all Ops/Manager/Admin users.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="max-h-[55vh] overflow-auto border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Strategy</TableHead>
-                    <TableHead>Owner</TableHead>
-                    <TableHead>Sharing</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {presets.length === 0 && (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">No presets yet</TableCell></TableRow>
-                  )}
-                  {presets.map((p) => {
-                    const pAny = p as Preset & { created_by?: string; created_by_email?: string | null; is_shared?: boolean };
-                    const mine = pAny.created_by === user?.id;
-                    const isEditing = editingPreset?.id === p.id;
-                    return (
-                      <TableRow key={p.id}>
-                        <TableCell>
-                          {isEditing ? (
-                            <Input
-                              value={editingPreset!.name}
-                              onChange={(e) => setEditingPreset({ ...editingPreset!, name: e.target.value })}
-                              className="h-8"
-                            />
-                          ) : (
-                            <span className="font-medium">{p.name}</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-xs">{p.duplicate_strategy}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{pAny.created_by_email ?? "—"}</TableCell>
-                        <TableCell>
-                          {isEditing ? (
-                            <label className="flex items-center gap-2 text-xs cursor-pointer">
-                              <Checkbox
-                                checked={editingPreset!.is_shared}
-                                onCheckedChange={(c) => setEditingPreset({ ...editingPreset!, is_shared: !!c })}
-                              />
-                              Shared
-                            </label>
-                          ) : (
-                            <Badge variant={pAny.is_shared ? "outline" : "secondary"} className="text-xs">
-                              {pAny.is_shared ? "Shared" : "Private"}
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex gap-1 justify-end">
-                            {isEditing ? (
-                              <>
-                                <Button size="sm" onClick={() => renamePreset(p.id, editingPreset!.name, editingPreset!.is_shared)} disabled={!editingPreset!.name.trim()}>Save</Button>
-                                <Button size="sm" variant="ghost" onClick={() => setEditingPreset(null)}>Cancel</Button>
-                              </>
-                            ) : (
-                              <>
-                                <Button size="sm" variant="ghost" onClick={() => applyPreset(p.id)} title="Load into form">Load</Button>
-                                <Button size="sm" variant="ghost" disabled={!mine} onClick={() => setEditingPreset({ id: p.id, name: p.name, is_shared: !!pAny.is_shared })} title={mine ? "Rename / sharing" : "Only the creator can edit"}>
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button size="sm" variant="ghost" disabled={!mine} onClick={() => deletePreset(p.id)} title={mine ? "Delete" : "Only the creator can delete"}>
-                                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPresetMgrOpen(false)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

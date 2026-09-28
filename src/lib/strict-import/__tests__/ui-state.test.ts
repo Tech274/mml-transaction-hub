@@ -10,7 +10,6 @@ const preview = (over: Partial<PreviewResult> = {}): PreviewResult => ({
   fileSha256: "a".repeat(64),
   sheetName: null,
   summary: { rowsInFile: 1, blankRowsIgnored: 0, rowsToImport: 1, errorCount: 0, warningCount: 0, totalSellingCents: 100, totalInputCents: 50, distinctCustomers: 1 },
-  headerErrors: [],
   rowErrors: [],
   warnings: [],
   customers: { newCustomers: ["Beta Test Ltd"], matchedWithDifferentSpelling: [], inFileVariants: [] },
@@ -48,7 +47,7 @@ describe("strict import screen state", () => {
   });
   it("template CSV has exactly the strict headers and parses back cleanly", () => {
     const sheet = parseCsvText(strictTemplateCsv());
-    expect(matchHeaders(sheet.header).errors).toEqual([]);
+    expect(matchHeaders(sheet.header).warnings).toEqual([]);
     expect(sheet.rows).toEqual([]);
     expect(strictTemplateFilename()).toBe("strict-import-template-2.0.0-proposed.csv");
   });

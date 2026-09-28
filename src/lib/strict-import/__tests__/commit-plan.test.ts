@@ -75,9 +75,11 @@ describe("commitBlockers", () => {
     expect(planCustomers(okValidation.records, []).newCustomers.length).toBeGreaterThan(0);
     expect(commitBlockers(okValidation, open)).toEqual([]);
   });
-  it("blocks a file with an unknown column, and does not block an unstorable cell", () => {
-    const bad = validateStrict([...HEADER, "Notes"], [row(2)]);
-    expect(commitBlockers(bad, open)[0]).toMatch(/1 error/);
+  it("does not block an unknown column or an unstorable cell", () => {
+    const extra = validateStrict([...HEADER, "Notes"], [row(2)]);
+    expect(extra.ok).toBe(true);
+    expect(extra.warnings.some((w) => w.message === 'Unknown column "Notes" is ignored.')).toBe(true);
+    expect(commitBlockers(extra, open)).toEqual([]);
     const soft = validateStrict(HEADER, [row(2, { Month: "nope", "Cloud Provider": "OpenAI" })]);
     expect(commitBlockers(soft, open)).toEqual([]);
   });

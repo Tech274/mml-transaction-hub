@@ -10,12 +10,6 @@
 import { isBlankCell, isExcelDate, isIsoDate, type RawCell, type RawRow } from "./cells";
 import { PROPOSED_RULES, columnLetter, normalizeHeader, type StrictColumn, type StrictField, type StrictRules } from "./template";
 
-export interface HeaderError {
-  column: string | null;
-  header: string | null;
-  message: string;
-}
-
 export interface RowIssue {
   line: number;
   column: string | null;
@@ -53,19 +47,19 @@ export interface StrictSummary {
 }
 
 export interface StrictValidationResult {
-  headerErrors: HeaderError[];
   rowErrors: RowIssue[];
   warnings: RowIssue[];
   records: StrictRecord[];
   summary: StrictSummary;
-  /** True only when there are no header errors and no row errors. Warnings still need acknowledgement. */
+  /** True when nothing blocks the commit. Header notes are warnings and do not affect this. */
   ok: boolean;
 }
 
 type ColumnMap = Map<StrictField, number>;
 
-export function matchHeaders(header: string[], rules: StrictRules = PROPOSED_RULES): { map: ColumnMap; errors: HeaderError[] } {
-  const errors: HeaderError[] = [];
+/** Header notes. None of these block the import (validateStrict blocks only when no template column matches). */
+export function matchHeaders(header: string[], rules: StrictRules = PROPOSED_RULES): { map: ColumnMap; warnings: RowIssue[] } {
+  const warnings: RowIssue[] = [];
   const map: ColumnMap = new Map();
   const byNorm = new Map<string, StrictColumn>();
   for (const col of rules.columns) byNorm.set(normalizeHeader(col.header), col);
@@ -75,24 +69,43 @@ export function matchHeaders(header: string[], rules: StrictRules = PROPOSED_RUL
   header.forEach((raw, idx) => {
     const norm = normalizeHeader(raw ?? "");
     const letter = columnLetter(idx);
-    if (norm === "") {
-      errors.push({ column: letter, header: raw ?? "", message: `Column ${letter} has no header` });
-      return;
-    }
+    if (norm === "") return;
     if (seen.has(norm)) {
-      errors.push({ column: letter, header: raw, message: `Duplicate header "${raw.trim()}" (also in column ${columnLetter(seen.get(norm)!)})` });
+      warnings.push({
+        line: 1,
+        column: letter,
+        header: raw,
+        value: raw.trim(),
+        message: `Duplicate header "${raw.trim()}" (also in column ${columnLetter(seen.get(norm)!)}). The first occurrence is used.`,
+      });
       return;
     }
     seen.set(norm, idx);
     const col = byNorm.get(norm);
     if (col) map.set(col.field, idx);
     else if (!ignored.has(norm)) {
-      errors.push({ column: letter, header: raw, message: `Unknown column "${raw.trim()}". It is not in the template.` });
+      warnings.push({
+        line: 1,
+        column: letter,
+        header: raw,
+        value: raw.trim(),
+        message: `Unknown column "${raw.trim()}" is ignored.`,
+      });
     }
   });
 
-  // A missing column is a blank field on every row, not a reason to reject the file.
-  return { map, errors };
+  for (const col of rules.columns) {
+    if (!map.has(col.field)) {
+      warnings.push({
+        line: 1,
+        column: null,
+        header: col.header,
+        value: "",
+        message: `Column "${col.header}" is missing. Those cells are stored blank.`,
+      });
+    }
+  }
+  return { map, warnings };
 }
 
 function display(v: RawCell): string {
@@ -122,16 +135,48 @@ export function toCents(n: number): number | null {
 
 export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?: StrictRules; blankRowsIgnored?: number }): StrictValidationResult {
   const rules = opts?.rules ?? PROPOSED_RULES;
-  const { map, errors: headerErrors } = matchHeaders(header, rules);
+  const { map, warnings: headerWarnings } = matchHeaders(header, rules);
   const rowErrors: RowIssue[] = [];
-  const warnings: RowIssue[] = [];
+  const warnings: RowIssue[] = [...headerWarnings];
   const records: StrictRecord[] = [];
   let blankRows = opts?.blankRowsIgnored ?? 0;
 
   const colFor = (f: StrictField) => rules.columns.find((c) => c.field === f)!;
 
+  // The one header problem that blocks: not a single template column was recognised.
+  if (map.size === 0) {
+    rowErrors.push({
+      line: 1,
+      column: null,
+      header: null,
+      value: "",
+      message: "No recognised columns; please use the template.",
+    });
+  }
+
+  // A cell under a blank header is dropped. Say so when that column has any values.
+  const width = rows.reduce((w, r) => Math.max(w, r.cells.length), header.length);
+  for (let idx = 0; idx < width; idx++) {
+    if (normalizeHeader(header[idx] ?? "") !== "") continue;
+    const filled = rows.filter((r) => idx < r.cells.length && !isBlankCell(r.cells[idx])).length;
+    if (filled === 0) continue;
+    warnings.push({
+      line: 1,
+      column: columnLetter(idx),
+      header: null,
+      value: "",
+      message: `Column ${columnLetter(idx)} has no header. Its ${filled} value(s) are ignored.`,
+    });
+  }
+
+  // A row is blank when every TEMPLATE cell is blank. Values in unknown or ignored
+  // columns (an S.No filled down the sheet, remarks) do not make a row.
+  const templateIdx = [...map.values()];
+  const isBlankRow = (row: RawRow) => templateIdx.every((idx) => idx >= row.cells.length || isBlankCell(row.cells[idx]));
+
   for (const row of rows) {
-    if (row.cells.every(isBlankCell)) {
+    if (map.size === 0) break;
+    if (isBlankRow(row)) {
       blankRows += 1;
       continue;
     }
@@ -258,7 +303,6 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
   const customers = new Set(records.map((r) => r.customer_name).filter((x): x is string => !!x));
 
   return {
-    headerErrors,
     rowErrors,
     warnings,
     records,
@@ -266,12 +310,12 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
       rowsInFile: records.length + blankRows,
       blankRowsIgnored: blankRows,
       rowsToImport: records.length,
-      errorCount: headerErrors.length + rowErrors.length,
+      errorCount: rowErrors.length,
       warningCount: warnings.length,
       totalSellingCents,
       totalInputCents,
       distinctCustomers: customers.size,
     },
-    ok: headerErrors.length === 0 && rowErrors.length === 0,
+    ok: rowErrors.length === 0,
   };
 }

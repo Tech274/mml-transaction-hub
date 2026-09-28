@@ -288,8 +288,8 @@ describe("existing sandbox SQL checks also pass locally", () => {
     await db.exec("rollback").catch(() => undefined);
   });
 
-  // The lenient rules are in supabase/migrations/20260928031000_scrum103_lenient_import.sql
-  // (applied to live 28 Sep), so the local database already has them. The sandbox
+  // 20260928031000_scrum103_lenient_import and 20260928040000_scrum103_customer_name_normalize
+  // are both in supabase/migrations, so the local database already has them. The sandbox
   // script runs inside its own transaction and is rolled back. It never touches live.
   it("supabase/tests/rls/scrum103_import_batch.sql", async () => {
     const { readFileSync } = await import("node:fs");
@@ -299,4 +299,117 @@ describe("existing sandbox SQL checks also pass locally", () => {
     await expect(db.exec(sql)).resolves.toBeDefined();
     await db.exec("rollback").catch(() => undefined);
   });
+});
+
+// SCRUM-103: 20260928040000_scrum103_customer_name_normalize revokes EXECUTE on its two helpers from
+// PUBLIC and anon. The import RPC (SECURITY DEFINER) and the customer trigger (runs as
+// the caller) must still work for an ops user, and anon must not call the helpers.
+describe("20260928040000_scrum103_customer_name_normalize: helper grants", () => {
+  let cdb: PGlite;
+  beforeAll(async () => {
+    cdb = await createLocalDb();
+    await cdb.query("insert into auth.users (id, email) values ($1, 'ops@example.test'), ($2, 'viewer@example.test')", [U.opsUser, U.viewer]);
+    await cdb.exec("delete from public.user_roles");
+    await cdb.query("insert into public.user_roles (user_id, role) values ($1, 'ops_user'::app_role), ($2, 'viewer'::app_role)", [U.opsUser, U.viewer]);
+  }, 120_000);
+
+  it("anon and PUBLIC cannot execute the helpers; authenticated and service_role can", async () => {
+    const r = await cdb.query<{ fn: string; anon: boolean; auth: boolean; svc: boolean; pub: boolean }>(
+      `select p.proname fn,
+              has_function_privilege('anon', p.oid, 'EXECUTE') anon,
+              has_function_privilege('authenticated', p.oid, 'EXECUTE') auth,
+              has_function_privilege('service_role', p.oid, 'EXECUTE') svc,
+              coalesce(p.proacl::text, '') ~ '(^|[{,])=X/' pub
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname in ('clean_customer_name', 'normalize_customer_name')
+        order by 1`,
+    );
+    expect(r.rows).toEqual([
+      { fn: "clean_customer_name", anon: false, auth: true, svc: true, pub: false },
+      { fn: "normalize_customer_name", anon: false, auth: true, svc: true, pub: false },
+    ]);
+    expect(await asActor(cdb, { role: "anon" }, (q) => outcome(q.query("select public.normalize_customer_name('x')")))).toBe("42501");
+    expect(await asActor(cdb, { role: "anon" }, (q) => outcome(q.query("select public.clean_customer_name('x')")))).toBe("42501");
+  });
+
+  it("an ops user creating a customer directly goes through the trigger with the new key", async () => {
+    const got = await asActor(cdb, as(U.opsUser), async (q) => {
+      await q.query("insert into public.customers (customer_name, created_by) values ($1, $2)", ["Grant" + String.fromCharCode(160) + "  Test   Co", U.opsUser]);
+      return (await q.query<{ normalized_name: string }>("select normalized_name from public.customers where created_by = $1", [U.opsUser])).rows;
+    });
+    expect(got).toEqual([{ normalized_name: "grant test co" }]);
+  });
+
+  it("an ops user calling import_transactions_batch creates a missing customer (RPC caller path)", async () => {
+    const got = await asActor(cdb, as(U.opsUser), async (q) => {
+      const res = await q.query<{ r: { inserted: number } }>(
+        `select public.import_transactions_batch('public_cloud', 'grants.xlsx', $1, '2.0.0-proposed',
+           jsonb_build_array(jsonb_build_object('source_line', 2, 'customer_name', 'Rpc' || chr(160) || ' Grant  Labs', 'lab_name', 'Lab G')),
+           '[]'::jsonb) r`,
+        ["e".repeat(64)],
+      );
+      const c = await q.query<{ n: number }>("select count(*)::int n from public.customers where normalized_name = 'rpc grant labs'");
+      const t = await q.query<{ n: number }>(
+        "select count(*)::int n from public.transactions t join public.customers c on c.id = t.customer_id where c.normalized_name = 'rpc grant labs'",
+      );
+      return { inserted: res.rows[0].r.inserted, customers: c.rows[0].n, linked: t.rows[0].n };
+    });
+    expect(got).toEqual({ inserted: 1, customers: 1, linked: 1 });
+  });
+
+  it("a viewer still cannot call import_transactions_batch", async () => {
+    const got = await asActor(cdb, as(U.viewer), (q) =>
+      outcome(q.query("select public.import_transactions_batch('public_cloud', 'v.xlsx', $1, '2.0.0-proposed', jsonb_build_array(jsonb_build_object('source_line', 2, 'customer_name', 'V Co')), '[]'::jsonb)", ["f".repeat(64)])),
+    );
+    expect(got).toBe("42501");
+  });
+
+  it("bulk_import_runs has exactly one duplicate_strategy CHECK, with the live name", async () => {
+    const r = await cdb.query<{ conname: string; d: string }>(
+      `select conname, pg_get_constraintdef(oid) d from pg_constraint
+        where conrelid = 'public.bulk_import_runs'::regclass and contype = 'c'
+          and pg_get_constraintdef(oid) like '%duplicate_strategy%'`,
+    );
+    expect(r.rows.map((x) => x.conname)).toEqual(["bulk_import_runs_duplicate_strategy_check"]);
+    for (const v of ["skip", "update", "link", "insert"]) expect(r.rows[0].d).toContain(`'${v}'`);
+  });
+
+  it("an ops user can record a legacy run with duplicate_strategy 'insert'; an unknown value is rejected", async () => {
+    const insert = (strategy: string) =>
+      asActor(cdb, as(U.opsUser), (q) =>
+        outcome(
+          q.query(
+            "insert into public.bulk_import_runs (user_id, kind, filename, duplicate_strategy) values ($1, 'public_cloud', 'legacy.csv', $2)",
+            [U.opsUser, strategy],
+          ),
+        ),
+      );
+    expect(await insert("insert")).toBe("ok");
+    expect(await insert("merge")).toBe("23514");
+    expect(await insert("")).toBe("23514");
+  });
+
+  it("the preflight stops the file when a stored customer key differs from the new key", async () => {
+    const sql = (await import("node:fs")).readFileSync(
+      (await import("node:path")).resolve(__dirname, "../../..", "supabase/migrations/20260928040000_scrum103_customer_name_normalize.sql"),
+      "utf8",
+    );
+    const fresh = await createLocalDb();
+    await fresh.query("insert into auth.users (id, email) values ($1, 'ops@example.test')", [U.opsUser]);
+    // Build a row with the OLD key (NBSP kept), as a customer saved before this file would have.
+    const nbsp = String.fromCharCode(160);
+    await fresh.exec("alter table public.customers disable trigger customers_normalize");
+    await fresh.query("insert into public.customers (customer_name, normalized_name, created_by) values ($1, $2, $3)", [`Drift${nbsp}Co`, `drift${nbsp}co`, U.opsUser]);
+    await fresh.exec("alter table public.customers enable trigger customers_normalize");
+    // Marker: the file GRANTs this before the preflight; a full rollback leaves it revoked.
+    await fresh.exec("revoke execute on function public.clean_customer_name(text) from authenticated");
+    await expect(fresh.exec(sql)).rejects.toThrow(/SCRUM-103 preflight: 1 customers row\(s\)/);
+    const after = await fresh.query<{ granted: boolean; key: string }>(
+      `select has_function_privilege('authenticated', 'public.clean_customer_name(text)', 'EXECUTE') granted,
+              (select normalized_name from public.customers where customer_name = $1) key`,
+      [`Drift${nbsp}Co`],
+    );
+    expect(after.rows[0]).toEqual({ granted: false, key: `drift${nbsp}co` });
+    await fresh.close();
+  }, 120_000);
 });

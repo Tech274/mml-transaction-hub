@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { runCommit, runPreview, StrictImportError, type ImportRpcPayload, type StrictImportDeps } from "../service";
+import { runCommit, runPreview, type ImportRpcPayload, type StrictImportDeps } from "../service";
 import { sha256Hex, base64ToBytes, bytesToBase64 } from "../hash";
 import { parseStrictBytes, MAX_STRICT_FILE_BYTES } from "../parse";
 import { HEADER } from "./fixtures";
@@ -112,13 +112,19 @@ describe("runCommit", () => {
     expect(r.inserted).toBe(1);
     expect(calls[0].p_rows[0].cloud_provider).toBeNull();
   });
-  it("an unknown extra column still never reaches the database", async () => {
-    const bad = new TextEncoder().encode(`${HEADER.join(",")},Notes\n${line("PID-TEST-003", "Acme Test Co", "1", "2")},x\n`);
+  it("an unknown extra column is ignored and the row is still imported", async () => {
+    const bad = new TextEncoder().encode(`${HEADER.join(",")},S.No,Remarks\n${line("PID-TEST-003", "Acme Test Co", "1", "2")},4,note\n`);
     const { deps, calls } = fakeDeps();
-    const err = await runCommit(deps, { filename: "f.csv", bytes: bad, expectedSha256: await sha256Hex(bad), importAnyway: false }).catch((e) => e);
-    expect(err).toBeInstanceOf(StrictImportError);
-    expect(err.code).toBe("blocked");
-    expect(calls).toHaveLength(0);
+    const preview = await runPreview(deps, { filename: "f.csv", bytes: bad });
+    expect(preview.blockers).toEqual([]);
+    expect(preview.warnings.map((w) => w.message)).toEqual([
+      'Unknown column "S.No" is ignored.',
+      'Unknown column "Remarks" is ignored.',
+    ]);
+    const r = await runCommit(deps, { filename: "f.csv", bytes: bad, expectedSha256: await sha256Hex(bad), importAnyway: false });
+    expect(r.inserted).toBe(1);
+    expect(calls[0].p_rows[0]).toMatchObject({ potential_id: "PID-TEST-003", cloud_provider: "AWS", selling_cost: "2.00" });
+    expect(JSON.stringify(calls[0].p_rows[0])).not.toMatch(/S\.No|Remarks|note/);
   });
   it("creates new customers without an approval step", async () => {
     const { deps, calls } = fakeDeps();

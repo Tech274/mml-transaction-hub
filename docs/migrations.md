@@ -9,8 +9,10 @@ rollback. Merging a migration to `main` **does not apply it**.
   lenient follow-up. 8 register migrations were applied on 28 Sep 2026 between 04:22 and 04:50 IST;
   register #4 `20260925130000_scrum103_import_batches` at ~07:40 IST and
   `20260928031000_scrum103_lenient_import` (moved from `supabase/migrations-pending/`) at ~07:50 IST,
-  with Vivek's GO (28 Sep 06:35 IST) and Atlas's review of PR #39. Each is recorded in
-  `supabase_migrations.schema_migrations` (45 rows, latest `20260928031000`).
+  with Vivek's GO (28 Sep 06:35 IST) and Atlas's review of PR #39. Register #10
+  `20260928040000_scrum103_customer_name_normalize` was applied at ~09:58 IST with Vivek's GO
+  (28 Sep 09:51 IST), after a backup (`backup-2026-09-28c`) and a read-only drift check (0 of 23).
+  Each is recorded in `supabase_migrations.schema_migrations` (46 rows, latest `20260928040000`).
 - The app code from `main` 3ab3bc7e (PR #39) was pushed to `Tech274/mml-internal` (commit
   `aa5c1f4`) after both migrations and then published through Lovable at ~07:55 IST (deploy `77d2bf72`, bundle `index-D_tFFzDm.js`).
   That repository does not carry the register migrations, `supabase/migrations-pending/` or
@@ -73,7 +75,9 @@ Full steps: **`docs/runbooks/publish-main.md`**. In short:
 3. Publish, avoiding ±10 min around HH:45 IST (HH:15 UTC) and 07:30 IST (02:00 UTC).
 4. Apply 8, then 9.
 5. After a fresh drift check, apply 3, 5, 6 and 7 one at a time.
-6. Apply 4, then `scrum103_lenient_import.sql` (move it into `supabase/migrations/` first), then publish. The All Transactions Complete/Incomplete filter reads `is_complete` from that file, so publish stays after the migration.
+6. Apply 4, then `scrum103_lenient_import.sql` (move it into `supabase/migrations/` first), then publish. The All Transactions Complete/Incomplete filter reads `is_complete` from that file, so publish stays after the migration. (Done 28 Sep ~07:40 / ~07:50 IST, published 07:55 IST.)
+   Next, when approved: back up, move `scrum103_customer_name_normalize.sql` into `supabase/migrations/` with a timestamp
+   later than 20260928031000, apply it, then publish the code that needs it (PR #41).
 7. Verify the next sync and snapshot runs, the 401 for the old `apikey`, and the register.
 
 ## Drift check (read-only; run on sandbox and live before a release)
@@ -113,6 +117,7 @@ migration.
 | 7 | `20260928010000_scrum57_revoke_unused_write_grants` | SCRUM-57 | Removes write grants that no policy uses. No behaviour change | Drift check first (`docs/rls-audit.md`) | GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:50 IST |
 | 8 | `20260928020000_scrum102_agent_identities_server_writes` | SCRUM-102 | `agent_identities` becomes read-own for users; the server writes it after its check | **Publish the app code first**, then apply (before the code, "link my agent" fails with an error, no data lost) | Policy + GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:47 IST |
 | 9 | `20260928030000_scrum77_mcp_audit_server_writes` | SCRUM-77 | MCP audit rows written by the server only (users lose INSERT) | **Publish the app code first**, then apply (before the code, audit rows fail to save, logged) | Policy + GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:47 IST |
+| 10 | `20260928040000_scrum103_customer_name_normalize` | SCRUM-103 | `clean_customer_name` / `normalize_customer_name` (EXECUTE: authenticated + service_role only); customer trigger uses that key; `import_transactions_batch` creates a missing customer instead of raising "not approved"; `bulk_import_runs_duplicate_strategy_check` also allows `'insert'`. Locks `customers` and stops on any key drift (preflight) | After `20260928031000`. Backup, read-only drift check = 0, then apply, then publish PR #41 code (the code writes `'insert'`) | File header: restore the trigger (with `SET search_path = public`) and the 20260928031000 `import_transactions_batch` body, drop the helpers, then the old CHECK only if no `'insert'` rows | skipped (Vivek GO direct to live, 28 Sep 09:51 IST) | 28 Sep ~09:58 IST |
 
 Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
 
@@ -122,6 +127,16 @@ Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
   Nullable transaction fields, no input-vs-selling or end-date order check, lenient
   `classify_transaction` (blank private provider filled) and `import_transactions_batch`,
   non-unique `import_batches.file_sha256` index, stored generated `is_complete`.
+- `scrum103_customer_name_normalize.sql` moved to `supabase/migrations/20260928040000_scrum103_customer_name_normalize.sql`
+  (register #10) with Vivek's GO 28 Sep 09:51 IST. Installs `clean_customer_name` /
+  `normalize_customer_name` (EXECUTE revoked from PUBLIC/anon), points the customer
+  trigger at that key, and replaces `import_transactions_batch` so a missing customer is
+  created instead of raising "not approved". The rest of the import function body is the
+  applied 20260928031000 body. **Apply after 20260928031000** (it replaces that function).
+  A preflight stops the file if any `customers.normalized_name` differs from the new key
+  (read-only check on live 28 Sep ~08:47 IST: 0 of 23 rows differ). Also adds `'insert'` to
+  `bulk_import_runs_duplicate_strategy_check`.
+  Rollback is in the file header and restores the applied 20260928031000 body.
 
 Files 1–6 were merged before rule 3 existed, so their rollback lives here instead of in the file.
 Rule 6 means the files themselves are not edited.
