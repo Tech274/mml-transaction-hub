@@ -12,12 +12,19 @@ rollback. Merging a migration to `main` **does not apply it**.
   with Vivek's GO (28 Sep 06:35 IST) and Atlas's review of PR #39. Register #10
   `20260928040000_scrum103_customer_name_normalize` was applied at ~09:58 IST with Vivek's GO
   (28 Sep 09:51 IST), after a backup (`backup-2026-09-28c`) and a read-only drift check (0 of 23).
-  Each is recorded in `supabase_migrations.schema_migrations` (46 rows, latest `20260928040000`).
+  `20260928090500_scrum78_role_check_respects_active` (register #11, moved from
+  `supabase/migrations-pending/`) was applied at ~14:34 IST with Vivek's GO (28 Sep 14:12 IST),
+  after the PR #41/#42 code was published (deploy `0248f354`, 14:31 IST, bundle `index-CY96S2jF.js`).
+  Each is recorded in `supabase_migrations.schema_migrations` (47 rows, latest `20260928090500`).
 - The app code from `main` 3ab3bc7e (PR #39) was pushed to `Tech274/mml-internal` (commit
   `aa5c1f4`) after both migrations and then published through Lovable at ~07:55 IST (deploy `77d2bf72`, bundle `index-D_tFFzDm.js`).
   That repository does not carry the register migrations, `supabase/migrations-pending/` or
   `.github/workflows/`.
 - Backup and before/after fingerprints for this release: `backup-2026-09-28b` (Atlas box, counts and sha256 on SCRUM-103).
+- The app code from `main` 65cb9811 (PRs #40-#42) went to the new `Tech274/mml-internal` repo that
+  Lovable created on 28 Sep ~14:28 IST when the project was reconnected to GitHub (commit `4cbc72c`;
+  the old repo is archived as `Tech274/mml-internal-archive-20260928`), then was published through
+  Lovable at ~14:31 IST (deploy `0248f354`, bundle `index-CY96S2jF.js`).
 - Sandbox was skipped for this release (Vivek approved applying straight to live).
 
 ## Rules
@@ -118,11 +125,15 @@ migration.
 | 8 | `20260928020000_scrum102_agent_identities_server_writes` | SCRUM-102 | `agent_identities` becomes read-own for users; the server writes it after its check | **Publish the app code first**, then apply (before the code, "link my agent" fails with an error, no data lost) | Policy + GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:47 IST |
 | 9 | `20260928030000_scrum77_mcp_audit_server_writes` | SCRUM-77 | MCP audit rows written by the server only (users lose INSERT) | **Publish the app code first**, then apply (before the code, audit rows fail to save, logged) | Policy + GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:47 IST |
 | 10 | `20260928040000_scrum103_customer_name_normalize` | SCRUM-103 | `clean_customer_name` / `normalize_customer_name` (EXECUTE: authenticated + service_role only); customer trigger uses that key; `import_transactions_batch` creates a missing customer instead of raising "not approved"; `bulk_import_runs_duplicate_strategy_check` also allows `'insert'`. Locks `customers` and stops on any key drift (preflight) | After `20260928031000`. Backup, read-only drift check = 0, then apply, then publish PR #41 code (the code writes `'insert'`) | File header: restore the trigger (with `SET search_path = public`) and the 20260928031000 `import_transactions_batch` body, drop the helpers, then the old CHECK only if no `'insert'` rows | skipped (Vivek GO direct to live, 28 Sep 09:51 IST) | 28 Sep ~09:58 IST |
-| 11 | `20260928120000_mml_cost_and_lab_catalog` | MML-accommodations-demo | `vm_tiers`, `cost_rates` (`private_input_cost_pct` default 20), `lab_catalog`, catalog audit, admin save RPCs | After #10. Migration before any publish that reads these tables. **Not applied.** Local demo only until Atlas and Vivek GO | File header | – | – |
-| 12 | `20260928120100_mml_adr_fields_and_hybrid` | MML-accommodations-demo | Nullable private-cloud price columns, generated addon total, admin-only `transaction_tags` | After #11. Additive and nullable. **Not applied** | File header | – | – |
-| 13 | `20260928120200_mml_lab_batches_and_margin` | MML-accommodations-demo | `lab_batches`, invoices, margin routine, nightly cron `mml-lab-batch-recompute` | After #12. **Not applied.** Do not `db push` this to the hosted project | File header | – | – |
+| 11 | `20260928090500_scrum78_role_check_respects_active` | SCRUM-78 | `has_role` / `has_any_role` also require `profiles.is_active IS TRUE` (fail closed on a missing profile). Same signatures, SECURITY DEFINER, STABLE, `search_path = public`; EXECUTE restated (authenticated only) | Publish PR #42 code first. Read-only check that every role holder who keeps access is active | `supabase/migrations-pending/scrum78_role_check_respects_active.rollback.sql` (original bodies; also quoted in the file header) | skipped (Vivek GO direct to live, 28 Sep 14:12 IST) | 28 Sep ~14:34 IST |
+| 12 | `20260928120000_mml_cost_and_lab_catalog` | MML-accommodations-demo | `vm_tiers`, `cost_rates` (`private_input_cost_pct` default 20), `lab_catalog`, catalog audit, admin save RPCs | After #11. Migration before any publish that reads these tables. **Not applied.** Local demo only until Atlas and Vivek GO | File header | – | – |
+| 13 | `20260928120100_mml_adr_fields_and_hybrid` | MML-accommodations-demo | Nullable private-cloud price columns, generated addon total, admin-only `transaction_tags` | After #12. Additive and nullable. **Not applied** | File header | – | – |
+| 14 | `20260928120200_mml_lab_batches_and_margin` | MML-accommodations-demo | `lab_batches`, invoices, margin routine, nightly cron `mml-lab-batch-recompute` | After #13. **Not applied.** Do not `db push` this to the hosted project | File header | – | – |
 
 Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
+
+- `scrum78_role_check_respects_active.sql` moved to `supabase/migrations/20260928090500_scrum78_role_check_respects_active.sql`
+  (register #11) and applied to live 28 Sep ~14:34 IST. The rollback file stays in `supabase/migrations-pending/`.
 
 - `scrum100_drop_duplicate_bulk_import_index.sql` (SCRUM-100, destructive, needs Vivek).
 - `scrum103_lenient_import.sql` moved to `supabase/migrations/20260928031000_scrum103_lenient_import.sql`
