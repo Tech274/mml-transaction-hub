@@ -85,6 +85,85 @@ BEGIN
   SELECT count(*) INTO after_count FROM public.transactions;
   IF after_count <> before_count + 4 THEN RAISE EXCEPTION 'FAIL: expected exactly 4 new rows, got %', after_count - before_count; END IF;
   RAISE NOTICE 'PASS: exactly 4 rows added overall';
+
+  -- Completeness: public rows need cloud_provider; private rows need system_config.
+  -- 0 is a value. Blank text is empty. Filter is the is_complete column.
+  IF EXISTS (
+    SELECT 1 FROM public.transactions t
+    JOIN public.import_batches b ON b.id = t.import_batch_id
+    WHERE b.file_sha256 = repeat('a', 64) AND t.is_complete IS NOT TRUE
+  ) THEN
+    RAISE EXCEPTION 'FAIL: filled public rows should be complete';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.transactions t
+    JOIN public.import_batches b ON b.id = t.import_batch_id
+    WHERE b.file_sha256 = repeat('b', 64) AND t.is_complete
+  ) THEN
+    RAISE EXCEPTION 'FAIL: null provider and blank row should be incomplete';
+  END IF;
+
+  UPDATE public.transactions t
+     SET input_cost = 0, selling_cost = 0
+    FROM public.import_batches b
+   WHERE b.id = t.import_batch_id AND b.file_sha256 = repeat('a', 64) AND t.source_line = 2;
+  IF EXISTS (
+    SELECT 1 FROM public.transactions t
+    JOIN public.import_batches b ON b.id = t.import_batch_id
+    WHERE b.file_sha256 = repeat('a', 64) AND t.source_line = 2 AND t.is_complete IS NOT TRUE
+  ) THEN
+    RAISE EXCEPTION 'FAIL: a 0 cost must still count as a value';
+  END IF;
+
+  UPDATE public.transactions t
+     SET potential_id = '   '
+    FROM public.import_batches b
+   WHERE b.id = t.import_batch_id AND b.file_sha256 = repeat('a', 64) AND t.source_line = 2;
+  IF EXISTS (
+    SELECT 1 FROM public.transactions t
+    JOIN public.import_batches b ON b.id = t.import_batch_id
+    WHERE b.file_sha256 = repeat('a', 64) AND t.source_line = 2 AND t.is_complete
+  ) THEN
+    RAISE EXCEPTION 'FAIL: blank text must count as empty';
+  END IF;
+
+  INSERT INTO public.transactions (
+    potential_id, month, year, customer_name, lab_name, lab_type, repository_type,
+    cloud_provider, system_config, line_of_business, start_date, end_date,
+    total_users, input_cost, selling_cost, created_by
+  ) VALUES
+    ('PID-PRIV', 3, 2026, 'Synthetic Test Customer', 'Priv Lab', 'private_cloud', 'private_cloud',
+     NULL, '8GB 2vCPUs', 'VILT', '2026-03-01', '2026-03-31', 1, 0, 0, u),
+    ('PID-PRIV-2', 3, 2026, 'Synthetic Test Customer', 'Priv Lab', 'private_cloud', 'private_cloud',
+     'AWS', NULL, 'VILT', '2026-03-01', '2026-03-31', 1, 0, 0, u);
+  IF NOT EXISTS (SELECT 1 FROM public.transactions WHERE potential_id = 'PID-PRIV' AND is_complete) THEN
+    RAISE EXCEPTION 'FAIL: private row with system_config should be complete without a provider';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.transactions WHERE potential_id = 'PID-PRIV-2' AND is_complete) THEN
+    RAISE EXCEPTION 'FAIL: private row without system_config should be incomplete';
+  END IF;
+
+  -- Incomplete filter plus most-recent sort: newest incomplete row first.
+  UPDATE public.transactions SET created_at = '2026-01-01T00:00:00Z' WHERE potential_id = 'PID-PRIV-2';
+  UPDATE public.transactions t
+     SET created_at = '2026-06-01T00:00:00Z'
+    FROM public.import_batches b
+   WHERE b.id = t.import_batch_id AND b.file_sha256 = repeat('b', 64) AND t.source_line = 2;
+  IF (
+    SELECT potential_id FROM public.transactions
+    WHERE is_deleted = false AND is_complete = false AND potential_id IN ('PID-PRIV-2', 'PID-SYN-1')
+    ORDER BY created_at DESC
+    LIMIT 1
+  ) IS DISTINCT FROM 'PID-SYN-1' THEN
+    RAISE EXCEPTION 'FAIL: incomplete filter did not sort newest first';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.transactions
+    WHERE is_deleted = false AND is_complete = false AND potential_id = 'PID-PRIV'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: complete private row appeared in the incomplete filter';
+  END IF;
+  RAISE NOTICE 'PASS: is_complete matches public/private, zero, blank text, and sort';
 END $$;
 
 ROLLBACK;

@@ -7,9 +7,10 @@
 --   1. 20260925130000_scrum103_import_batches.sql (held; creates import_batches and
 --      import_transactions_batch). This file refuses to run if that table is missing.
 --   2. This file.
---   3. Publish the app. New code sends NULL for blank cells, so the columns must
---      already be nullable. Old app code still writes complete rows and keeps working
---      on this schema (old code + new schema). New code + old schema rejects blanks.
+--   3. Publish the app. New code sends NULL for blank cells and the All Transactions
+--      filter reads is_complete, so this file must already be applied. Old app code
+--      still writes complete rows and keeps working on this schema (old code + new
+--      schema). New code + old schema rejects blanks and the completeness filter errors.
 --
 -- What changes:
 --   * User-facing transaction columns accept NULL. Blank stays blank (no DEFAULT 0).
@@ -20,6 +21,10 @@
 --     fills a blank provider with a default.
 --   * import_transactions_batch stores NULL for a cell it cannot cast, and still inserts
 --     one transaction per input row (repeated Potential IDs included).
+--   * is_complete is a stored generated column: true only when every business field
+--     has a value (0 counts; NULL and blank text do not). Public rows require
+--     cloud_provider; private rows require system_config. Adding it rewrites
+--     public.transactions once.
 --
 -- Rollback:
 --   Restore the previous function bodies (quoted below), then set NOT NULL only on
@@ -56,6 +61,9 @@
 --   -- and the same SET NOT NULL for potential_id, month, year, customer_id,
 --   -- customer_name, lab_name, cloud_provider, line_of_business, start_date,
 --   -- end_date, total_users, selling_cost.
+--
+--   DROP INDEX IF EXISTS public.transactions_is_complete_live_idx;
+--   ALTER TABLE public.transactions DROP COLUMN IF EXISTS is_complete;
 
 -- Held SCRUM-103 migration must already be applied (import_batches exists).
 DO $$
@@ -309,3 +317,31 @@ $$;
 
 REVOKE ALL ON FUNCTION public.import_transactions_batch(text, text, text, text, jsonb, jsonb) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.import_transactions_batch(text, text, text, text, jsonb, jsonb) TO authenticated;
+
+-- 5) Completeness for the All Transactions filter. Same field list as
+--    TRANSACTION_COMPLETENESS_FIELDS / TRANSACTION_KIND_COMPLETENESS_FIELD
+--    in src/lib/transaction-completeness.ts. A 0 cost is a value. NULL and
+--    blank or whitespace text are empty. System columns are not included.
+ALTER TABLE public.transactions
+  ADD COLUMN is_complete boolean
+  GENERATED ALWAYS AS (
+    nullif(btrim(potential_id), '') IS NOT NULL
+    AND month IS NOT NULL
+    AND year IS NOT NULL
+    AND nullif(btrim(customer_name), '') IS NOT NULL
+    AND nullif(btrim(lab_name), '') IS NOT NULL
+    AND nullif(btrim(line_of_business), '') IS NOT NULL
+    AND start_date IS NOT NULL
+    AND end_date IS NOT NULL
+    AND total_users IS NOT NULL
+    AND input_cost IS NOT NULL
+    AND selling_cost IS NOT NULL
+    AND CASE
+      WHEN lab_type = 'private_cloud' THEN nullif(btrim(system_config), '') IS NOT NULL
+      ELSE nullif(btrim(cloud_provider), '') IS NOT NULL
+    END
+  ) STORED;
+
+CREATE INDEX transactions_is_complete_live_idx
+  ON public.transactions (is_complete, created_at DESC)
+  WHERE is_deleted = false;

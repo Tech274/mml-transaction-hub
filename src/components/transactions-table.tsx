@@ -17,6 +17,12 @@ import { useAuth } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
 import { Badge } from "@/components/ui/badge";
 import { highlight, tokenize } from "@/lib/highlight";
+import {
+  isTransactionComplete,
+  transactionListPlan,
+  sortTransactionRows,
+  type CompletenessFilter,
+} from "@/lib/transaction-completeness";
 
 export type RepoFilter = "all" | "public_cloud" | "private_cloud";
 
@@ -71,6 +77,7 @@ export function TransactionsTable({
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("recent");
+  const [completeness, setCompleteness] = useState<CompletenessFilter>("all");
   const pageSize = 25;
   const { user } = useAuth();
   const { can } = usePermissions();
@@ -92,7 +99,7 @@ export function TransactionsTable({
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ["transactions", repoFilter, filters, page, sortMode],
+    queryKey: ["transactions", repoFilter, filters, page, sortMode, completeness],
     queryFn: async () => {
       let scoreMap: Map<string, number> | null = null;
       if (filters.search.trim()) {
@@ -103,40 +110,57 @@ export function TransactionsTable({
         });
         if (rpcErr) throw rpcErr;
         scoreMap = new Map((matches ?? []).map((m: { id: string; score: number }) => [m.id, Number(m.score)]));
-        if (scoreMap.size === 0) return { rows: [], count: 0, scoreMap };
+        if (scoreMap.size === 0) return { rows: [], count: 0, scoreMap, incompleteCount: 0 };
       }
       const fuzzy = scoreMap !== null;
-      let q = supabase.from("transactions").select("*", { count: "exact" }).eq("is_deleted", false);
-      if (repoFilter !== "all") q = q.eq("repository_type", repoFilter);
-      if (filters.month !== "all") q = q.eq("month", Number(filters.month));
-      if (filters.year !== "all") q = q.eq("year", Number(filters.year));
-      if (filters.customer !== "all") q = q.eq("customer_id", filters.customer);
-      if (filters.provider !== "all") q = q.eq("cloud_provider", filters.provider);
-      if (filters.lob !== "all") q = q.eq("line_of_business", filters.lob);
-      if (filters.startFrom) q = q.gte("start_date", filters.startFrom);
-      if (filters.startTo) q = q.lte("start_date", filters.startTo);
-      if (filters.systemConfig !== "all") q = q.eq("system_config", filters.systemConfig);
+      const plan = transactionListPlan({ completeness, sortMode, fuzzy });
+      const ids = fuzzy ? Array.from(scoreMap!.keys()) : null;
+      // Same predicate for the page and the Incomplete count, so the dropdown
+      // number matches the list once that option is chosen. Sort and range
+      // happen after the predicate, so pages stay correct.
+      const applyShared = <Q extends { eq: Function; gte: Function; lte: Function; in: Function }>(query: Q): Q => {
+        let next = query.eq("is_deleted", false);
+        if (repoFilter !== "all") next = next.eq("repository_type", repoFilter);
+        if (filters.month !== "all") next = next.eq("month", Number(filters.month));
+        if (filters.year !== "all") next = next.eq("year", Number(filters.year));
+        if (filters.customer !== "all") next = next.eq("customer_id", filters.customer);
+        if (filters.provider !== "all") next = next.eq("cloud_provider", filters.provider);
+        if (filters.lob !== "all") next = next.eq("line_of_business", filters.lob);
+        if (filters.startFrom) next = next.gte("start_date", filters.startFrom);
+        if (filters.startTo) next = next.lte("start_date", filters.startTo);
+        if (filters.systemConfig !== "all") next = next.eq("system_config", filters.systemConfig);
+        if (ids) next = next.in("id", ids);
+        return next;
+      };
+      let listQuery = applyShared(supabase.from("transactions").select("*", { count: "exact" }));
+      if (plan.isComplete != null) listQuery = listQuery.eq("is_complete", plan.isComplete);
+      const countQuery = applyShared(
+        supabase.from("transactions").select("id", { count: "exact", head: true }),
+      ).eq("is_complete", false);
       if (fuzzy) {
-        q = q.in("id", Array.from(scoreMap!.keys()));
-        // Sort client-side; fetch all matching (already capped at 500).
-        const { data, error } = await q;
+        const [{ data, error }, countResult] = await Promise.all([listQuery, countQuery]);
         if (error) throw error;
-        const all = (data ?? []).slice();
-        const useRelevance = sortMode === "relevance";
-        all.sort((a, b) => {
-          if (useRelevance) {
-            const diff = (scoreMap!.get(b.id) ?? 0) - (scoreMap!.get(a.id) ?? 0);
-            if (diff !== 0) return diff;
-          }
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
+        if (countResult.error) throw countResult.error;
+        const all = sortTransactionRows(data ?? [], sortMode, (id) => scoreMap!.get(id) ?? 0);
         const start = page * pageSize;
-        return { rows: all.slice(start, start + pageSize), allRows: all, count: all.length, scoreMap };
+        return {
+          rows: all.slice(start, start + pageSize),
+          allRows: all,
+          count: all.length,
+          scoreMap,
+          incompleteCount: countResult.count ?? 0,
+        };
       }
-      q = q.order("created_at", { ascending: false }).range(page * pageSize, page * pageSize + pageSize - 1);
-      const { data: pageData, count, error } = await q;
+      const ordered = plan.serverOrder
+        ? listQuery.order(plan.serverOrder.column, { ascending: plan.serverOrder.ascending })
+        : listQuery;
+      const [{ data: pageData, count, error }, countResult] = await Promise.all([
+        ordered.range(page * pageSize, page * pageSize + pageSize - 1),
+        countQuery,
+      ]);
       if (error) throw error;
-      return { rows: pageData ?? [], count: count ?? 0, scoreMap: null };
+      if (countResult.error) throw countResult.error;
+      return { rows: pageData ?? [], count: count ?? 0, scoreMap: null, incompleteCount: countResult.count ?? 0 };
     },
   });
 
@@ -144,6 +168,7 @@ export function TransactionsTable({
   const allRows = (data as { allRows?: typeof rows } | undefined)?.allRows ?? rows;
   const scoreMap = data?.scoreMap ?? null;
   const total = data?.count ?? 0;
+  const incompleteCount = data?.incompleteCount ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const searchTokens = useMemo(() => tokenize(filters.search), [filters.search]);
   const isFuzzy = searchTokens.length > 0;
@@ -182,7 +207,7 @@ export function TransactionsTable({
         "Created At": r.created_at,
         "Updated At": r.updated_at,
       })),
-      { generatedBy: user?.email ?? "—", filters: { repository: repoFilter, sortMode, ...filters } },
+      { generatedBy: user?.email ?? "—", filters: { repository: repoFilter, sortMode, completeness, ...filters } },
     );
   }
 
@@ -261,6 +286,14 @@ export function TransactionsTable({
             <span>Page profit: <strong className={summary.profit < 0 ? "text-destructive" : "text-foreground"}>{fmtCurrency(summary.profit)}</strong></span>
           </div>
           <div className="flex items-center gap-2">
+            <Select value={completeness} onValueChange={(v) => { setCompleteness(v as CompletenessFilter); setPage(0); }}>
+              <SelectTrigger className="h-8 w-[200px]" data-testid="completeness-filter"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="complete">Complete</SelectItem>
+                <SelectItem value="incomplete">Incomplete ({fmtNumber(incompleteCount)})</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={sortMode} onValueChange={(v) => { setSortMode(v as SortMode); setPage(0); }}>
               <SelectTrigger className="h-8 w-[180px]"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -268,7 +301,7 @@ export function TransactionsTable({
                 <SelectItem value="relevance" disabled={!isFuzzy}>Sort: Relevance score</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="ghost" size="sm" onClick={() => { setFilters(initial); setPage(0); setSortMode("recent"); }}>Reset</Button>
+            <Button variant="ghost" size="sm" onClick={() => { setFilters(initial); setPage(0); setSortMode("recent"); setCompleteness("all"); }}>Reset</Button>
             {can("feature_excel_export") && (
               <Button size="sm" onClick={exportCurrent}><Download className="h-4 w-4 mr-1" />Export{isFuzzy ? ` (${allRows.length})` : ""}</Button>
             )}
@@ -306,7 +339,14 @@ export function TransactionsTable({
               )}
               {rows.map((r) => (
                 <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setOpenId(r.id)}>
-                  <TableCell className="font-medium">{highlight(r.potential_id, searchTokens)}</TableCell>
+                  <TableCell className="font-medium">
+                    <span className="inline-flex items-center gap-2">
+                      {highlight(r.potential_id, searchTokens)}
+                      {(r.is_complete === false || (r.is_complete == null && !isTransactionComplete(r))) && (
+                        <Badge variant="secondary" data-testid="incomplete-badge">Incomplete</Badge>
+                      )}
+                    </span>
+                  </TableCell>
                   <TableCell>{r.month ? `${MONTH_NAMES[r.month - 1]} ${r.year ?? ""}` : "—"}</TableCell>
                   <TableCell>{highlight(r.customer_name, searchTokens)}</TableCell>
                   <TableCell className="max-w-[240px] truncate">{highlight(r.lab_name, searchTokens)}</TableCell>

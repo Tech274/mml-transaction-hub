@@ -11,7 +11,7 @@ rollback. Merging a migration to `main` **does not apply it**.
   (43 rows, latest `20260928030000`).
 - **Held:** `20260925130000_scrum103_import_batches` (register #4) and the pending
   `scrum103_lenient_import.sql`. Rules were decided 28 Sep. Apply #4, then the lenient
-  file, then publish. Neither is on live.
+  file (including the `is_complete` column the All Transactions filter reads), then publish. Neither is on live.
 - The app code from `main` (3cb7202f) was published at 04:23 IST (Lovable deploy `565140ef`), via
   the Lovable-linked repository `Tech274/mml-internal`. That repository does not carry the register
   migrations or `.github/workflows/`.
@@ -72,7 +72,7 @@ Full steps: **`docs/runbooks/publish-main.md`**. In short:
 3. Publish, avoiding ±10 min around HH:45 IST (HH:15 UTC) and 07:30 IST (02:00 UTC).
 4. Apply 8, then 9.
 5. After a fresh drift check, apply 3, 5, 6 and 7 one at a time.
-6. Apply 4, then `scrum103_lenient_import.sql` (move it into `supabase/migrations/` first), then publish.
+6. Apply 4, then `scrum103_lenient_import.sql` (move it into `supabase/migrations/` first), then publish. The All Transactions Complete/Incomplete filter reads `is_complete` from that file, so publish stays after the migration.
 7. Verify the next sync and snapshot runs, the 401 for the old `apikey`, and the register.
 
 ## Drift check (read-only; run on sandbox and live before a release)
@@ -119,9 +119,10 @@ Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
 - `scrum103_lenient_import.sql` (SCRUM-103, 28 Sep). Drops NOT NULL on the transaction
   fields that may be blank, keeps `CHECK (>= 0)` only when a cost is present, drops any
   input-vs-selling check and the end-date order check, and relaxes `classify_transaction`
-  plus `import_transactions_batch`. Rollback is in the file header. Live order: apply
-  register #4, then move this file into `supabase/migrations/` with a fresh timestamp and
-  apply it, then publish. Do not backfill 0.
+  plus `import_transactions_batch`, and adds stored generated `is_complete` (plus an
+  index) for the All Transactions filter. Rollback is in the file header, including
+  `DROP COLUMN is_complete`. Live order: apply register #4, then move this file into
+  `supabase/migrations/` with a fresh timestamp and apply it, then publish. Do not backfill 0.
 
 Files 1–6 were merged before rule 3 existed, so their rollback lives here instead of in the file.
 Rule 6 means the files themselves are not edited.
