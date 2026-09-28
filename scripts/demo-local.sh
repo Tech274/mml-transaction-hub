@@ -9,11 +9,15 @@ if ! command -v supabase >/dev/null 2>&1; then
   exit 1
 fi
 
-supabase start
+# Local config lives in scripts/demo-local/supabase/config.toml, not supabase/config.toml
+# (that file syncs to the hosted project and stays a one-line project_id).
+SB=(supabase --workdir scripts/demo-local)
 
-DB_URL="$(supabase status -o env | sed -n 's/^DB_URL="//p' | sed 's/"$//')"
+"${SB[@]}" start
+
+DB_URL="$("${SB[@]}" status -o env | sed -n 's/^DB_URL="//p' | sed 's/"$//')"
 if [[ -z "${DB_URL}" ]]; then
-  DB_URL="$(supabase status -o env | sed -n 's/^DB_URL=//p')"
+  DB_URL="$("${SB[@]}" status -o env | sed -n 's/^DB_URL=//p')"
 fi
 
 # Apply repo migrations in a real transaction. The CLI skips its wrapper on
@@ -32,7 +36,7 @@ done
 
 psql "${DB_URL}" -v ON_ERROR_STOP=1 -f supabase/seed-demo.sql
 
-supabase status -o env > /tmp/mml-supabase-status.env
+"${SB[@]}" status -o env > /tmp/mml-supabase-status.env
 # shellcheck disable=SC1091
 set -a
 source /tmp/mml-supabase-status.env

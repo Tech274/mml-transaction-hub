@@ -5,6 +5,9 @@ connect to the hosted project, and it does not publish to mml-labs.com.
 
 Do not run `supabase link`, `supabase db push`, or this seed against any hosted
 database. `supabase/seed-demo.sql` is not wired into `config.toml`.
+The local stack config is `scripts/demo-local/supabase/config.toml` (the script passes
+`--workdir scripts/demo-local`). `supabase/config.toml` stays the one-line `project_id` that
+syncs to Lovable, so local auth settings never reach the hosted project.
 
 ## One command
 

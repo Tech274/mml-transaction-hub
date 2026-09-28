@@ -186,7 +186,8 @@ export function looksLikeSecret(value: string): boolean {
   const s = value.trim();
   if (
     /^sk-[A-Za-z0-9]/.test(s) ||
-    /^sk_live_|^sk_test_|^AKIA[0-9A-Z]{16}|^ghp_|^xox[baprs]-/.test(s)
+    /^sk_live_|^sk_test_|^AKIA[0-9A-Z]{16}|^ghp_|^github_pat_|^xox[baprs]-/.test(s) ||
+    /^eyJ[A-Za-z0-9_-]{10,}\./.test(s)
   )
     return true;
   if (/^[A-Za-z0-9_+/=-]{32,}$/.test(s)) return true;

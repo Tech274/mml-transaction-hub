@@ -7,6 +7,7 @@ import {
   gapFillMean,
   gapFillWithFallback,
   invoiceAmountInr,
+  looksLikeSecret,
   privateCloudSplit,
 } from "@/lib/cost-calculator";
 
@@ -128,5 +129,25 @@ describe("invoice FX and profit precedence", () => {
     const parts = allocateProRata(100, [1, 1, 1]);
     expect(parts.reduce((s, n) => s + n, 0)).toBe(100);
     expect(parts.filter((p) => p === 33.34)).toHaveLength(1);
+  });
+});
+
+describe("secret-looking licence and API-key names", () => {
+  it("rejects key-shaped values and keeps plain names", () => {
+    for (const v of [
+      "sk-abc123",
+      "sk_live_abc",
+      "AKIAABCDEFGHIJKLMNOP",
+      "ghp_abcdef",
+      "github_pat_abc",
+      "xoxb-123",
+      "eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.sig",
+      "A".repeat(40),
+    ]) {
+      expect(looksLikeSecret(v)).toBe(true);
+    }
+    for (const v of ["Microsoft 365 E3", "OpenAI API", "Skillsoft Percipio", "Azure OpenAI tokens"]) {
+      expect(looksLikeSecret(v)).toBe(false);
+    }
   });
 });

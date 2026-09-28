@@ -5,6 +5,7 @@
 -- Private-cloud commercials and the admin-only hybrid tag. The 20% rule is
 -- private_input_cost_pct of the entered per-user selling price (Vivek, 28 Sep 2026).
 -- The 250/100 split in the draft spec was an example, not a fixed price.
+-- The not_secret checks match looksLikeSecret() in src/lib/cost-calculator.ts (names only, never key values).
 --
 -- Rollback:
 --   DROP TRIGGER IF EXISTS transaction_tags_audit ON public.transaction_tags;
@@ -47,12 +48,20 @@ ALTER TABLE public.transactions
   DROP CONSTRAINT IF EXISTS transactions_license_name_not_secret,
   ADD CONSTRAINT transactions_license_name_not_secret CHECK (
     license_name IS NULL
-    OR (license_name !~* '^sk-[A-Za-z0-9]' AND license_name !~ '^[A-Za-z0-9_+/=-]{32,}$')
+    OR (
+      btrim(license_name) !~* '^sk-[A-Za-z0-9]'
+      AND btrim(license_name) !~ '^(sk_live_|sk_test_|AKIA[0-9A-Z]{16}|ghp_|github_pat_|xox[baprs]-|eyJ[A-Za-z0-9_-]{10,}\.)'
+      AND btrim(license_name) !~ '^[A-Za-z0-9_+/=-]{32,}$'
+    )
   ),
   DROP CONSTRAINT IF EXISTS transactions_api_key_service_not_secret,
   ADD CONSTRAINT transactions_api_key_service_not_secret CHECK (
     api_key_service IS NULL
-    OR (api_key_service !~* '^sk-[A-Za-z0-9]' AND api_key_service !~ '^[A-Za-z0-9_+/=-]{32,}$')
+    OR (
+      btrim(api_key_service) !~* '^sk-[A-Za-z0-9]'
+      AND btrim(api_key_service) !~ '^(sk_live_|sk_test_|AKIA[0-9A-Z]{16}|ghp_|github_pat_|xox[baprs]-|eyJ[A-Za-z0-9_-]{10,}\.)'
+      AND btrim(api_key_service) !~ '^[A-Za-z0-9_+/=-]{32,}$'
+    )
   ),
   DROP CONSTRAINT IF EXISTS transactions_selling_price_per_user_nonneg,
   ADD CONSTRAINT transactions_selling_price_per_user_nonneg CHECK (selling_price_per_user IS NULL OR selling_price_per_user >= 0),

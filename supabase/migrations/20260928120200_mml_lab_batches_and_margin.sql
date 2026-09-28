@@ -218,9 +218,12 @@ CREATE TRIGGER transactions_guard_closed_batch
   BEFORE INSERT OR UPDATE ON public.transactions
   FOR EACH ROW EXECUTE FUNCTION public.guard_closed_batch();
 
+-- SECURITY DEFINER so the dirty flag is set for any role that may edit the line, even when
+-- RLS would not let that role update the batch row itself. It only touches needs_recompute.
 CREATE OR REPLACE FUNCTION public.mark_lab_batch_dirty()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
@@ -645,6 +648,7 @@ CREATE OR REPLACE FUNCTION public._assert_batch_closer()
 RETURNS void
 LANGUAGE plpgsql
 STABLE
+SET search_path = public
 AS $$
 BEGIN
   IF auth.uid() IS NULL OR NOT public.has_any_role(auth.uid(), ARRAY['admin','ops_lead']::app_role[]) THEN
@@ -856,8 +860,17 @@ CREATE POLICY "Roles read cost runs"
   USING (public.has_any_role(auth.uid(), ARRAY['admin','leadership','finance','ops_lead','ops_user','viewer']::app_role[]));
 
 REVOKE ALL ON public.lab_batches, public.lab_batch_invoices, public.lab_batch_cost_runs FROM PUBLIC, anon, authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.lab_batches TO authenticated;
-GRANT SELECT, INSERT, UPDATE ON public.lab_batch_invoices TO authenticated;
+-- Status, totals, flags, close/reopen stamps and invoices change only through the
+-- SECURITY DEFINER routines below (close, reopen, record/supersede invoice, recompute).
+-- Signed-in users get column-limited writes on lab_batches and read-only invoices.
+GRANT SELECT ON public.lab_batches TO authenticated;
+GRANT INSERT (batch_code, name, potential_id, lab_type, currency,
+              vm_hours_consumed, license_seats_used, api_units_consumed, api_unit_label)
+  ON public.lab_batches TO authenticated;
+GRANT UPDATE (name, potential_id, lab_type, currency,
+              vm_hours_consumed, license_seats_used, api_units_consumed, api_unit_label)
+  ON public.lab_batches TO authenticated;
+GRANT SELECT ON public.lab_batch_invoices TO authenticated;
 GRANT SELECT ON public.lab_batch_cost_runs TO authenticated;
 GRANT ALL ON public.lab_batches, public.lab_batch_invoices, public.lab_batch_cost_runs TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.lab_batch_code_seq TO authenticated, service_role;
