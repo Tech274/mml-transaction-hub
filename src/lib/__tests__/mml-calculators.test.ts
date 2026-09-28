@@ -8,6 +8,7 @@ import {
   gapFillWithFallback,
   invoiceAmountInr,
   looksLikeSecret,
+  publicCloudMarginBreakdown,
   privateCloudSplit,
 } from "@/lib/cost-calculator";
 
@@ -129,6 +130,16 @@ describe("invoice FX and profit precedence", () => {
     const parts = allocateProRata(100, [1, 1, 1]);
     expect(parts.reduce((s, n) => s + n, 0)).toBe(100);
     expect(parts.filter((p) => p === 33.34)).toHaveLength(1);
+  });
+
+  it("breaks public-cloud profit into service margin and unused credit margin", () => {
+    const out = publicCloudMarginBreakdown(15, 10, 6.5);
+    expect(out).toEqual({
+      serviceMargin: 5,
+      unusedCredit: 3.5,
+      unusedCreditMargin: 3.5,
+      totalProfitActual: 8.5,
+    });
   });
 });
 

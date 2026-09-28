@@ -51,6 +51,29 @@ beforeAll(async () => {
     [run.rows[0].id],
   );
   await db.query("insert into public.freshdesk_tickets (id, subject, status) values (1001, 'Synthetic ticket', 'Open')");
+  const worker = await db.query<{ id: string }>(
+    `select id
+       from public.ai_cc_agent_workers
+      where agent_key = 'generalist'
+      order by created_at
+      limit 1`,
+  );
+  await db.query(
+    `insert into public.ai_cc_work_items (
+       id, title, work_type, status, requires_approval, assigned_agent_key, assigned_worker_id, created_by, created_by_email
+     ) values (
+       '00000000-0000-4000-8000-0000000000e1',
+       'Example publish plan',
+       'publish',
+       'needs_approval',
+       true,
+       'generalist',
+       $2,
+       $1,
+       'admin@example.test'
+     ) on conflict (id) do nothing`,
+    [U.admin, worker.rows[0].id],
+  );
 }, 120_000);
 
 describe("structure", () => {
@@ -190,9 +213,17 @@ describe("Freshdesk tickets and AI Command Center tables", () => {
     expect(await asActor(db, as(U.viewer), (q) => count(q, "freshdesk_tickets"))).toBe(1);
     expect(await asActor(db, as(U.admin), (q) => outcome(q.query("update public.freshdesk_tickets set subject = 'x'")))).toBe("42501");
   });
-  it.each(["ai_cc_inbox", "ai_cc_runs", "ai_cc_audit", "ai_cc_lab_requests"])("%s is read-only for signed-in users", async (t) => {
+  it.each(["ai_cc_inbox", "ai_cc_runs", "ai_cc_audit", "ai_cc_lab_requests", "ai_cc_work_items", "ai_cc_agent_workers"])(
+    "%s is read-only for signed-in users",
+    async (t) => {
     expect(await asActor(db, as(U.admin), (q) => outcome(q.query(`delete from public.${t}`)))).toBe("42501");
     expect(await asActor(db, as(U.admin), (q) => outcome(q.query(`insert into public.${t} default values`)))).toBe("42501");
+    },
+  );
+  it("roled users can read AI worker pool and work-item queue", async () => {
+    expect(await asActor(db, as(U.viewer), (q) => count(q, "ai_cc_agent_workers"))).toBeGreaterThanOrEqual(1);
+    expect(await asActor(db, as(U.viewer), (q) => count(q, "ai_cc_work_items"))).toBeGreaterThanOrEqual(1);
+    expect(await asActor(db, as(U.noRole), (q) => count(q, "ai_cc_agent_workers"))).toBe(0);
   });
 });
 
@@ -296,7 +327,11 @@ describe("existing sandbox SQL checks also pass locally", () => {
     const path = await import("node:path");
     const root = path.resolve(__dirname, "../../..");
     const sql = readFileSync(path.join(root, "supabase/tests/rls/scrum103_import_batch.sql"), "utf8");
+    // SCRUM-44: this legacy import check updates costs in-place to validate "zero is a value".
+    // Cost edits now require the audited admin correction path, so test-only override is set here.
+    await db.query("select set_config('mml.admin_cost_override', '1', false)");
     await expect(db.exec(sql)).resolves.toBeDefined();
+    await db.query("select set_config('mml.admin_cost_override', '', false)");
     await db.exec("rollback").catch(() => undefined);
   });
 });
