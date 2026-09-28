@@ -6,15 +6,16 @@ import { AppError, dbError, logError } from "@/lib/app-error";
 type Sb = any;
 
 /**
- * Ids of admins whose profile is active. A disabled admin does not count.
- * Throws if either lookup fails (an empty list would make the guard pass).
- * A missing profile row is not an active admin.
+ * Ids of admins. With `activeOnly`, a disabled profile does not count (role
+ * changes and disabling a user). Delete keeps the default and still counts
+ * every admin row. Throws if a lookup fails (an empty list would make the
+ * guard pass). A missing profile row is not an active admin.
  */
-export async function adminUserIds(sb: Sb): Promise<Set<string>> {
+export async function adminUserIds(sb: Sb, opts?: { activeOnly?: boolean }): Promise<Set<string>> {
   const { data, error } = await sb.from("user_roles").select("user_id").eq("role", "admin");
   if (error) throw dbError(error, "admin.adminUserIds");
   const ids = ((data ?? []) as Array<{ user_id: string }>).map((r) => r.user_id);
-  if (ids.length === 0) return new Set();
+  if (!opts?.activeOnly || ids.length === 0) return new Set(ids);
   const { data: profiles, error: pErr } = await sb.from("profiles").select("id, is_active").in("id", ids);
   if (pErr) throw dbError(pErr, "admin.adminUserIds");
   return new Set(
@@ -29,15 +30,21 @@ export function removesLastAdmin(adminIds: Set<string>, userId: string, stillAdm
   return adminIds.has(userId) && !stillAdmin && adminIds.size <= 1;
 }
 
-export async function assertNotLastAdmin(sb: Sb, userId: string, stillAdmin: boolean, verb: "remove" | "disable" | "delete") {
-  if (removesLastAdmin(await adminUserIds(sb), userId, stillAdmin)) {
+export async function assertNotLastAdmin(
+  sb: Sb,
+  userId: string,
+  stillAdmin: boolean,
+  verb: "remove" | "disable" | "delete",
+  opts?: { activeOnly?: boolean },
+) {
+  if (removesLastAdmin(await adminUserIds(sb, opts), userId, stillAdmin)) {
     throw new AppError(`Cannot ${verb} the last Super Admin.`, "last_admin");
   }
 }
 
 export async function syncRoles(sb: Sb, userId: string, roles: string[]) {
   const desired = Array.from(new Set(roles));
-  await assertNotLastAdmin(sb, userId, desired.includes("admin"), "remove");
+  await assertNotLastAdmin(sb, userId, desired.includes("admin"), "remove", { activeOnly: true });
   const { data: held, error: heldErr } = await sb.from("user_roles").select("id, role").eq("user_id", userId);
   if (heldErr) throw dbError(heldErr, "admin.syncRoles:read");
   const heldRows = (held ?? []) as Array<{ id: string; role: string }>;
@@ -120,7 +127,7 @@ function errorBrief(err: unknown): string | null {
 
 export async function applyActive(sb: Sb, userId: string, active: boolean, callerId: string) {
   if (!active && userId === callerId) throw new AppError("You cannot disable your own account.");
-  if (!active) await assertNotLastAdmin(sb, userId, false, "disable");
+  if (!active) await assertNotLastAdmin(sb, userId, false, "disable", { activeOnly: true });
   const { error: pErr } = await sb.from("profiles").update({ is_active: active }).eq("id", userId);
   if (pErr) throw dbError(pErr, "admin.applyActive");
   const { error: aErr } = await sb.auth.admin.updateUserById(userId, { ban_duration: active ? "none" : "876000h" });

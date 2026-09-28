@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ACCOUNT_MAY_STILL_BE_ACTIVE, adminUserIds, applyActive, assignCreatedUserRoles, removesLastAdmin, syncRoles } from "../admin-guards";
+import { ACCOUNT_MAY_STILL_BE_ACTIVE, adminUserIds, applyActive, assertNotLastAdmin, assignCreatedUserRoles, removesLastAdmin, syncRoles } from "../admin-guards";
 import { setErrorLogger } from "../app-error";
 
 // Tiny in-memory stand-in for the service-role client (synthetic data only).
@@ -155,7 +155,8 @@ describe("admin guards", () => {
     ];
     const active = { disabled: false };
     const listed = fakeSb({ roles, active });
-    expect([...(await adminUserIds(listed.sb))]).toEqual(["active"]);
+    expect([...(await adminUserIds(listed.sb, { activeOnly: true }))].sort()).toEqual(["active"]);
+    expect([...(await adminUserIds(listed.sb))].sort()).toEqual(["active", "disabled"]);
 
     const demote = fakeSb({ roles, active });
     await expect(syncRoles(demote.sb, "active", ["viewer"])).rejects.toThrow("Cannot remove the last Super Admin.");
@@ -166,6 +167,11 @@ describe("admin guards", () => {
     await expect(applyActive(disable.sb, "active", false, "someone")).rejects.toThrow("Cannot disable the last Super Admin.");
     expect(disable.calls).toEqual([]);
     expect(disable.roles).toEqual(roles);
+
+    // Delete still counts every admin row, including a disabled one.
+    const del = fakeSb({ roles, active });
+    await expect(assertNotLastAdmin(del.sb, "active", false, "delete")).resolves.toBeUndefined();
+    expect(del.calls).toEqual([]);
   });
 
   it("a failed active-admin profile lookup blocks the change and writes nothing", async () => {
