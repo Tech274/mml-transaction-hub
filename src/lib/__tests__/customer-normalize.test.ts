@@ -95,3 +95,36 @@ describe("duplicate detection logic", () => {
     expect(isDuplicatePhone("", "")).toBe(false);
   });
 });
+
+// SCRUM-103: the app key and the SQL key must treat the same unicode spaces as a space.
+// Parse both lists from source so a change on one side fails here.
+describe("TS and SQL unicode space lists match", () => {
+  it("UNICODE_SPACES in customer-normalize.ts equals the translate() list in the pending SQL", async () => {
+    const { readFileSync } = await import("node:fs");
+    const path = await import("node:path");
+    const root = path.resolve(__dirname, "../../..");
+    const ts = readFileSync(path.join(root, "src/lib/customer-normalize.ts"), "utf8");
+    const sql = readFileSync(path.join(root, "supabase/migrations-pending/scrum103_customer_name_normalize.sql"), "utf8");
+
+    const cls = ts.match(/const UNICODE_SPACES = \/\[([^\]]+)\]\/g;/);
+    expect(cls).not.toBeNull();
+    const tsPoints = new Set<number>();
+    const re = /\\u([0-9A-Fa-f]{4})(?:-\\u([0-9A-Fa-f]{4}))?/g;
+    let consumed = "";
+    for (let m = re.exec(cls![1]); m; m = re.exec(cls![1])) {
+      consumed += m[0];
+      const a = parseInt(m[1], 16);
+      const b = m[2] ? parseInt(m[2], 16) : a;
+      for (let c = a; c <= b; c++) tsPoints.add(c);
+    }
+    expect(consumed).toBe(cls![1]); // nothing in the class that the parser skipped
+
+    const fn = sql.match(/FUNCTION public\.clean_customer_name[\s\S]*?translate\(\s*coalesce\(p_name, ''\),([\s\S]*?),\s*repeat\(' ', (\d+)\)/);
+    expect(fn).not.toBeNull();
+    const chrs = [...fn![1].matchAll(/chr\((\d+)\)/g)].map((m) => Number(m[1]));
+    expect(fn![1].replace(/chr\(\d+\)|\|\||\s/g, "")).toBe(""); // only chr(n) || chr(n) ...
+    expect(chrs.length).toBe(Number(fn![2])); // one replacement space per character
+    expect(new Set(chrs).size).toBe(chrs.length);
+    expect([...new Set(chrs)].sort((x, y) => x - y)).toEqual([...tsPoints].sort((x, y) => x - y));
+  });
+});

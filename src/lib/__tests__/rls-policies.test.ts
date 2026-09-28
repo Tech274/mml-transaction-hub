@@ -371,11 +371,44 @@ describe("pending scrum103_customer_name_normalize.sql: helper grants", () => {
     expect(got).toBe("42501");
   });
 
-  it("bulk_import_runs accepts duplicate_strategy 'insert' and still rejects unknown values", async () => {
-    const def = await cdb.query<{ d: string }>(
-      "select pg_get_constraintdef(oid) d from pg_constraint where conname = 'bulk_import_runs_duplicate_strategy_check'",
+  it("bulk_import_runs has exactly one duplicate_strategy CHECK, with the live name", async () => {
+    const r = await cdb.query<{ conname: string; d: string }>(
+      `select conname, pg_get_constraintdef(oid) d from pg_constraint
+        where conrelid = 'public.bulk_import_runs'::regclass and contype = 'c'
+          and pg_get_constraintdef(oid) like '%duplicate_strategy%'`,
     );
-    expect(def.rows[0].d).toContain("'insert'");
-    expect(def.rows[0].d).not.toContain("'merge'");
+    expect(r.rows.map((x) => x.conname)).toEqual(["bulk_import_runs_duplicate_strategy_check"]);
+    for (const v of ["skip", "update", "link", "insert"]) expect(r.rows[0].d).toContain(`'${v}'`);
   });
+
+  it("an ops user can record a legacy run with duplicate_strategy 'insert'; an unknown value is rejected", async () => {
+    const insert = (strategy: string) =>
+      asActor(cdb, as(U.opsUser), (q) =>
+        outcome(
+          q.query(
+            "insert into public.bulk_import_runs (user_id, kind, filename, duplicate_strategy) values ($1, 'public_cloud', 'legacy.csv', $2)",
+            [U.opsUser, strategy],
+          ),
+        ),
+      );
+    expect(await insert("insert")).toBe("ok");
+    expect(await insert("merge")).toBe("23514");
+    expect(await insert("")).toBe("23514");
+  });
+
+  it("the preflight stops the file when a stored customer key differs from the new key", async () => {
+    const sql = (await import("node:fs")).readFileSync(
+      (await import("node:path")).resolve(__dirname, "../../..", "supabase/migrations-pending/scrum103_customer_name_normalize.sql"),
+      "utf8",
+    );
+    const fresh = await createLocalDb();
+    await fresh.query("insert into auth.users (id, email) values ($1, 'ops@example.test')", [U.opsUser]);
+    // Old trigger key keeps the NBSP; the new key turns it into a space.
+    await fresh.query("insert into public.customers (customer_name, created_by) values ($1, $2)", ["Drift" + String.fromCharCode(160) + "Co", U.opsUser]);
+    await expect(fresh.exec(sql)).rejects.toThrow(/SCRUM-103 preflight: 1 customers row\(s\)/);
+    // Nothing from the file stayed behind.
+    const left = await fresh.query<{ n: number }>("select count(*)::int n from pg_proc where proname in ('clean_customer_name', 'normalize_customer_name')");
+    expect(left.rows[0].n).toBe(0);
+    await fresh.close();
+  }, 120_000);
 });

@@ -18,6 +18,8 @@
 --      PUBLIC and anon, and granted to authenticated and service_role only, because
 --      set_normalized_customer runs as the calling user when a customer row is written.
 --      import_transactions_batch is SECURITY DEFINER (owner postgres) and needs nothing extra.
+--      A preflight then stops the file if any customers.normalized_name differs from
+--      normalize_customer_name(customer_name) (checked read-only on live 28 Sep).
 --   2. set_normalized_customer uses normalize_customer_name.
 --   3. import_transactions_batch creates any missing customer itself. It does not raise
 --      when the name was not passed in p_customer_names.
@@ -95,6 +97,26 @@ REVOKE ALL ON FUNCTION public.clean_customer_name(text) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.normalize_customer_name(text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.clean_customer_name(text) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.normalize_customer_name(text) TO authenticated, service_role;
+
+-- Preflight: every stored key must already equal the new key. If one differs, the
+-- next UPDATE of that customer would change its normalized_name (and could collide
+-- with another customer on customers_normalized_name_key), so stop here. Nothing
+-- below has run yet and the whole file rolls back with this exception.
+DO $$
+DECLARE
+  v_drift bigint;
+  v_ids text;
+BEGIN
+  SELECT count(*), string_agg(id::text, ', ' ORDER BY id)
+    INTO v_drift, v_ids
+    FROM public.customers
+   WHERE normalized_name IS DISTINCT FROM public.normalize_customer_name(customer_name);
+  IF v_drift > 0 THEN
+    RAISE EXCEPTION 'SCRUM-103 preflight: % customers row(s) have normalized_name that differs from normalize_customer_name(customer_name): %', v_drift, v_ids
+      USING HINT = 'Fix those rows (with approval) before applying this file.';
+  END IF;
+END;
+$$;
 
 -- 2) The customer trigger uses the same key.
 CREATE OR REPLACE FUNCTION public.set_normalized_customer()

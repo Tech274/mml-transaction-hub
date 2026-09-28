@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { validateStrict, matchHeaders, parseStrictNumber, toCents } from "../validate";
 import { PROPOSED_RULES, STRICT_TEMPLATE_STATUS, columnLetter } from "../template";
 import { HEADER, row } from "./fixtures";
+import { commitBlockers } from "../commit-plan";
 
 describe("template status", () => {
   it("records the 28 Sep lenient rules", () => {
@@ -18,7 +19,7 @@ describe("headers", () => {
     expect(matchHeaders(h).warnings).toEqual([]);
   });
   it("a missing column is stored blank, warned, and does not block", () => {
-    const r = validateStrict(HEADER.slice(0, 11), [row(2)]);
+    const r = validateStrict(HEADER.slice(0, 11), [{ line: 2, cells: row(2).cells.slice(0, 11) }]);
     expect(r.ok).toBe(true);
     expect(r.records[0].cloud_provider).toBeNull();
     expect(r.warnings).toEqual([
@@ -46,7 +47,45 @@ describe("headers", () => {
     expect(r.records[0].month).toBeNull();
     expect(r.records[0].year).toBe(2026);
     expect(r.records[0].lab_name).toBe("Synthetic Lab A");
-    expect(r.warnings.map((w) => w.message)).toEqual(['Column "Month" is missing. Those cells are stored blank.']);
+    expect(r.warnings.map((w) => w.message)).toEqual([
+      'Column "Month" is missing. Those cells are stored blank.',
+      "Column B has no header. Its 1 value(s) are ignored.",
+    ]);
+  });
+  it("a blank header cell over an empty column gives no note", () => {
+    const header = [...HEADER, ""];
+    const r = validateStrict(header, [{ line: 2, cells: [...row(2).cells, null] }]);
+    expect(r.ok).toBe(true);
+    expect(r.warnings).toEqual([]);
+  });
+  it("values past the last header are dropped with a note, not an error", () => {
+    const r = validateStrict(HEADER, [{ line: 2, cells: [...row(2).cells, "extra"] }, { line: 3, cells: [...row(3, { "Potential ID": "PID-TEST-002" }).cells, "more"] }]);
+    expect(r.ok).toBe(true);
+    expect(r.records).toHaveLength(2);
+    expect(r.warnings.map((w) => w.message)).toEqual([`Column ${columnLetter(HEADER.length)} has no header. Its 2 value(s) are ignored.`]);
+  });
+  it("zero recognised template headers blocks the file with a clear error", () => {
+    const r = validateStrict(["S.No", "Remarks", "Foo"], [{ line: 2, cells: ["1", "x", "y"] }, { line: 3, cells: ["2", "z", "w"] }]);
+    expect(r.ok).toBe(false);
+    expect(r.records).toEqual([]);
+    expect(r.rowErrors).toEqual([expect.objectContaining({ line: 1, message: "No recognised columns; please use the template." })]);
+    expect(r.summary.errorCount).toBe(1);
+    expect(commitReady(r)).toBe(false);
+    expect(commitBlockers(r, { priorImport: null, importAnyway: true })).toEqual([
+      "The file has 1 error(s). Fix them and upload again.",
+      "The file has no rows to import.",
+    ]);
+  });
+  it("an empty header row also blocks", () => {
+    const r = validateStrict([], [{ line: 2, cells: ["a", "b"] }]);
+    expect(r.ok).toBe(false);
+    expect(r.rowErrors.map((e) => e.message)).toEqual(["No recognised columns; please use the template."]);
+  });
+  it("one recognised column is enough; the file is not blocked", () => {
+    const r = validateStrict(["Lab Name", "S.No"], [{ line: 2, cells: ["Lab Z", "1"] }]);
+    expect(r.ok).toBe(true);
+    expect(r.records).toHaveLength(1);
+    expect(r.records[0].lab_name).toBe("Lab Z");
   });
   it("an explicitly ignored column produces no warning", () => {
     const r = validateStrict([...HEADER, "S.No"], [row(2)], { rules: { ...PROPOSED_RULES, ignoredHeaders: ["s.no"] } });
@@ -80,6 +119,48 @@ describe("headers", () => {
 function commitReady(r: { ok: boolean }) {
   return r.ok;
 }
+
+describe("blank rows", () => {
+  it("a row with values only in unknown columns (S.No filled down) is blank, not an all-NULL record", () => {
+    const header = [...HEADER, "S.No", "Remarks"];
+    const blankTemplate = HEADER.map(() => null);
+    const r = validateStrict(header, [
+      { line: 2, cells: [...row(2).cells, "1", ""] },
+      { line: 3, cells: [...blankTemplate, "2", null] },
+      { line: 4, cells: [...blankTemplate.map(() => "   "), "3", "note"] },
+      { line: 5, cells: [...blankTemplate, "4"] },
+    ]);
+    expect(r.ok).toBe(true);
+    expect(r.records.map((x) => x.line)).toEqual([2]);
+    expect(r.summary.rowsToImport).toBe(1);
+    expect(r.summary.blankRowsIgnored).toBe(3);
+    expect(r.summary.rowsInFile).toBe(4);
+  });
+  it("a value in an explicitly ignored column does not make a row either", () => {
+    const r = validateStrict([...HEADER, "S.No"], [{ line: 2, cells: [...HEADER.map(() => null), "9"] }], {
+      rules: { ...PROPOSED_RULES, ignoredHeaders: ["s.no"] },
+    });
+    expect(r.records).toEqual([]);
+    expect(r.summary.blankRowsIgnored).toBe(1);
+  });
+  it("an empty row (no cells, or a short row of blanks) is blank", () => {
+    const r = validateStrict(HEADER, [
+      { line: 2, cells: [] },
+      { line: 3, cells: [null, "", "  "] },
+      { line: 4, cells: row(4).cells },
+    ]);
+    expect(r.records.map((x) => x.line)).toEqual([4]);
+    expect(r.summary.blankRowsIgnored).toBe(2);
+  });
+  it("a row with one template value is kept (the rest stays blank)", () => {
+    const cells: (string | null)[] = HEADER.map(() => null);
+    cells[HEADER.indexOf("Lab Name")] = "Only Lab";
+    const r = validateStrict([...HEADER, "S.No"], [{ line: 2, cells: [...cells, "1"] }]);
+    expect(r.records).toHaveLength(1);
+    expect(r.records[0].lab_name).toBe("Only Lab");
+    expect(r.records[0].potential_id).toBeNull();
+  });
+});
 
 describe("one row in = one row out", () => {
   it("repeated Potential IDs produce one record each (no merging)", () => {

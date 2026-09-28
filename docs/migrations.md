@@ -129,6 +129,9 @@ Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
   trigger at that key, and replaces `import_transactions_batch` so a missing customer is
   created instead of raising "not approved". The rest of the import function body is the
   applied 20260928031000 body. **Apply after 20260928031000** (it replaces that function).
+  A preflight stops the file if any `customers.normalized_name` differs from the new key
+  (read-only check on live 28 Sep ~08:47 IST: 0 of 23 rows differ). Also adds `'insert'` to
+  `bulk_import_runs_duplicate_strategy_check`.
   Rollback is in the file header and restores the applied 20260928031000 body. Not applied.
 
 Files 1–6 were merged before rule 3 existed, so their rollback lives here instead of in the file.

@@ -57,7 +57,7 @@ export interface StrictValidationResult {
 
 type ColumnMap = Map<StrictField, number>;
 
-/** Header notes. None of these block the import. Blank header cells are ignored with no note. */
+/** Header notes. None of these block the import (validateStrict blocks only when no template column matches). */
 export function matchHeaders(header: string[], rules: StrictRules = PROPOSED_RULES): { map: ColumnMap; warnings: RowIssue[] } {
   const warnings: RowIssue[] = [];
   const map: ColumnMap = new Map();
@@ -143,8 +143,40 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
 
   const colFor = (f: StrictField) => rules.columns.find((c) => c.field === f)!;
 
+  // The one header problem that blocks: not a single template column was recognised.
+  if (map.size === 0) {
+    rowErrors.push({
+      line: 1,
+      column: null,
+      header: null,
+      value: "",
+      message: "No recognised columns; please use the template.",
+    });
+  }
+
+  // A cell under a blank header is dropped. Say so when that column has any values.
+  const width = rows.reduce((w, r) => Math.max(w, r.cells.length), header.length);
+  for (let idx = 0; idx < width; idx++) {
+    if (normalizeHeader(header[idx] ?? "") !== "") continue;
+    const filled = rows.filter((r) => idx < r.cells.length && !isBlankCell(r.cells[idx])).length;
+    if (filled === 0) continue;
+    warnings.push({
+      line: 1,
+      column: columnLetter(idx),
+      header: null,
+      value: "",
+      message: `Column ${columnLetter(idx)} has no header. Its ${filled} value(s) are ignored.`,
+    });
+  }
+
+  // A row is blank when every TEMPLATE cell is blank. Values in unknown or ignored
+  // columns (an S.No filled down the sheet, remarks) do not make a row.
+  const templateIdx = [...map.values()];
+  const isBlankRow = (row: RawRow) => templateIdx.every((idx) => idx >= row.cells.length || isBlankCell(row.cells[idx]));
+
   for (const row of rows) {
-    if (row.cells.every(isBlankCell)) {
+    if (map.size === 0) break;
+    if (isBlankRow(row)) {
       blankRows += 1;
       continue;
     }
