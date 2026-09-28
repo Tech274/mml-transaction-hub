@@ -1,14 +1,12 @@
-// SCRUM-103: server functions for the strict importer.
-// Behind the strict_import_enabled flag (env STRICT_IMPORT_ENABLED, default OFF).
+// SCRUM-103: server functions for the lenient bulk importer (the Bulk Import tab).
+// Available to Admin, Ops Lead and Ops User. No feature flag.
 // All rules live in src/lib/strict-import/service.ts (unit-tested). The write
 // happens only through the database function import_transactions_batch(),
 // called with the user's own session so auth.uid() and role checks apply.
-// Import rules are PROPOSED defaults pending Vivek's confirmation.
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Json } from "@/integrations/supabase/types";
-import { isStrictImportEnabled } from "@/lib/strict-import/flag";
 import { base64ToBytes } from "@/lib/strict-import/hash";
 import { loadSheetJs, MAX_STRICT_FILE_BYTES } from "@/lib/strict-import/parse";
 import { STRICT_TEMPLATE_STATUS, STRICT_TEMPLATE_VERSION } from "@/lib/strict-import/template";
@@ -19,6 +17,7 @@ import {
   type ImportRpcResult,
   type StrictImportDeps,
 } from "@/lib/strict-import/service";
+import type { PriorImport } from "@/lib/strict-import/commit-plan";
 import { dbError } from "@/lib/app-error";
 import { hasAnyRole } from "@/lib/require-role";
 
@@ -34,7 +33,6 @@ type AuthedContext = {
 function depsFor(context: AuthedContext): StrictImportDeps {
   const { supabase, userId } = context;
   return {
-    enabled: isStrictImportEnabled(process.env),
     hasImportRole: () => hasAnyRole(context, IMPORT_ROLES),
     findCustomers: async (norms) => {
       const out: { customer_name: string; normalized_name: string }[] = [];
@@ -48,10 +46,17 @@ function depsFor(context: AuthedContext): StrictImportDeps {
       }
       return out;
     },
-    isFileImported: async (sha) => {
-      const { data, error } = await supabase.from("import_batches").select("id").eq("file_sha256", sha).limit(1);
-      if (error) return null; // e.g. SCRUM-103 migration not applied yet
-      return (data ?? []).length > 0;
+    priorImport: async (sha): Promise<PriorImport | null> => {
+      const { data, error } = await supabase
+        .from("import_batches")
+        .select("id, created_at")
+        .eq("file_sha256", sha)
+        .order("created_at", { ascending: true })
+        .limit(1);
+      // A failed lookup (migration not applied) does not block the import.
+      if (error || !data?.length) return null;
+      const row = data[0];
+      return { id: row.id, importedOn: String(row.created_at).slice(0, 10) };
     },
     callImport: async (payload) => {
       const { data, error } = await supabase.rpc("import_transactions_batch", {
@@ -83,8 +88,8 @@ export const getStrictImportStatus = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const deps = depsFor(context);
     return {
-      enabled: deps.enabled,
-      canImport: deps.enabled ? await deps.hasImportRole() : false,
+      enabled: true,
+      canImport: await deps.hasImportRole(),
       templateVersion: STRICT_TEMPLATE_VERSION,
       templateStatus: STRICT_TEMPLATE_STATUS,
     };
@@ -111,8 +116,7 @@ export const commitStrictImport = createServerFn({ method: "POST" })
     fileInput
       .extend({
         expectedSha256: z.string().regex(/^[0-9a-f]{64}$/),
-        warningsAcknowledged: z.boolean(),
-        approvedNewCustomers: z.array(z.string().max(200)).max(5000),
+        importAnyway: z.boolean(),
       })
       .parse(raw),
   )
@@ -122,8 +126,7 @@ export const commitStrictImport = createServerFn({ method: "POST" })
         filename: data.filename,
         bytes: base64ToBytes(data.contentBase64),
         expectedSha256: data.expectedSha256,
-        warningsAcknowledged: data.warningsAcknowledged,
-        approvedNewCustomers: data.approvedNewCustomers,
+        importAnyway: data.importAnyway,
       });
       return { ok: true as const, result };
     } catch (e) {

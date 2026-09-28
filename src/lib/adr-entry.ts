@@ -20,64 +20,124 @@ export const SYSTEM_CONFIG_OPTIONS = [
 ] as const;
 export const MAX_AMOUNT = 1_000_000_000;
 
-/** A real calendar date written as YYYY-MM-DD (what <input type="date"> produces). */
-const isoDate = z
-  .string()
-  .min(1, "Required")
-  .refine((s) => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-    const d = new Date(`${s}T00:00:00Z`);
-    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
-  }, "Enter a valid date");
+const blankToNull = (v: unknown) => {
+  if (v === undefined || v === null) return null;
+  if (typeof v === "string" && v.trim() === "") return null;
+  return v;
+};
 
-const amount = (label: string) =>
-  z.coerce
-    .number({ invalid_type_error: `${label} is required` })
-    .finite("Enter a valid number")
-    .nonnegative(`${label} cannot be negative`)
-    .max(MAX_AMOUNT, `${label} is unrealistically high`);
+const optionalText = (max: number) =>
+  z.preprocess(blankToNull, z.union([z.null(), z.string().trim().max(max)]));
 
-export const adrEntrySchema = z
-  .object({
-    potential_id: z.string().trim().min(1, "Required").max(50, "At most 50 characters"),
-    month: z.coerce.number().int().min(1, "Month must be 1–12").max(12, "Month must be 1–12"),
-    year: z.coerce.number().int().min(2000, "Year must be 2000–2100").max(2100, "Year must be 2000–2100"),
-    customer_id: z.string().uuid("Select a customer"),
-    customer_name: z.string().trim().min(1, "Select a customer"),
-    lab_name: z.string().trim().min(1, "Required").max(200, "At most 200 characters"),
-    lab_type: z.enum(["public_cloud", "private_cloud"], { errorMap: () => ({ message: "Choose Public or Private Cloud" }) }),
-    cloud_provider: z.string().optional(),
-    system_config: z.string().optional(),
-    line_of_business: z.string().min(1, "Required"),
-    start_date: isoDate,
-    end_date: isoDate,
-    total_users: z.coerce.number({ invalid_type_error: "Total users is required" }).int("Whole numbers only").positive("Must be greater than zero"),
-    input_cost: amount("Input cost"),
-    selling_cost: amount("Selling cost"),
-  })
-  .superRefine((v, ctx) => {
-    if (v.end_date && v.start_date && v.end_date < v.start_date) {
-      ctx.addIssue({ code: "custom", path: ["end_date"], message: "End date cannot be before start date" });
-    }
-    if (v.lab_type === "public_cloud" && !(PUBLIC_CLOUD_PROVIDERS as readonly string[]).includes(v.cloud_provider ?? "")) {
-      ctx.addIssue({ code: "custom", path: ["cloud_provider"], message: "Required for Public Cloud (AWS, Azure, GCP)" });
-    }
-    if (v.lab_type === "private_cloud" && !(SYSTEM_CONFIG_OPTIONS as readonly string[]).includes(v.system_config ?? "")) {
-      ctx.addIssue({ code: "custom", path: ["system_config"], message: "Required for Private Cloud" });
-    }
-    if (!(LINES_OF_BUSINESS as readonly string[]).includes(v.line_of_business)) {
-      ctx.addIssue({ code: "custom", path: ["line_of_business"], message: "Choose VILT, Standalone or Integrated" });
-    }
-    if (v.input_cost > v.selling_cost) {
-      ctx.addIssue({ code: "custom", path: ["input_cost"], message: "Input cost should not exceed selling cost (negative margin)" });
-    }
-  });
+const optionalInt = (min: number, max: number, label: string) =>
+  z.preprocess(
+    blankToNull,
+    z.union([
+      z.null(),
+      z.coerce.number().int(`${label} must be a whole number`).min(min, `${label} is out of range`).max(max, `${label} is out of range`),
+    ]),
+  );
+
+const optionalMoney = (label: string) =>
+  z.preprocess(
+    blankToNull,
+    z.union([
+      z.null(),
+      z.coerce
+        .number({ invalid_type_error: `${label} must be a number` })
+        .finite("Enter a valid number")
+        .nonnegative(`${label} cannot be negative`)
+        .max(MAX_AMOUNT, `${label} is unrealistically high`),
+    ]),
+  );
+
+const optionalDate = z.preprocess(
+  blankToNull,
+  z.union([
+    z.null(),
+    z.string().refine((s) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+      const d = new Date(`${s}T00:00:00Z`);
+      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+    }, "Enter a valid date"),
+  ]),
+);
+
+/**
+ * SCRUM-103: new entry and editing share this schema. No business field is
+ * required. Blanks become NULL. lab_type stays required because a transaction
+ * is either public or private cloud (the column is NOT NULL).
+ * End before start and selling below cost are notes, not errors.
+ */
+export const adrEntrySchema = z.object({
+  potential_id: optionalText(200),
+  month: optionalInt(1, 12, "Month"),
+  year: optionalInt(2000, 2100, "Year"),
+  customer_id: z.preprocess(blankToNull, z.union([z.null(), z.string().uuid()])),
+  customer_name: optionalText(200),
+  lab_name: optionalText(200),
+  lab_type: z.enum(["public_cloud", "private_cloud"], { errorMap: () => ({ message: "Choose Public or Private Cloud" }) }),
+  cloud_provider: optionalText(200),
+  system_config: optionalText(200),
+  line_of_business: z.preprocess(
+    blankToNull,
+    z.union([
+      z.null(),
+      z.string().refine((s) => (LINES_OF_BUSINESS as readonly string[]).includes(s), "Choose VILT, Standalone or Integrated"),
+    ]),
+  ),
+  start_date: optionalDate,
+  end_date: optionalDate,
+  total_users: optionalInt(1, 1_000_000_000, "Total users"),
+  input_cost: optionalMoney("Input cost"),
+  selling_cost: optionalMoney("Selling cost"),
+});
 
 export type AdrEntry = z.infer<typeof adrEntrySchema>;
+/** Same rules as a new entry. */
+export const adrEditSchema = adrEntrySchema;
+export type AdrEdit = AdrEntry;
 
-/** The row written to public.transactions (created_by is the signed-in user). */
+/** Non-blocking note when selling is below cost. Never a validation error. */
+export function marginNote(input: number | null | undefined, selling: number | null | undefined): string | null {
+  if (input == null || selling == null) return null;
+  if (input > selling) return "Input cost is higher than selling cost. This is allowed and will be saved.";
+  return null;
+}
+
+/** Non-blocking note when the end date is before the start date. Both dates are kept. */
+export function dateOrderNote(start: string | null | undefined, end: string | null | undefined): string | null {
+  if (!start || !end) return null;
+  if (end < start) return "End date is before the start date. This is allowed and will be saved.";
+  return null;
+}
+
+/** Update payload. Blank fields are NULL, never 0. */
+export function toTransactionUpdate(v: AdrEdit) {
+  return {
+    potential_id: v.potential_id,
+    month: v.month,
+    year: v.year,
+    customer_id: null as string | null,
+    customer_name: v.customer_name,
+    lab_name: v.lab_name,
+    lab_type: v.lab_type,
+    repository_type: v.lab_type,
+    cloud_provider: v.cloud_provider,
+    system_config: v.lab_type === "private_cloud" ? v.system_config : null,
+    line_of_business: v.line_of_business,
+    start_date: v.start_date,
+    end_date: v.end_date,
+    total_users: v.total_users,
+    input_cost: v.input_cost,
+    selling_cost: v.selling_cost,
+  };
+}
+
+/** The row written to public.transactions (created_by is the signed-in user). Blank fields are NULL, never 0. */
 export function toTransactionInsert(v: AdrEntry, userId: string) {
   const isPrivate = v.lab_type === "private_cloud";
+  const provider = v.cloud_provider && v.cloud_provider.trim() !== "" ? v.cloud_provider : null;
   return {
     potential_id: v.potential_id,
     month: v.month,
@@ -87,8 +147,8 @@ export function toTransactionInsert(v: AdrEntry, userId: string) {
     lab_name: v.lab_name,
     lab_type: v.lab_type,
     repository_type: v.lab_type, // trigger normalizes
-    cloud_provider: isPrivate ? PRIVATE_CLOUD_PROVIDER : (v.cloud_provider ?? ""),
-    system_config: isPrivate ? (v.system_config ?? null) : null,
+    cloud_provider: isPrivate ? (provider ?? PRIVATE_CLOUD_PROVIDER) : provider,
+    system_config: isPrivate ? v.system_config : null,
     line_of_business: v.line_of_business,
     start_date: v.start_date,
     end_date: v.end_date,

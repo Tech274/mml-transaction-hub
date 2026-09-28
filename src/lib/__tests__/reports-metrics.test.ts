@@ -30,6 +30,16 @@ describe("computeTotals", () => {
   it("handles zero revenue safely", () => {
     expect(computeTotals([]).margin).toBe(0);
   });
+  it("ignores null costs and does not write 0 back onto the row", () => {
+    const row = { ...rows[0], input_cost: null, selling_cost: null };
+    const snapshot = { ...row };
+    const t = computeTotals([row, rows[1]]);
+    expect(t.revenue).toBe(200);
+    expect(t.cost).toBe(50);
+    expect(row).toEqual(snapshot);
+    expect(row.input_cost).toBeNull();
+    expect(row.selling_cost).toBeNull();
+  });
 });
 
 describe("groupByKey", () => {
