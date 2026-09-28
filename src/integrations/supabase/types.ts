@@ -683,6 +683,7 @@ export type Database = {
           requester_name: string | null
           satisfaction_rating: string | null
           source: string | null
+          stale_since: string | null
           status: string | null
           status_id: number | null
           subject: string | null
@@ -707,6 +708,7 @@ export type Database = {
           requester_name?: string | null
           satisfaction_rating?: string | null
           source?: string | null
+          stale_since?: string | null
           status?: string | null
           status_id?: number | null
           subject?: string | null
@@ -731,6 +733,7 @@ export type Database = {
           requester_name?: string | null
           satisfaction_rating?: string | null
           source?: string | null
+          stale_since?: string | null
           status?: string | null
           status_id?: number | null
           subject?: string | null
@@ -1192,83 +1195,85 @@ export type Database = {
       }
       transactions: {
         Row: {
-          cloud_provider: string
+          cloud_provider: string | null
           created_at: string
           created_by: string | null
-          customer_id: string
-          customer_name: string
-          end_date: string
+          customer_id: string | null
+          customer_name: string | null
+          end_date: string | null
           id: string
           import_batch_id: string | null
-          input_cost: number
-          is_complete: boolean
+          input_cost: number | null
+          is_complete: boolean | null
           is_deleted: boolean
-          lab_name: string
+          lab_name: string | null
           lab_type: string
-          line_of_business: string
-          month: number
-          potential_id: string
+          line_of_business: string | null
+          month: number | null
+          potential_id: string | null
           repository_type: string
-          selling_cost: number
+          selling_cost: number | null
           source_line: number | null
-          start_date: string
+          start_date: string | null
           system_config: string | null
-          total_users: number
+          total_users: number | null
           updated_at: string
           updated_by: string | null
-          year: number
+          year: number | null
         }
         Insert: {
-          cloud_provider: string
+          cloud_provider?: string | null
           created_at?: string
           created_by?: string | null
-          customer_id: string
-          customer_name: string
-          end_date: string
+          customer_id?: string | null
+          customer_name?: string | null
+          end_date?: string | null
           id?: string
           import_batch_id?: string | null
-          input_cost?: number
+          input_cost?: number | null
+          is_complete?: boolean | null
           is_deleted?: boolean
-          lab_name: string
+          lab_name?: string | null
           lab_type: string
-          line_of_business: string
-          month: number
-          potential_id: string
+          line_of_business?: string | null
+          month?: number | null
+          potential_id?: string | null
           repository_type: string
-          selling_cost: number
+          selling_cost?: number | null
           source_line?: number | null
-          start_date: string
+          start_date?: string | null
           system_config?: string | null
-          total_users: number
+          total_users?: number | null
           updated_at?: string
           updated_by?: string | null
-          year: number
+          year?: number | null
         }
         Update: {
-          cloud_provider?: string
+          cloud_provider?: string | null
           created_at?: string
           created_by?: string | null
-          customer_id?: string
-          customer_name?: string
-          end_date?: string
+          customer_id?: string | null
+          customer_name?: string | null
+          end_date?: string | null
           id?: string
           import_batch_id?: string | null
-          input_cost?: number
+          input_cost?: number | null
+          is_complete?: boolean | null
           is_deleted?: boolean
-          lab_name?: string
+          lab_name?: string | null
           lab_type?: string
-          line_of_business?: string
-          month?: number
-          potential_id?: string
+          line_of_business?: string | null
+          month?: number | null
+          potential_id?: string | null
           repository_type?: string
-          selling_cost?: number
+          selling_cost?: number | null
           source_line?: number | null
-          start_date?: string
+          start_date?: string | null
           system_config?: string | null
-          total_users?: number
+          total_users?: number | null
           updated_at?: string
           updated_by?: string | null
-          year?: number
+          year?: number | null
         }
         Relationships: [
           {
@@ -1313,6 +1318,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clean_customer_name: { Args: { p_name: string }; Returns: string }
       clear_bulk_import_artifact_paths: {
         Args: { _run_ids: string[] }
         Returns: number
@@ -1357,6 +1363,7 @@ export type Database = {
         }
         Returns: Json
       }
+      normalize_customer_name: { Args: { p_name: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       verify_cron_secret: { Args: { _token: string }; Returns: boolean }
