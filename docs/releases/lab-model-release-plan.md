@@ -4,7 +4,8 @@ All PRs below must remain open and unmerged until the full set is complete.
 
 ## Planned PR set and merge order
 
-1. **PR-A (this branch): non-UI foundations**
+1. **PR-A: non-UI foundations** (`#46`, HOLD)
+   - https://github.com/Tech274/mml-transaction-hub/pull/46
    - Proposed migrations (not applied), DB invariants, locked-cost correction path, AI work-item auto-assignment backend, and tests.
 2. **PR-B (pending owner design approval): UI implementation**
    - Screen implementation for lab transaction, lab batch, and KPI profit/margin views behind feature flags.
