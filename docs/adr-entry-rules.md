@@ -7,8 +7,8 @@ same rules. Both are in `src/lib/adr-entry.ts`:
 - **Edit**: `src/components/transaction-edit-form.tsx` and `updateAdrTransaction`.
 - **Database**: CHECK constraints and RLS on `public.transactions`. Nullable columns
   and the dropped date-order check live in
-  `supabase/migrations-pending/scrum103_lenient_import.sql` (not applied). Until that
-  file is applied, the database still rejects a blank required column.
+  `supabase/migrations/20260928031000_scrum103_lenient_import.sql` (applied to live
+  28 Sep 2026), so the database accepts a blank business column.
 
 Nothing on the form is required except lab type (public or private), because that
 column is NOT NULL. A blank cell is stored as NULL, never as 0. A value that cannot

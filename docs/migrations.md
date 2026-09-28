@@ -3,18 +3,19 @@
 Goal: no schema change reaches the live database without review, a sandbox run and a written
 rollback. Merging a migration to `main` **does not apply it**.
 
-## Current state (28 Sep 2026, after the release)
+## Current state (28 Sep 2026, after the SCRUM-103 release)
 
-- Live has every migration up to `20260925024238` plus 8 of the 9 register migrations, applied on
-  28 Sep 2026 between 04:22 and 04:50 IST with Vivek's approval, in the order of
-  `docs/runbooks/publish-main.md`. Each is recorded in `supabase_migrations.schema_migrations`
-  (43 rows, latest `20260928030000`).
-- **Held:** `20260925130000_scrum103_import_batches` (register #4) and the pending
-  `scrum103_lenient_import.sql`. Rules were decided 28 Sep. Apply #4, then the lenient
-  file (including the `is_complete` column the All Transactions filter reads), then publish. Neither is on live.
-- The app code from `main` (3cb7202f) was published at 04:23 IST (Lovable deploy `565140ef`), via
-  the Lovable-linked repository `Tech274/mml-internal`. That repository does not carry the register
-  migrations or `.github/workflows/`.
+- Live has every migration up to `20260925024238` plus all 9 register migrations and the SCRUM-103
+  lenient follow-up. 8 register migrations were applied on 28 Sep 2026 between 04:22 and 04:50 IST;
+  register #4 `20260925130000_scrum103_import_batches` at ~07:40 IST and
+  `20260928031000_scrum103_lenient_import` (moved from `supabase/migrations-pending/`) at ~07:50 IST,
+  with Vivek's GO (28 Sep 06:35 IST) and Atlas's review of PR #39. Each is recorded in
+  `supabase_migrations.schema_migrations` (45 rows, latest `20260928031000`).
+- The app code from `main` 3ab3bc7e (PR #39) was pushed to `Tech274/mml-internal` (commit
+  `aa5c1f4`) after both migrations and then published through Lovable at ~07:55 IST (deploy `77d2bf72`, bundle `index-D_tFFzDm.js`).
+  That repository does not carry the register migrations, `supabase/migrations-pending/` or
+  `.github/workflows/`.
+- Backup and before/after fingerprints for this release: `backup-2026-09-28b` (Atlas box, counts and sha256 on SCRUM-103).
 - Sandbox was skipped for this release (Vivek approved applying straight to live).
 
 ## Rules
@@ -106,7 +107,7 @@ migration.
 | 1 | `20260925120000_scrum89_cron_secret` | SCRUM-89 | Vault `cron_secret` plus `verify_cron_secret()` (service role only) | Backup. Then migration → cron headers → code (`docs/runbooks/scrum-89-cron-secret.md`) | Revert the code first. Remove the cron header. Then `DROP FUNCTION public.verify_cron_secret(text);` and `DELETE FROM vault.secrets WHERE name='cron_secret';` (destructive: approval) | skipped (Vivek approved direct to live) | 28 Sep 04:22 IST |
 | 2 | `20260925120100_scrum98_import_artifact_legal_hold` | SCRUM-98 | Legal hold: `expired_bulk_import_artifacts()` returns nothing, so no import evidence can be auto-deleted | None; safe any time | Restore the original body quoted in the file header. **Only with Vivek's approval** (lifts the hold) | skipped (Vivek approved direct to live) | 28 Sep 04:22 IST |
 | 3 | `20260925121000_scrum99_profile_guard_audit_writes` | SCRUM-99, SCRUM-57 | Users can edit only their own display name. Audit tables are trigger-only. No default anon grants | None; admin flows use the service role | `DROP TRIGGER profiles_guard_self_update ON public.profiles; DROP FUNCTION public.guard_profile_self_update();` `GRANT INSERT, UPDATE, DELETE ON public.customer_audit_log, public.permission_audit_log, public.role_audit_log, public.transaction_activity_log TO authenticated;` (anon grants are not restored) | skipped (Vivek approved direct to live) | 28 Sep 04:49 IST |
-| 4 | `20260925130000_scrum103_import_batches` | SCRUM-103, SCRUM-79 | `import_batches` table, batch link on transactions, NOT VALID checks, all-or-nothing import function | Apply before the lenient follow-up below. Rules decided 28 Sep (blanks allowed) | If `select count(*) from import_batches` = 0: drop the function, the two constraints, the unique index, the two `transactions` columns, and `import_batches`. If batches exist: needs a Vivek decision (data loss) | – | **held** (apply with the lenient follow-up, then publish) |
+| 4 | `20260925130000_scrum103_import_batches` | SCRUM-103, SCRUM-79 | `import_batches` table, batch link on transactions, NOT VALID checks, all-or-nothing import function | Apply before the lenient follow-up below. Rules decided 28 Sep (blanks allowed) | If `select count(*) from import_batches` = 0: drop the function, the two constraints, the unique index, the two `transactions` columns, and `import_batches`. If batches exist: needs a Vivek decision (data loss) | skipped (Vivek approved direct to live) | 28 Sep ~07:40 IST |
 | 5 | `20260925140000_scrum74_sync_runs_freshdesk` | SCRUM-74, SCRUM-72 | `fetched_count` / `upserted_count` on `sync_runs`, plus an index | None; the code works without it | `DROP INDEX public.idx_sync_runs_kind_started; ALTER TABLE public.sync_runs DROP COLUMN fetched_count, DROP COLUMN upserted_count;` (loses the counts only) | skipped (Vivek approved direct to live) | 28 Sep 04:49 IST |
 | 6 | `20260925150000_scrum92_freshdesk_stale_marker` | SCRUM-92 | `freshdesk_tickets.stale_since`, plus a partial index | Migration first, then set `FRESHDESK_STALE_SWEEP_ENABLED=true` | Unset the flag, then `DROP INDEX public.idx_freshdesk_tickets_stale; ALTER TABLE public.freshdesk_tickets DROP COLUMN stale_since;` | skipped (Vivek approved direct to live) | 28 Sep 04:49 IST |
 | 7 | `20260928010000_scrum57_revoke_unused_write_grants` | SCRUM-57 | Removes write grants that no policy uses. No behaviour change | Drift check first (`docs/rls-audit.md`) | GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:50 IST |
@@ -116,15 +117,11 @@ migration.
 Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
 
 - `scrum100_drop_duplicate_bulk_import_index.sql` (SCRUM-100, destructive, needs Vivek).
-- `scrum103_lenient_import.sql` (SCRUM-103, 28 Sep). Drops NOT NULL on the transaction
-  fields that may be blank, keeps `CHECK (>= 0)` only when a cost is present, drops any
-  input-vs-selling check and the end-date order check, and relaxes `classify_transaction`
-  plus `import_transactions_batch`, fills a blank private `cloud_provider` with
-  MakeMyLabs Private Cloud, drops the unique constraint on `import_batches.file_sha256`
-  (a non-unique index remains), and adds stored generated `is_complete` (plus an
-  index) for the All Transactions filter. Rollback is in the file header, including
-  `DROP COLUMN is_complete` and restoring the unique hash. Live order: apply register #4, then move this file into
-  `supabase/migrations/` with a fresh timestamp and apply it, then publish. Do not backfill 0.
+- `scrum103_lenient_import.sql` moved to `supabase/migrations/20260928031000_scrum103_lenient_import.sql`
+  and applied to live 28 Sep ~07:50 IST (after register #4). Rollback is in the file header.
+  Nullable transaction fields, no input-vs-selling or end-date order check, lenient
+  `classify_transaction` (blank private provider filled) and `import_transactions_batch`,
+  non-unique `import_batches.file_sha256` index, stored generated `is_complete`.
 
 Files 1–6 were merged before rule 3 existed, so their rollback lives here instead of in the file.
 Rule 6 means the files themselves are not edited.

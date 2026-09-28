@@ -1,6 +1,6 @@
 -- SCRUM-103 checks for import_transactions_batch(). SANDBOX ONLY, never live.
 -- Run after BOTH 20260925130000_scrum103_import_batches.sql AND
--- supabase/migrations-pending/scrum103_lenient_import.sql (moved into migrations first).
+-- 20260928031000_scrum103_lenient_import.sql (both applied to live 28 Sep 2026).
 -- Everything is inside a transaction that is rolled back. Synthetic values only.
 BEGIN;
 
