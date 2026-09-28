@@ -217,19 +217,6 @@ export function StrictImport() {
               <div>Total input: <b>{formatCents(s.totalInputCents)}</b></div>
             </div>
 
-            {result.headerErrors.length > 0 && (
-              <Alert variant="destructive">
-                <AlertTitle>Column problems</AlertTitle>
-                <AlertDescription>
-                  <ul className="list-disc pl-5">
-                    {result.headerErrors.map((h, i) => (
-                      <li key={i}>{h.column ? `Column ${h.column}: ` : ""}{h.message}</li>
-                    ))}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            )}
-
             <IssueTable issues={result.rowErrors} label="Errors (must be fixed in the file)" />
             <IssueTable issues={result.warnings} label="Notes (saved anyway — fix later by editing the transaction)" />
 

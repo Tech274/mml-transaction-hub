@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { AppError, dbError } from "@/lib/app-error";
 import { adrEditSchema, adrEntrySchema, fieldErrors, toTransactionInsert, toTransactionUpdate } from "@/lib/adr-entry";
+import { cleanCustomerName, normalizeName } from "@/lib/customer-normalize";
 
 export const checkPotentialIdUnique = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -23,14 +24,16 @@ export const findOrCreateCustomer = createServerFn({ method: "POST" })
     z.object({ customerName: z.string().trim().min(1).max(200) }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const normalized = data.customerName.trim().replace(/\s+/g, " ").toLowerCase();
+    const display = cleanCustomerName(data.customerName);
+    if (!display) throw new AppError("Customer name is blank", "validation");
+    const normalized = normalizeName(display);
     const { data: existing } = await context.supabase
       .from("customers").select("id, customer_name, is_active")
       .eq("normalized_name", normalized).maybeSingle();
     if (existing) return existing;
     const { data: created, error } = await context.supabase
       .from("customers")
-      .insert({ customer_name: data.customerName.trim(), normalized_name: normalized, created_by: context.userId })
+      .insert({ customer_name: display, normalized_name: normalized, created_by: context.userId })
       .select("id, customer_name, is_active").single();
     if (error) throw dbError(error, "transactions.findOrCreateCustomer");
     return created;
@@ -52,20 +55,24 @@ export const createAdrTransaction = createServerFn({ method: "POST" })
     }
     const insert = toTransactionInsert(parsed.data, context.userId);
     if (insert.customer_name) {
-      const normalized = insert.customer_name.trim().replace(/\s+/g, " ").toLowerCase();
+      const display = cleanCustomerName(insert.customer_name);
+      const normalized = normalizeName(display);
       const { data: existing } = await context.supabase
         .from("customers").select("id, customer_name").eq("normalized_name", normalized).maybeSingle();
       if (existing) {
         insert.customer_id = existing.id;
         insert.customer_name = existing.customer_name;
-      } else {
+      } else if (display) {
         const { data: created, error } = await context.supabase
           .from("customers")
-          .insert({ customer_name: insert.customer_name, normalized_name: normalized, created_by: context.userId })
+          .insert({ customer_name: display, normalized_name: normalized, created_by: context.userId })
           .select("id, customer_name").single();
         if (error) throw dbError(error, "transactions.createAdrTransaction.customer");
         insert.customer_id = created.id;
         insert.customer_name = created.customer_name;
+      } else {
+        insert.customer_id = null;
+        insert.customer_name = null;
       }
     } else {
       insert.customer_id = null;
@@ -98,16 +105,17 @@ export const updateAdrTransaction = createServerFn({ method: "POST" })
     }
     const patch = toTransactionUpdate(parsed.data);
     if (patch.customer_name) {
-      const normalized = patch.customer_name.trim().replace(/\s+/g, " ").toLowerCase();
+      const display = cleanCustomerName(patch.customer_name);
+      const normalized = normalizeName(display);
       const { data: existing } = await context.supabase
         .from("customers").select("id, customer_name").eq("normalized_name", normalized).maybeSingle();
       if (existing) {
         patch.customer_id = existing.id;
         patch.customer_name = existing.customer_name;
-      } else {
+      } else if (display) {
         const { data: created, error } = await context.supabase
           .from("customers")
-          .insert({ customer_name: patch.customer_name, normalized_name: normalized, created_by: context.userId })
+          .insert({ customer_name: display, normalized_name: normalized, created_by: context.userId })
           .select("id, customer_name").single();
         if (error) throw dbError(error, "transactions.updateAdrTransaction.customer");
         patch.customer_id = created.id;

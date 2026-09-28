@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { dbError, logIfError } from "@/lib/app-error";
 import { APP_ROLES, requireRole, type RoleContext } from "@/lib/require-role";
-import { applyActive, assertNotLastAdmin, syncRoles } from "@/lib/admin-guards";
+import { applyActive, assertNotLastAdmin, assignCreatedUserRoles, syncRoles } from "@/lib/admin-guards";
 
 const roleEnum = z.enum(APP_ROLES);
 
@@ -38,12 +38,10 @@ export const adminCreateUser = createServerFn({ method: "POST" })
     if (error) throw dbError(error, "admin.adminCreateUser");
     const newUserId = created.user!.id;
 
-    // handle_new_user trigger inserts default viewer role + profile. Sync requested roles.
-    const { error: clearErr } = await supabaseAdmin.from("user_roles").delete().eq("user_id", newUserId);
-    if (clearErr) throw dbError(clearErr, "admin.adminCreateUser:clearDefaultRoles");
-    const rows = Array.from(new Set(data.roles)).map((role) => ({ user_id: newUserId, role }));
-    const { error: rErr } = await supabaseAdmin.from("user_roles").insert(rows);
-    if (rErr) throw dbError(rErr, "admin.adminCreateUser");
+    // Trigger inserts the profile (admin only for the very first account; older
+    // databases also inserted viewer). Add the requested roles before removing
+    // any role that was not requested. A failure disables this new account.
+    await assignCreatedUserRoles(supabaseAdmin, newUserId, data.roles);
 
     // Optionally create the account disabled (profile flag + auth ban).
     if (data.isActive === false) {

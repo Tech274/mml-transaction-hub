@@ -1,6 +1,6 @@
 # Runbook: getting `main` live (publish order)
 
-Status: **done on 28 Sep 2026 (04:17–04:50 IST), except migration 4 (held).** Steps 1–7 ran in
+Status: **done on 28 Sep 2026 (04:17–04:50 IST); migration 4 plus the SCRUM-103 lenient migration applied 07:40–07:50 IST, then published.** Steps 1–7 ran in
 this order with Vivek's approval: `main` 3cb7202f pushed to the Lovable-linked repository
 `Tech274/mml-internal` (commit `35943226`), migrations 1+2 and the cron header at 04:22–04:23 IST,
 publish at 04:23 IST (Lovable deploy `565140ef`), then 8, 9, drift check, 3, 5, 6, 7 by 04:50 IST.

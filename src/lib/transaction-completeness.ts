@@ -1,6 +1,6 @@
 // SCRUM-103: which fields make a transaction Complete on All Transactions.
 // Keep this list in step with the is_complete expression in
-// supabase/migrations-pending/scrum103_lenient_import.sql.
+// supabase/migrations/20260928031000_scrum103_lenient_import.sql.
 //
 // A numeric 0 is a value. NULL and blank or whitespace text are empty.
 // System columns (id, timestamps, created_by, import_batch_id, source_line, …)

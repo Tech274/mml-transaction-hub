@@ -8,7 +8,7 @@
 // and re-validates them before calling the database function.
 import { normalizeName } from "@/lib/customer-normalize";
 import { parseStrictBytes, type XlsxLike } from "./parse";
-import { validateStrict, type HeaderError, type RowIssue, type StrictSummary } from "./validate";
+import { validateStrict, type RowIssue, type StrictSummary } from "./validate";
 import { STRICT_TEMPLATE_STATUS, STRICT_TEMPLATE_VERSION } from "./template";
 import { sha256Hex } from "./hash";
 import { buildRpcRows, commitBlockers, planCustomers, type CustomerPlan, type ExistingCustomer, type PriorImport, type RpcRow } from "./commit-plan";
@@ -49,7 +49,6 @@ export interface PreviewResult {
   fileSha256: string;
   sheetName: string | null;
   summary: StrictSummary;
-  headerErrors: HeaderError[];
   rowErrors: RowIssue[];
   warnings: RowIssue[];
   customers: CustomerPlan;
@@ -101,7 +100,6 @@ export async function runPreview(deps: StrictImportDeps, input: StrictFileInput)
     fileSha256,
     sheetName: sheet.sheetName ?? null,
     summary: validation.summary,
-    headerErrors: validation.headerErrors,
     rowErrors: validation.rowErrors,
     warnings: validation.warnings,
     customers,

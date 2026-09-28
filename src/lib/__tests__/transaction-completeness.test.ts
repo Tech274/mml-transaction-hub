@@ -94,9 +94,9 @@ describe("transaction completeness", () => {
     expect(isTransactionComplete(filled({ input_cost: null }))).toBe(false);
   });
 
-  it("the pending migration expression names the same fields", () => {
+  it("the applied migration expression names the same fields", () => {
     const sql = readFileSync(
-      path.resolve(__dirname, "../../../supabase/migrations-pending/scrum103_lenient_import.sql"),
+      path.resolve(__dirname, "../../../supabase/migrations/20260928031000_scrum103_lenient_import.sql"),
       "utf8",
     );
     const expression = sql.slice(sql.indexOf("ADD COLUMN is_complete"), sql.indexOf("CREATE INDEX transactions_is_complete_live_idx"));
