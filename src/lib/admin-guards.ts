@@ -1,7 +1,7 @@
 // SCRUM-100 (G-23): the admin user-management rules in one place, shared by every
 // mutating admin function so the "last Super Admin" protection cannot be bypassed.
 // `sb` is the service-role client (server only); callers must check admin first.
-import { AppError, dbError } from "@/lib/app-error";
+import { AppError, dbError, logError } from "@/lib/app-error";
 
 type Sb = any;
 
@@ -32,16 +32,48 @@ export async function syncRoles(sb: Sb, userId: string, roles: string[]) {
   const heldRoles = new Set(heldRows.map((r) => r.role));
   const toAdd = desired.filter((r) => !heldRoles.has(r));
   const toRemove = heldRows.filter((r) => !desired.includes(r.role));
-  if (toRemove.length) {
-    const { error } = await sb.from("user_roles").delete().in("id", toRemove.map((r) => r.id));
-    if (error) throw dbError(error, "admin.syncRoles");
-  }
+  // Insert before delete. A failed insert must leave the roles the user already
+  // has (including a default viewer). Deleting first could leave them with none.
   if (toAdd.length) {
     const { error } = await sb.from("user_roles").insert(toAdd.map((role) => ({ user_id: userId, role })));
     if (error) {
       if (error.code === "23505") throw new AppError("That role is already assigned to this user.");
       throw dbError(error, "admin.syncRoles");
     }
+  }
+  if (toRemove.length) {
+    const { error } = await sb.from("user_roles").delete().in("id", toRemove.map((r) => r.id));
+    if (error) throw dbError(error, "admin.syncRoles");
+  }
+}
+
+/** Profile flag off and an auth ban. Does not apply the last-admin guard. */
+export async function disableAccount(sb: Sb, userId: string): Promise<void> {
+  const { error: pErr } = await sb.from("profiles").update({ is_active: false }).eq("id", userId);
+  if (pErr) throw dbError(pErr, "admin.disableAccount");
+  const { error: aErr } = await sb.auth.admin.updateUserById(userId, { ban_duration: "876000h" });
+  if (aErr) throw dbError(aErr, "admin.disableAccount");
+}
+
+/**
+ * Role setup for a user auth.admin.createUser just created. The trigger has
+ * already inserted the profile (and, on older databases, a default viewer role).
+ * Requested roles are inserted before any other role is removed. If that sync
+ * fails, the new account is disabled and banned, then the role error is rethrown
+ * so the admin sees it. A last-admin refusal happens before any write, so that
+ * account is left as the trigger created it.
+ */
+export async function assignCreatedUserRoles(sb: Sb, userId: string, roles: string[]): Promise<void> {
+  try {
+    await syncRoles(sb, userId, roles);
+  } catch (err) {
+    if (err instanceof AppError && err.code === "last_admin") throw err;
+    try {
+      await disableAccount(sb, userId);
+    } catch (disableErr) {
+      logError(disableErr, "admin.assignCreatedUserRoles:disable");
+    }
+    throw err;
   }
 }
 
