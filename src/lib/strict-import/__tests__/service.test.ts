@@ -71,7 +71,7 @@ describe("runPreview", () => {
     expect(p.summary).toMatchObject({ rowsToImport: 3, errorCount: 0, totalSellingCents: 330100, totalInputCents: 220025 });
     expect(p.customers.newCustomers).toEqual(["Beta Test Ltd"]);
     expect(p.fileSha256).toBe(await sha256Hex(GOOD));
-    expect(p.templateStatus).toBe("PENDING_VIVEK_CONFIRMATION");
+    expect(p.templateStatus).toBe("LENIENT_2026-09-28");
     expect(p.blockers).toEqual([]);
     expect(calls).toHaveLength(0);
   });
@@ -99,8 +99,25 @@ describe("runCommit", () => {
     await expect(runCommit(deps, { ...(await base()), expectedSha256: "0".repeat(64) })).rejects.toMatchObject({ code: "file_changed" });
     expect(calls).toHaveLength(0);
   });
-  it("re-validates on the server: an invalid file never reaches the database", async () => {
-    const bad = csv(line("PID-TEST-003", "Acme Test Co", "", "100"));
+  it("re-validates on the server: a blank cost is stored null and still committed", async () => {
+    const blankCost = csv(line("PID-TEST-003", "Acme Test Co", "", "100"));
+    const { deps, calls } = fakeDeps();
+    const r = await runCommit(deps, { filename: "f.csv", bytes: blankCost, expectedSha256: await sha256Hex(blankCost), warningsAcknowledged: false, approvedNewCustomers: [] });
+    expect(r.inserted).toBe(1);
+    expect(calls[0].p_rows[0].input_cost).toBeNull();
+    expect(calls[0].p_rows[0].selling_cost).toBe("100.00");
+  });
+  it("an unknown provider does not block the commit", async () => {
+    const header = HEADER.join(",");
+    const body = ["PID-TEST-003", "3", "2026", "Acme Test Co", "Synthetic Lab A", "VILT", "2026-03-01", "2026-03-31", "10", "100", "150", "OpenAI"].join(",");
+    const bytes = new TextEncoder().encode(`${header}\n${body}\n`);
+    const { deps, calls } = fakeDeps();
+    const r = await runCommit(deps, { filename: "f.csv", bytes, expectedSha256: await sha256Hex(bytes), warningsAcknowledged: false, approvedNewCustomers: [] });
+    expect(r.inserted).toBe(1);
+    expect(calls[0].p_rows[0].cloud_provider).toBeNull();
+  });
+  it("an unknown extra column still never reaches the database", async () => {
+    const bad = new TextEncoder().encode(`${HEADER.join(",")},Notes\n${line("PID-TEST-003", "Acme Test Co", "1", "2")},x\n`);
     const { deps, calls } = fakeDeps();
     const err = await runCommit(deps, { filename: "f.csv", bytes: bad, expectedSha256: await sha256Hex(bad), warningsAcknowledged: true, approvedNewCustomers: [] }).catch((e) => e);
     expect(err).toBeInstanceOf(StrictImportError);

@@ -1,5 +1,6 @@
 -- SCRUM-103 checks for import_transactions_batch(). SANDBOX ONLY, never live.
--- Run in the sandbox SQL editor after applying 20260925130000_scrum103_import_batches.sql.
+-- Run after BOTH 20260925130000_scrum103_import_batches.sql AND
+-- supabase/migrations-pending/scrum103_lenient_import.sql (moved into migrations first).
 -- Everything is inside a transaction that is rolled back. Synthetic values only.
 BEGIN;
 
@@ -33,21 +34,57 @@ BEGIN
     RAISE NOTICE 'PASS: same file hash rejected';
   END;
 
-  -- 3) Injected failure on the second row (bad provider) -> whole batch rolled back
-  BEGIN
-    PERFORM public.import_transactions_batch('public_cloud', 'synthetic-2.xlsx', repeat('b', 64), '2.0.0-proposed',
-      jsonb_set(rows_ok, '{1,cloud_provider}', '"OpenAI"'), '[]');
-    RAISE EXCEPTION 'FAIL: bad row accepted';
-  EXCEPTION WHEN raise_exception THEN
-    IF EXISTS (SELECT 1 FROM public.import_batches WHERE file_sha256 = repeat('b', 64)) THEN
-      RAISE EXCEPTION 'FAIL: partial batch left behind';
-    END IF;
-    RAISE NOTICE 'PASS: failure on row 2 rolled back the whole batch';
-  END;
+  -- 3) Unknown provider is stored NULL and the row is still inserted (28 Sep). Blank cost stays NULL, not 0.
+  res := public.import_transactions_batch(
+    'public_cloud', 'synthetic-2.xlsx', repeat('b', 64), '2.0.0-proposed',
+    jsonb_build_array(
+      jsonb_build_object(
+        'source_line', 2,
+        'potential_id', 'PID-SYN-1',
+        'month', 3, 'year', 2026,
+        'customer_name', 'Synthetic Test Customer',
+        'lab_name', 'Lab A',
+        'line_of_business', 'VILT',
+        'start_date', '2026-03-01', 'end_date', '2026-03-31',
+        'total_users', 5,
+        'input_cost', '400.00', 'selling_cost', '100.00',
+        'cloud_provider', 'OpenAI'
+      ),
+      jsonb_build_object(
+        'source_line', 3,
+        'potential_id', NULL,
+        'customer_name', NULL,
+        'lab_name', 'Only lab',
+        'input_cost', NULL, 'selling_cost', NULL,
+        'cloud_provider', NULL
+      )
+    ),
+    '[]'
+  );
+  IF (res->>'inserted')::int <> 2 THEN RAISE EXCEPTION 'FAIL: lenient batch expected 2 inserted, got %', res; END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.transactions t
+    JOIN public.import_batches b ON b.id = t.import_batch_id
+    WHERE b.file_sha256 = repeat('b', 64)
+      AND t.source_line = 2
+      AND (t.cloud_provider IS NOT NULL OR t.input_cost <> 400 OR t.selling_cost <> 100)
+  ) THEN
+    RAISE EXCEPTION 'FAIL: OpenAI row was not stored with a null provider and the original costs';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.transactions t
+    JOIN public.import_batches b ON b.id = t.import_batch_id
+    WHERE b.file_sha256 = repeat('b', 64)
+      AND t.source_line = 3
+      AND (t.input_cost IS NOT NULL OR t.selling_cost IS NOT NULL OR t.potential_id IS NOT NULL OR t.customer_id IS NOT NULL)
+  ) THEN
+    RAISE EXCEPTION 'FAIL: blank cells were not stored as NULL';
+  END IF;
+  RAISE NOTICE 'PASS: unknown provider and blank costs imported as NULL without blocking';
 
   SELECT count(*) INTO after_count FROM public.transactions;
-  IF after_count <> before_count + 2 THEN RAISE EXCEPTION 'FAIL: expected exactly 2 new rows, got %', after_count - before_count; END IF;
-  RAISE NOTICE 'PASS: exactly 2 rows added overall';
+  IF after_count <> before_count + 4 THEN RAISE EXCEPTION 'FAIL: expected exactly 4 new rows, got %', after_count - before_count; END IF;
+  RAISE NOTICE 'PASS: exactly 4 rows added overall';
 END $$;
 
 ROLLBACK;

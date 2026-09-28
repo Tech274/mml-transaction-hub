@@ -237,7 +237,7 @@ export function StrictImport() {
             )}
 
             <IssueTable issues={result.rowErrors} label="Errors (must be fixed in the file)" />
-            <IssueTable issues={result.warnings} label="Warnings (must be acknowledged)" />
+            <IssueTable issues={result.warnings} label="Notes (saved anyway — fix later by editing the transaction)" />
 
             {result.customers.newCustomers.length > 0 && (
               <div className="space-y-2">

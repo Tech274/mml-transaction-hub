@@ -4,8 +4,8 @@ import { PROPOSED_RULES, STRICT_TEMPLATE_STATUS, columnLetter } from "../templat
 import { HEADER, row } from "./fixtures";
 
 describe("template status", () => {
-  it("is clearly marked as pending Vivek's confirmation", () => {
-    expect(STRICT_TEMPLATE_STATUS).toBe("PENDING_VIVEK_CONFIRMATION");
+  it("records the 28 Sep lenient rules", () => {
+    expect(STRICT_TEMPLATE_STATUS).toBe("LENIENT_2026-09-28");
   });
   it("column letters", () => {
     expect([0, 11, 25, 26, 27].map(columnLetter)).toEqual(["A", "L", "Z", "AA", "AB"]);
@@ -17,10 +17,11 @@ describe("headers", () => {
     const h = HEADER.map((x, i) => (i === 0 ? "  potential id " : x.toUpperCase()));
     expect(matchHeaders(h).errors).toEqual([]);
   });
-  it("missing column is a blocking error", () => {
+  it("a missing column is stored blank and does not block", () => {
     const r = validateStrict(HEADER.slice(0, 11), [row(2)]);
-    expect(r.ok).toBe(false);
-    expect(r.headerErrors.map((e) => e.message)).toContain('Missing column "Cloud Provider"');
+    expect(r.ok).toBe(true);
+    expect(r.headerErrors).toEqual([]);
+    expect(r.records[0].cloud_provider).toBeNull();
   });
   it("unknown extra column is a blocking error", () => {
     const r = validateStrict([...HEADER, "Notes"], [row(2)]);
@@ -62,10 +63,13 @@ describe("one row in = one row out", () => {
     expect(r.summary.blankRowsIgnored).toBe(1);
     expect(r.summary.rowsInFile).toBe(3);
   });
-  it("a row with errors still yields exactly one record (and blocks commit)", () => {
+  it("a row with an unstorable month still yields exactly one record and does not block", () => {
     const r = validateStrict(HEADER, [row(2, { Month: 13 })]);
     expect(r.records).toHaveLength(1);
-    expect(r.ok).toBe(false);
+    expect(r.records[0].month).toBeNull();
+    expect(r.ok).toBe(true);
+    expect(r.warnings.some((w) => w.column === "B" && w.value === "13")).toBe(true);
+    expect(r.rowErrors).toEqual([]);
   });
   it("exact duplicate rows are kept and flagged as a warning", () => {
     const r = validateStrict(HEADER, [row(2), row(3)]);
@@ -75,21 +79,70 @@ describe("one row in = one row out", () => {
   });
 });
 
-describe("no guessing", () => {
-  it("blank Selling Cost is an error, never 0 (proposed default)", () => {
-    const r = validateStrict(HEADER, [row(2, { "Selling Cost": "" })]);
-    expect(r.rowErrors).toEqual([{ line: 2, column: "K", header: "Selling Cost", value: "", message: "Required value is blank" }]);
+describe("blanks and unstorable cells (28 Sep)", () => {
+  it("a row with every field blank except one is one record, and the blanks stay null", () => {
+    const r = validateStrict(HEADER, [row(2, {
+      "Potential ID": "",
+      Month: null,
+      Year: "",
+      "Customer Name": "Only Customer",
+      "Lab Name": "",
+      "Line of Business": "",
+      "Start Date": null,
+      "End Date": "",
+      "Total Users": "",
+      "Input Cost": null,
+      "Selling Cost": "",
+      "Cloud Provider": "  ",
+    })]);
+    expect(r.ok).toBe(true);
+    expect(r.rowErrors).toEqual([]);
+    expect(r.records).toHaveLength(1);
+    expect(r.records[0].customer_name).toBe("Only Customer");
+    expect(r.records[0].potential_id).toBeNull();
+    expect(r.records[0].input_cost_cents).toBeNull();
     expect(r.records[0].selling_cost_cents).toBeNull();
+    expect(r.records[0].cloud_provider).toBeNull();
+    expect(r.records[0].total_users).toBeNull();
   });
-  it("blank cost can be stored as NULL only if the rule is switched", () => {
-    const r = validateStrict(HEADER, [row(2, { "Input Cost": null })], { rules: { ...PROPOSED_RULES, blankCost: "null" } });
+  it("blank costs are NULL, never 0", () => {
+    const r = validateStrict(HEADER, [row(2, { "Input Cost": "", "Selling Cost": null })]);
     expect(r.ok).toBe(true);
     expect(r.records[0].input_cost_cents).toBeNull();
+    expect(r.records[0].selling_cost_cents).toBeNull();
+    expect(r.warnings.filter((w) => w.header === "Input Cost" || w.header === "Selling Cost")).toEqual([]);
   });
-  it("DD/MM text dates are rejected", () => {
+  it("input cost above selling cost is a note and does not block", () => {
+    const r = validateStrict(HEADER, [row(2, { "Input Cost": 2000, "Selling Cost": 1500 })]);
+    expect(r.ok).toBe(true);
+    expect(r.rowErrors).toEqual([]);
+    expect(r.records[0].input_cost_cents).toBe(200000);
+    expect(r.records[0].selling_cost_cents).toBe(150000);
+    expect(r.warnings.map((w) => w.message).join(" ")).toMatch(/higher than Selling Cost/);
+    expect(r.warnings[0]).toMatchObject({ line: 2, column: "J", value: "2000.00" });
+  });
+  it("an unparseable number is NULL plus a warning and does not block", () => {
+    const r = validateStrict(HEADER, [row(2, { "Total Users": "ten", "Input Cost": "₹100" })]);
+    expect(r.ok).toBe(true);
+    expect(r.records[0].total_users).toBeNull();
+    expect(r.records[0].input_cost_cents).toBeNull();
+    const users = r.warnings.find((w) => w.header === "Total Users");
+    const cost = r.warnings.find((w) => w.header === "Input Cost");
+    expect(users).toMatchObject({ line: 2, column: "I", value: "ten" });
+    expect(cost).toMatchObject({ line: 2, column: "J", value: "₹100" });
+  });
+  it("an unknown provider does not block; the cell is NULL and the original value is on the warning", () => {
+    const r = validateStrict(HEADER, [row(2, { "Cloud Provider": "OpenAI" })]);
+    expect(r.ok).toBe(true);
+    expect(r.records[0].cloud_provider).toBeNull();
+    expect(r.warnings[0]).toMatchObject({ line: 2, column: "L", header: "Cloud Provider", value: "OpenAI" });
+  });
+  it("DD/MM text dates are stored blank with a warning", () => {
     const r = validateStrict(HEADER, [row(2, { "Start Date": "07/02/2026" })]);
-    expect(r.rowErrors[0].column).toBe("G");
-    expect(r.rowErrors[0].message).toMatch(/YYYY-MM-DD/);
+    expect(r.ok).toBe(true);
+    expect(r.records[0].start_date).toBeNull();
+    expect(r.warnings[0].column).toBe("G");
+    expect(r.warnings[0].value).toBe("07/02/2026");
   });
   it("YYYY-MM-DD text and Excel date cells are accepted as-is", () => {
     const r = validateStrict(HEADER, [row(2, { "Start Date": "2026-02-07", "End Date": { kind: "date", iso: "2026-07-02" } })]);
@@ -97,27 +150,38 @@ describe("no guessing", () => {
     expect(r.records[0].start_date).toBe("2026-02-07");
     expect(r.records[0].end_date).toBe("2026-07-02");
   });
-  it("impossible calendar dates are rejected", () => {
-    expect(validateStrict(HEADER, [row(2, { "Start Date": "2026-02-30" })]).ok).toBe(false);
+  it("impossible calendar dates are stored blank", () => {
+    const r = validateStrict(HEADER, [row(2, { "Start Date": "2026-02-30" })]);
+    expect(r.ok).toBe(true);
+    expect(r.records[0].start_date).toBeNull();
   });
-  it("end before start is an error", () => {
+  it("end before start is a note and both dates are kept", () => {
     const r = validateStrict(HEADER, [row(2, { "Start Date": "2026-03-10", "End Date": "2026-03-01" })]);
-    expect(r.rowErrors[0].message).toBe("End Date is before Start Date");
+    expect(r.ok).toBe(true);
+    expect(r.records[0].start_date).toBe("2026-03-10");
+    expect(r.records[0].end_date).toBe("2026-03-01");
+    expect(r.warnings[0].message).toMatch(/before Start Date/);
   });
-  it("month/year are not clamped", () => {
+  it("month/year are not clamped; out of range is stored blank", () => {
     const r = validateStrict(HEADER, [row(2, { Month: 0, Year: 1999 })]);
-    expect(r.rowErrors).toHaveLength(2);
+    expect(r.ok).toBe(true);
+    expect(r.records[0].month).toBeNull();
+    expect(r.records[0].year).toBeNull();
+    expect(r.warnings).toHaveLength(2);
   });
-  it("providers must match exactly; OpenAI rejected pending decision", () => {
-    expect(validateStrict(HEADER, [row(2, { "Cloud Provider": "aws" })]).ok).toBe(false);
-    expect(validateStrict(HEADER, [row(2, { "Cloud Provider": "OpenAI" })]).ok).toBe(false);
+  it("provider and line of business must match exactly; near misses are stored blank", () => {
+    const provider = validateStrict(HEADER, [row(2, { "Cloud Provider": "aws" })]);
+    expect(provider.ok).toBe(true);
+    expect(provider.records[0].cloud_provider).toBeNull();
+    const lob = validateStrict(HEADER, [row(2, { "Line of Business": "vilt" })]);
+    expect(lob.records[0].line_of_business).toBeNull();
+    expect(lob.ok).toBe(true);
   });
-  it("line of business must match exactly", () => {
-    expect(validateStrict(HEADER, [row(2, { "Line of Business": "vilt" })]).ok).toBe(false);
-  });
-  it("blank Potential ID is an error (proposed default)", () => {
+  it("blank Potential ID is NULL, not an error", () => {
     const r = validateStrict(HEADER, [row(2, { "Potential ID": "  " })]);
-    expect(r.rowErrors[0]).toMatchObject({ column: "A", header: "Potential ID" });
+    expect(r.ok).toBe(true);
+    expect(r.records[0].potential_id).toBeNull();
+    expect(r.rowErrors).toEqual([]);
   });
   it("combined Potential IDs are kept verbatim", () => {
     const r = validateStrict(HEADER, [row(2, { "Potential ID": "PF-X/87/88/89" })]);
@@ -127,17 +191,21 @@ describe("no guessing", () => {
     const r = validateStrict(HEADER, [row(2, { "Customer Name": "  ACME test CO " })]);
     expect(r.records[0].customer_name).toBe("ACME test CO");
   });
-  it("input above selling is a warning by default, an error if the rule says so", () => {
-    const over = row(2, { "Input Cost": 2000, "Selling Cost": 1500 });
-    const warn = validateStrict(HEADER, [over]);
-    expect(warn.ok).toBe(true);
-    expect(warn.warnings[0].message).toBe("Input Cost is higher than Selling Cost");
-    const strict = validateStrict(HEADER, [over], { rules: { ...PROPOSED_RULES, inputAboveSelling: "error" } });
-    expect(strict.ok).toBe(false);
-  });
-  it("short rows: missing trailing cells are blank (and therefore errors), never 0", () => {
+  it("short rows: missing trailing cells are blank, never 0", () => {
     const r = validateStrict(HEADER, [{ line: 2, cells: row(2).cells.slice(0, 9) }]);
-    expect(r.rowErrors.map((e) => e.header)).toEqual(["Input Cost", "Selling Cost", "Cloud Provider"]);
+    expect(r.ok).toBe(true);
+    expect(r.rowErrors).toEqual([]);
+    expect(r.records[0].input_cost_cents).toBeNull();
+    expect(r.records[0].selling_cost_cents).toBeNull();
+    expect(r.records[0].cloud_provider).toBeNull();
+  });
+  it("N non-blank rows in produce N records out", () => {
+    const blank = { line: 4, cells: HEADER.map(() => null) };
+    const rows = [row(2), blank, row(3, { "Lab Name": "Other" }), row(5, { "Potential ID": "PID-TEST-9" })];
+    const r = validateStrict(HEADER, rows);
+    expect(r.records).toHaveLength(3);
+    expect(r.summary.blankRowsIgnored).toBe(1);
+    expect(r.summary.rowsToImport).toBe(3);
   });
 });
 

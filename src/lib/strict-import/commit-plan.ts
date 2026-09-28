@@ -69,44 +69,37 @@ export function centsToDecimalString(cents: number): string {
 
 export interface RpcRow {
   source_line: number;
-  potential_id: string;
-  month: number;
-  year: number;
-  customer_name: string;
-  lab_name: string;
-  line_of_business: string;
-  start_date: string;
-  end_date: string;
-  total_users: number;
-  input_cost: string;
-  selling_cost: string;
-  cloud_provider: string;
+  potential_id: string | null;
+  month: number | null;
+  year: number | null;
+  customer_name: string | null;
+  lab_name: string | null;
+  line_of_business: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  total_users: number | null;
+  input_cost: string | null;
+  selling_cost: string | null;
+  cloud_provider: string | null;
 }
 
-/** One validated record -> exactly one row for the database function. Throws if a record is incomplete. */
+/** One validated record -> exactly one row. Blank and unstorable cells are JSON null, never 0. */
 export function buildRpcRows(records: StrictRecord[]): RpcRow[] {
-  return records.map((r) => {
-    const missing = (Object.keys(r) as (keyof StrictRecord)[]).filter((k) => r[k] === null);
-    if (missing.length > 0) {
-      // Only reachable if blank costs are allowed (decision D2 = "null"), which needs a schema change first.
-      throw new Error(`Line ${r.line}: cannot import, missing ${missing.join(", ")}`);
-    }
-    return {
-      source_line: r.line,
-      potential_id: r.potential_id!,
-      month: r.month!,
-      year: r.year!,
-      customer_name: r.customer_name!,
-      lab_name: r.lab_name!,
-      line_of_business: r.line_of_business!,
-      start_date: r.start_date!,
-      end_date: r.end_date!,
-      total_users: r.total_users!,
-      input_cost: centsToDecimalString(r.input_cost_cents!),
-      selling_cost: centsToDecimalString(r.selling_cost_cents!),
-      cloud_provider: r.cloud_provider!,
-    };
-  });
+  return records.map((r) => ({
+    source_line: r.line,
+    potential_id: r.potential_id,
+    month: r.month,
+    year: r.year,
+    customer_name: r.customer_name,
+    lab_name: r.lab_name,
+    line_of_business: r.line_of_business,
+    start_date: r.start_date,
+    end_date: r.end_date,
+    total_users: r.total_users,
+    input_cost: r.input_cost_cents === null ? null : centsToDecimalString(r.input_cost_cents),
+    selling_cost: r.selling_cost_cents === null ? null : centsToDecimalString(r.selling_cost_cents),
+    cloud_provider: r.cloud_provider,
+  }));
 }
 
 export interface CommitDecision {
@@ -129,8 +122,9 @@ export function commitBlockers(
   }
   if (opts.alreadyImported === null) reasons.push("Could not check whether this file was already imported (import tables not available).");
   if (opts.alreadyImported === true) reasons.push("This exact file was already imported. Re-uploads are not allowed (append-only).");
-  const needsAck = validation.warnings.length > 0 || plan.inFileVariants.length > 0 || plan.matchedWithDifferentSpelling.length > 0;
-  if (needsAck && !decision.warningsAcknowledged) reasons.push("Warnings and customer name variants must be acknowledged.");
+  // Cell warnings (blank, unstorable, selling below cost) are informational and do not block.
+  const needsAck = plan.inFileVariants.length > 0 || plan.matchedWithDifferentSpelling.length > 0;
+  if (needsAck && !decision.warningsAcknowledged) reasons.push("Customer name variants must be acknowledged.");
   const want = new Set(plan.newCustomers);
   const got = new Set(decision.approvedNewCustomers);
   const missing = [...want].filter((n) => !got.has(n));

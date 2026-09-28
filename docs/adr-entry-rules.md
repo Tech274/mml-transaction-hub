@@ -22,7 +22,7 @@ One manual transaction ("ADR entry") is checked in three places:
 | Total users | whole number > 0 | yes | `CHECK (total_users > 0)` |
 | Input cost | number ≥ 0 and ≤ 1,000,000,000 | yes | `transactions_input_cost_nonneg` (SCRUM-103 migration, not yet applied) |
 | Selling cost | number ≥ 0 and ≤ 1,000,000,000 | yes | `CHECK (selling_cost >= 0)` |
-| Margin | input cost must not exceed selling cost | yes | none |
+| Margin | selling below cost is allowed (28 Sep). The form may show a note; it does not block save | note only | none |
 | Who may save | admin, ops_lead, ops_user; `created_by` = the signed-in user | server (RLS) | RLS policy "Ops create transactions" |
 
 No rule is stricter than what the form accepted before SCRUM-66, except where the
@@ -36,9 +36,10 @@ It does not fix anything. Run it on sandbox first; on live only with approval.
 
 ## Open (not changed here)
 
-- The legacy bulk importer and the strict importer (SCRUM-103) have their own rules;
-  the strict importer rules are pending Vivek.
-- Negative margin (input cost > selling cost) is blocked in the form. Whether finance
-  ever needs it (e.g. loss-making deals) is a business question.
+- The legacy bulk importer and the strict importer (SCRUM-103) follow the 28 Sep
+  rules: blanks are NULL, unstorable cells are NULL plus a preview warning, and
+  selling below cost is allowed. Editing a transaction uses `adrEditSchema`, which
+  does not re-apply required fields or the old margin check.
+- Negative margin (input cost > selling cost) is a note, not a block.
 - Database constraints for the rules that only the app enforces (provider, system config,
   margin) could be added as `NOT VALID` constraints after the report shows the existing data.

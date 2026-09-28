@@ -4,7 +4,8 @@ import { centsToDecimalString } from "./commit-plan";
 import type { PreviewResult } from "./service";
 
 export function needsAcknowledgement(p: PreviewResult): boolean {
-  return p.warnings.length > 0 || p.customers.inFileVariants.length > 0 || p.customers.matchedWithDifferentSpelling.length > 0;
+  // Warnings (unstorable cells, selling below cost) do not block. Name variants still do.
+  return p.customers.inFileVariants.length > 0 || p.customers.matchedWithDifferentSpelling.length > 0;
 }
 
 export function pendingApprovals(p: PreviewResult, approved: ReadonlySet<string>): string[] {
@@ -37,4 +38,4 @@ export function strictTemplateFilename(): string {
   return `strict-import-template-${STRICT_TEMPLATE_VERSION}.csv`;
 }
 
-export const STRICT_TEMPLATE_BANNER = `Import rules are proposed defaults (${STRICT_TEMPLATE_STATUS}). Do not import real data until they are confirmed.`;
+export const STRICT_TEMPLATE_BANNER = `Blank cells are saved empty and can be filled in by editing (${STRICT_TEMPLATE_STATUS}). A value that cannot be stored is left blank and listed below.`;

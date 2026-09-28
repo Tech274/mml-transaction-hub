@@ -10,6 +10,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { TransactionDetailDrawer } from "./transaction-detail-drawer";
 import { fmtCurrency, fmtDate, fmtDateTime, fmtNumber, MONTH_NAMES, YEARS } from "@/lib/format";
+import { addNullable } from "@/lib/nullable-sum";
 import { exportToExcel } from "@/lib/export-xlsx";
 import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
@@ -148,10 +149,10 @@ export function TransactionsTable({
   const isFuzzy = searchTokens.length > 0;
 
   const summary = useMemo(() => ({
-    users: rows.reduce((s, r) => s + (r.total_users ?? 0), 0),
-    revenue: rows.reduce((s, r) => s + Number(r.selling_cost ?? 0), 0),
-    cost: rows.reduce((s, r) => s + Number(r.input_cost ?? 0), 0),
-    profit: rows.reduce((s, r) => s + Number(r.selling_cost ?? 0) - Number(r.input_cost ?? 0), 0),
+    users: rows.reduce((s, r) => addNullable(s, r.total_users), 0),
+    revenue: rows.reduce((s, r) => addNullable(s, r.selling_cost), 0),
+    cost: rows.reduce((s, r) => addNullable(s, r.input_cost), 0),
+    profit: rows.reduce((s, r) => s + addNullable(0, r.selling_cost) - addNullable(0, r.input_cost), 0),
   }), [rows]);
 
   function exportCurrent() {
@@ -160,7 +161,7 @@ export function TransactionsTable({
       repoFilter === "public_cloud" ? "public-cloud" : repoFilter === "private_cloud" ? "private-cloud" : "all-transactions",
       exportRows.map((r) => ({
         "Potential ID": r.potential_id,
-        "Month": MONTH_NAMES[r.month - 1],
+        "Month": r.month ? MONTH_NAMES[r.month - 1] : "",
         "Year": r.year,
         "Customer": r.customer_name,
         "Lab Name": r.lab_name,
@@ -171,12 +172,12 @@ export function TransactionsTable({
         "Start Date": r.start_date,
         "End Date": r.end_date,
         "Total Users": r.total_users,
-        "Input Cost": Number(r.input_cost ?? 0),
-        "Selling Cost": Number(r.selling_cost),
-        "Profit": Number(r.selling_cost ?? 0) - Number(r.input_cost ?? 0),
-        "Margin %": Number(r.selling_cost) > 0
-          ? Number((((Number(r.selling_cost) - Number(r.input_cost ?? 0)) / Number(r.selling_cost)) * 100).toFixed(2))
-          : 0,
+        "Input Cost": r.input_cost,
+        "Selling Cost": r.selling_cost,
+        "Profit": r.selling_cost == null && r.input_cost == null ? null : addNullable(0, r.selling_cost) - addNullable(0, r.input_cost),
+        "Margin %": r.selling_cost != null && Number(r.selling_cost) > 0
+          ? Number((((Number(r.selling_cost) - addNullable(0, r.input_cost)) / Number(r.selling_cost)) * 100).toFixed(2))
+          : null,
         ...(isFuzzy ? { "Relevance Score": Number((scoreMap?.get(r.id) ?? 0).toFixed(4)) } : {}),
         "Created At": r.created_at,
         "Updated At": r.updated_at,
@@ -306,7 +307,7 @@ export function TransactionsTable({
               {rows.map((r) => (
                 <TableRow key={r.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setOpenId(r.id)}>
                   <TableCell className="font-medium">{highlight(r.potential_id, searchTokens)}</TableCell>
-                  <TableCell>{MONTH_NAMES[r.month - 1]} {r.year}</TableCell>
+                  <TableCell>{r.month ? `${MONTH_NAMES[r.month - 1]} ${r.year ?? ""}` : "—"}</TableCell>
                   <TableCell>{highlight(r.customer_name, searchTokens)}</TableCell>
                   <TableCell className="max-w-[240px] truncate">{highlight(r.lab_name, searchTokens)}</TableCell>
                   {showProviderFilter && (
@@ -316,10 +317,12 @@ export function TransactionsTable({
                   <TableCell>{fmtDate(r.start_date)}</TableCell>
                   <TableCell>{fmtDate(r.end_date)}</TableCell>
                   <TableCell className="text-right">{fmtNumber(r.total_users)}</TableCell>
-                  <TableCell className="text-right">{fmtCurrency(r.input_cost ?? 0)}</TableCell>
+                  <TableCell className="text-right">{fmtCurrency(r.input_cost)}</TableCell>
                   <TableCell className="text-right">{fmtCurrency(r.selling_cost)}</TableCell>
-                  <TableCell className={`text-right ${Number(r.selling_cost) - Number(r.input_cost ?? 0) < 0 ? "text-destructive" : ""}`}>
-                    {fmtCurrency(Number(r.selling_cost) - Number(r.input_cost ?? 0))}
+                  <TableCell className={`text-right ${addNullable(0, r.selling_cost) - addNullable(0, r.input_cost) < 0 ? "text-destructive" : ""}`}>
+                    {r.selling_cost == null && r.input_cost == null
+                      ? "—"
+                      : fmtCurrency(addNullable(0, r.selling_cost) - addNullable(0, r.input_cost))}
                   </TableCell>
                   {isFuzzy && (
                     <TableCell className="text-right tabular-nums text-xs text-muted-foreground">

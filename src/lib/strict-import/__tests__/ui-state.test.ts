@@ -25,11 +25,14 @@ describe("strict import screen state", () => {
     expect(canCommit(preview(), new Set(), false)).toBe(false);
     expect(canCommit(preview(), new Set(["Beta Test Ltd"]), false)).toBe(true);
   });
-  it("needs acknowledgement when there are warnings or name variants", () => {
-    const p = preview({ warnings: [{ line: 2, column: "J", header: "Input Cost", value: "2.00", message: "Input Cost is higher than Selling Cost" }] });
-    expect(needsAcknowledgement(p)).toBe(true);
-    expect(canCommit(p, new Set(["Beta Test Ltd"]), false)).toBe(false);
-    expect(canCommit(p, new Set(["Beta Test Ltd"]), true)).toBe(true);
+  it("notes about cost do not block; customer name variants still need acknowledgement", () => {
+    const notes = preview({ warnings: [{ line: 2, column: "J", header: "Input Cost", value: "2.00", message: "Input Cost is higher than Selling Cost" }] });
+    expect(needsAcknowledgement(notes)).toBe(false);
+    expect(canCommit(notes, new Set(["Beta Test Ltd"]), false)).toBe(true);
+    const variants = preview({ customers: { newCustomers: ["Beta Test Ltd"], matchedWithDifferentSpelling: [{ fileName: "beta", existingName: "Beta Test Ltd", lines: [2] }], inFileVariants: [] } });
+    expect(needsAcknowledgement(variants)).toBe(true);
+    expect(canCommit(variants, new Set(["Beta Test Ltd"]), false)).toBe(false);
+    expect(canCommit(variants, new Set(["Beta Test Ltd"]), true)).toBe(true);
   });
   it("any server blocker disables commit", () => {
     expect(canCommit(preview({ blockers: ["x"] }), new Set(["Beta Test Ltd"]), true)).toBe(false);

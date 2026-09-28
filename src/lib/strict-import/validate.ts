@@ -2,9 +2,11 @@
 // (preview) and on the server (commit re-validation).
 //
 // Guarantees:
-//  - one input row -> exactly one record (no matching, no merging, no dropping);
+//  - one non-blank input row -> exactly one record (no matching, no merging, no deduping);
+//  - fully blank rows are skipped and counted;
 //  - no suggestions, no auto-correction, no defaults (blank never becomes 0);
-//  - every problem is reported as line + column letter + header + value + message.
+//  - a value that cannot be stored becomes NULL and a warning (line, column, original value);
+//  - nothing about a blank or unstorable cell blocks the import.
 import { isBlankCell, isExcelDate, isIsoDate, type RawCell, type RawRow } from "./cells";
 import { PROPOSED_RULES, columnLetter, normalizeHeader, type StrictColumn, type StrictField, type StrictRules } from "./template";
 
@@ -89,9 +91,7 @@ export function matchHeaders(header: string[], rules: StrictRules = PROPOSED_RUL
     }
   });
 
-  for (const col of rules.columns) {
-    if (!map.has(col.field)) errors.push({ column: null, header: col.header, message: `Missing column "${col.header}"` });
-  }
+  // A missing column is a blank field on every row, not a reason to reject the file.
   return { map, errors };
 }
 
@@ -141,25 +141,21 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
       line_of_business: null, start_date: null, end_date: null, total_users: null,
       input_cost_cents: null, selling_cost_cents: null, cloud_provider: null,
     };
-    const err = (col: StrictColumn, idx: number | undefined, value: RawCell, message: string) =>
-      rowErrors.push({ line: row.line, column: idx === undefined ? null : columnLetter(idx), header: col.header, value: display(value), message });
+    const warn = (col: StrictColumn, idx: number | undefined, value: RawCell, message: string) =>
+      warnings.push({ line: row.line, column: idx === undefined ? null : columnLetter(idx), header: col.header, value: display(value), message });
 
     for (const col of rules.columns) {
       const idx = map.get(col.field);
-      if (idx === undefined) continue; // reported as a header error
+      if (idx === undefined) continue; // column absent: the field stays NULL
       const value: RawCell = idx < row.cells.length ? row.cells[idx] : null;
 
-      if (isBlankCell(value)) {
-        const isCost = col.field === "input_cost" || col.field === "selling_cost";
-        if (isCost && rules.blankCost === "null") continue;
-        if (col.required) err(col, idx, value, "Required value is blank");
-        continue;
-      }
+      // Blank stays NULL. Never 0, never a default, never an error.
+      if (isBlankCell(value)) continue;
 
       switch (col.type) {
         case "text": {
           if (typeof value === "boolean" || isExcelDate(value)) {
-            err(col, idx, value, "Expected text");
+            warn(col, idx, value, "Expected text; stored blank");
             break;
           }
           const s = String(value).trim();
@@ -169,11 +165,11 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
         case "int": {
           const n = parseStrictNumber(value);
           if (n === null || !Number.isInteger(n)) {
-            err(col, idx, value, "Expected a whole number");
+            warn(col, idx, value, "Expected a whole number; stored blank");
             break;
           }
           if ((col.min !== undefined && n < col.min) || (col.max !== undefined && n > col.max)) {
-            err(col, idx, value, `Must be between ${col.min ?? "-∞"} and ${col.max ?? "∞"}`);
+            warn(col, idx, value, `Outside ${col.min ?? "-∞"}–${col.max ?? "∞"}; stored blank`);
             break;
           }
           (rec as unknown as Record<string, unknown>)[col.field] = n;
@@ -182,16 +178,16 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
         case "decimal": {
           const n = parseStrictNumber(value);
           if (n === null) {
-            err(col, idx, value, "Expected a number (digits, optional thousands commas, optional decimals)");
+            warn(col, idx, value, "Expected a number; stored blank");
             break;
           }
           if (col.min !== undefined && n < col.min) {
-            err(col, idx, value, `Must be ≥ ${col.min}`);
+            warn(col, idx, value, `Must be ≥ ${col.min}; stored blank`);
             break;
           }
           const cents = toCents(n);
           if (cents === null) {
-            err(col, idx, value, "More than 2 decimal places");
+            warn(col, idx, value, "More than 2 decimal places; stored blank");
             break;
           }
           if (col.field === "input_cost") rec.input_cost_cents = cents;
@@ -203,7 +199,7 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
           if (isExcelDate(value)) iso = value.iso;
           else if (typeof value === "string" && isIsoDate(value.trim())) iso = value.trim();
           if (!iso) {
-            err(col, idx, value, "Use a real Excel date cell or YYYY-MM-DD text (e.g. 07/02/2026 is ambiguous and not accepted)");
+            warn(col, idx, value, "Not a real date (use an Excel date or YYYY-MM-DD); stored blank");
             break;
           }
           (rec as unknown as Record<string, unknown>)[col.field] = iso;
@@ -213,7 +209,7 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
           const s = typeof value === "string" ? value.trim() : display(value);
           const allowed = col.field === "cloud_provider" ? rules.allowedProviders : (col.allowed ?? []);
           if (!allowed.includes(s)) {
-            err(col, idx, value, `Must be exactly one of: ${allowed.join(", ")}`);
+            warn(col, idx, value, `Not one of: ${allowed.join(", ")}; stored blank`);
             break;
           }
           (rec as unknown as Record<string, unknown>)[col.field] = s;
@@ -222,22 +218,26 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
       }
     }
 
-    // Row-level rules
+    // Row-level notes. Neither one blocks the row or clears the stored values.
     if (rec.start_date && rec.end_date && rec.end_date < rec.start_date) {
       const c = colFor("end_date");
-      err(c, map.get("end_date"), rec.end_date, "End Date is before Start Date");
+      warnings.push({
+        line: row.line,
+        column: map.has("end_date") ? columnLetter(map.get("end_date")!) : null,
+        header: c.header,
+        value: rec.end_date,
+        message: "End Date is before Start Date. Both dates are kept.",
+      });
     }
     if (rec.input_cost_cents !== null && rec.selling_cost_cents !== null && rec.input_cost_cents > rec.selling_cost_cents) {
       const c = colFor("input_cost");
-      const issue: RowIssue = {
+      warnings.push({
         line: row.line,
         column: map.has("input_cost") ? columnLetter(map.get("input_cost")!) : null,
         header: c.header,
         value: (rec.input_cost_cents / 100).toFixed(2),
-        message: "Input Cost is higher than Selling Cost",
-      };
-      if (rules.inputAboveSelling === "error") rowErrors.push(issue);
-      else warnings.push(issue);
+        message: "Input Cost is higher than Selling Cost. This is allowed and will be saved.",
+      });
     }
     records.push(rec);
   }

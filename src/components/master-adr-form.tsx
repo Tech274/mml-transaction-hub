@@ -10,13 +10,18 @@ import { CustomerCombobox, type CustomerOption } from "./customer-combobox";
 import { useConfig } from "@/hooks/use-config";
 import { useServerFn } from "@tanstack/react-start";
 import { checkPotentialIdUnique, createAdrTransaction } from "@/lib/transactions.functions";
-import { adrEntrySchema, SYSTEM_CONFIG_OPTIONS, type AdrEntry } from "@/lib/adr-entry";
+import { adrEntrySchema, marginNote, SYSTEM_CONFIG_OPTIONS, type AdrEntry } from "@/lib/adr-entry";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { MONTH_NAMES, YEARS } from "@/lib/format";
 
 // SCRUM-66: rules live in src/lib/adr-entry.ts and are re-checked on the server.
 const schema = adrEntrySchema;
+function moneyOrNull(v: unknown): number | null {
+  if (v === "" || v == null) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 type FormValues = AdrEntry;
 
 export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
@@ -193,6 +198,10 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
           <Field label="Selling Cost *" error={form.formState.errors.selling_cost?.message}>
             <Input type="number" min={0} step="0.01" {...form.register("selling_cost")} />
           </Field>
+          {(() => {
+            const note = marginNote(moneyOrNull(form.watch("input_cost")), moneyOrNull(form.watch("selling_cost")));
+            return note ? <p className="md:col-span-2 text-xs text-muted-foreground" data-testid="single-entry-margin-note">{note}</p> : null;
+          })()}
           <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-border">
             <Button type="button" variant="outline" onClick={() => form.reset()}>Reset</Button>
             <Button type="submit" disabled={submitting}>{submitting ? "Saving…" : "Save Transaction"}</Button>

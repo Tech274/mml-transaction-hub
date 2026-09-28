@@ -57,8 +57,13 @@ describe("buildRpcRows", () => {
     expect(rows.map((r) => r.source_line)).toEqual([2, 3, 7]);
     expect(rows[0]).toMatchObject({ potential_id: "PID-TEST-1", input_cost: "1000.00", selling_cost: "1500.50" });
   });
-  it("refuses a record with a blank value (never defaults to 0)", () => {
-    expect(() => buildRpcRows([{ ...rec(9, "A"), input_cost_cents: null }])).toThrow(/Line 9: cannot import, missing input_cost_cents/);
+  it("a blank cost is JSON null, never 0", () => {
+    const rows = buildRpcRows([{ ...rec(9, "A"), input_cost_cents: null, selling_cost_cents: null, potential_id: null }]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].input_cost).toBeNull();
+    expect(rows[0].selling_cost).toBeNull();
+    expect(rows[0].potential_id).toBeNull();
+    expect(JSON.stringify(rows[0])).not.toContain('"input_cost":"0');
   });
 });
 
@@ -78,19 +83,21 @@ describe("commitBlockers", () => {
     const r = commitBlockers(okValidation, plan, { ...approveAll, approvedNewCustomers: [...plan.newCustomers, "Zeta"] }, { alreadyImported: false });
     expect(r.join(" ")).toMatch(/not new in this file/);
   });
-  it("blocks files with errors", () => {
-    const bad = validateStrict(HEADER, [row(2, { Month: 13 })]);
+  it("blocks a file with an unknown column, and does not block an unstorable cell", () => {
+    const bad = validateStrict([...HEADER, "Notes"], [row(2)]);
     expect(commitBlockers(bad, planCustomers(bad.records, []), { warningsAcknowledged: true, approvedNewCustomers: ["Acme Test Co"] }, { alreadyImported: false })[0]).toMatch(/1 error/);
+    const soft = validateStrict(HEADER, [row(2, { Month: "nope", "Cloud Provider": "OpenAI" })]);
+    expect(commitBlockers(soft, planCustomers(soft.records, []), { warningsAcknowledged: false, approvedNewCustomers: ["Acme Test Co"] }, { alreadyImported: false })).toEqual([]);
   });
   it("blocks re-uploads and unknown import state", () => {
     expect(commitBlockers(okValidation, plan, approveAll, { alreadyImported: true }).join(" ")).toMatch(/already imported/);
     expect(commitBlockers(okValidation, plan, approveAll, { alreadyImported: null }).join(" ")).toMatch(/Could not check/);
   });
-  it("warnings must be acknowledged", () => {
+  it("selling below cost does not block, even without acknowledgement", () => {
     const warn = validateStrict(HEADER, [row(2, { "Input Cost": 2000, "Selling Cost": 1000 })]);
     const p = planCustomers(warn.records, []);
-    expect(commitBlockers(warn, p, { warningsAcknowledged: false, approvedNewCustomers: p.newCustomers }, { alreadyImported: false }).join(" ")).toMatch(/acknowledged/);
-    expect(commitBlockers(warn, p, { warningsAcknowledged: true, approvedNewCustomers: p.newCustomers }, { alreadyImported: false })).toEqual([]);
+    expect(warn.warnings.length).toBeGreaterThan(0);
+    expect(commitBlockers(warn, p, { warningsAcknowledged: false, approvedNewCustomers: p.newCustomers }, { alreadyImported: false })).toEqual([]);
   });
   it("blocks files over the batch limit", () => {
     const big = { ...okValidation, summary: { ...okValidation.summary, rowsToImport: MAX_ROWS_PER_BATCH + 1 } };

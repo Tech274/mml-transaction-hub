@@ -68,10 +68,111 @@ export const adrEntrySchema = z
     if (!(LINES_OF_BUSINESS as readonly string[]).includes(v.line_of_business)) {
       ctx.addIssue({ code: "custom", path: ["line_of_business"], message: "Choose VILT, Standalone or Integrated" });
     }
-    if (v.input_cost > v.selling_cost) {
-      ctx.addIssue({ code: "custom", path: ["input_cost"], message: "Input cost should not exceed selling cost (negative margin)" });
-    }
+    // SCRUM-103 (28 Sep): selling below cost is legitimate. Do not block the save.
   });
+
+const blankToNull = (v: unknown) => {
+  if (v === undefined || v === null) return null;
+  if (typeof v === "string" && v.trim() === "") return null;
+  return v;
+};
+
+const optionalText = (max: number) =>
+  z.preprocess(blankToNull, z.union([z.null(), z.string().trim().max(max)]));
+
+const optionalInt = (min: number, max: number, label: string) =>
+  z.preprocess(
+    blankToNull,
+    z.union([
+      z.null(),
+      z.coerce.number().int(`${label} must be a whole number`).min(min, `${label} is out of range`).max(max, `${label} is out of range`),
+    ]),
+  );
+
+const optionalMoney = (label: string) =>
+  z.preprocess(
+    blankToNull,
+    z.union([
+      z.null(),
+      z.coerce
+        .number({ invalid_type_error: `${label} must be a number` })
+        .finite("Enter a valid number")
+        .nonnegative(`${label} cannot be negative`)
+        .max(MAX_AMOUNT, `${label} is unrealistically high`),
+    ]),
+  );
+
+const optionalDate = z.preprocess(
+  blankToNull,
+  z.union([
+    z.null(),
+    z.string().refine((s) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+      const d = new Date(`${s}T00:00:00Z`);
+      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+    }, "Enter a valid date"),
+  ]),
+);
+
+/**
+ * SCRUM-103: editing an imported row. Every business field may stay blank.
+ * Does not re-apply the old required-field or input<=selling rules.
+ * lab_type stays required because the row is already public or private cloud.
+ */
+export const adrEditSchema = z.object({
+  potential_id: optionalText(200),
+  month: optionalInt(1, 12, "Month"),
+  year: optionalInt(2000, 2100, "Year"),
+  customer_id: z.preprocess(blankToNull, z.union([z.null(), z.string().uuid()])),
+  customer_name: optionalText(200),
+  lab_name: optionalText(200),
+  lab_type: z.enum(["public_cloud", "private_cloud"], { errorMap: () => ({ message: "Choose Public or Private Cloud" }) }),
+  cloud_provider: optionalText(200),
+  system_config: optionalText(200),
+  line_of_business: z.preprocess(
+    blankToNull,
+    z.union([
+      z.null(),
+      z.string().refine((s) => (LINES_OF_BUSINESS as readonly string[]).includes(s), "Choose VILT, Standalone or Integrated"),
+    ]),
+  ),
+  start_date: optionalDate,
+  end_date: optionalDate,
+  total_users: optionalInt(1, 1_000_000_000, "Total users"),
+  input_cost: optionalMoney("Input cost"),
+  selling_cost: optionalMoney("Selling cost"),
+});
+
+export type AdrEdit = z.infer<typeof adrEditSchema>;
+
+/** Non-blocking note when selling is below cost. Never a validation error. */
+export function marginNote(input: number | null | undefined, selling: number | null | undefined): string | null {
+  if (input == null || selling == null) return null;
+  if (input > selling) return "Input cost is higher than selling cost. This is allowed and will be saved.";
+  return null;
+}
+
+/** Update payload. Blank fields are NULL, never 0. */
+export function toTransactionUpdate(v: AdrEdit) {
+  return {
+    potential_id: v.potential_id,
+    month: v.month,
+    year: v.year,
+    customer_id: null as string | null,
+    customer_name: v.customer_name,
+    lab_name: v.lab_name,
+    lab_type: v.lab_type,
+    repository_type: v.lab_type,
+    cloud_provider: v.cloud_provider,
+    system_config: v.lab_type === "private_cloud" ? v.system_config : null,
+    line_of_business: v.line_of_business,
+    start_date: v.start_date,
+    end_date: v.end_date,
+    total_users: v.total_users,
+    input_cost: v.input_cost,
+    selling_cost: v.selling_cost,
+  };
+}
 
 export type AdrEntry = z.infer<typeof adrEntrySchema>;
 
