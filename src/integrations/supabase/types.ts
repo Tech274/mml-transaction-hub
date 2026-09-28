@@ -683,6 +683,7 @@ export type Database = {
           requester_name: string | null
           satisfaction_rating: string | null
           source: string | null
+          stale_since: string | null
           status: string | null
           status_id: number | null
           subject: string | null
@@ -707,6 +708,7 @@ export type Database = {
           requester_name?: string | null
           satisfaction_rating?: string | null
           source?: string | null
+          stale_since?: string | null
           status?: string | null
           status_id?: number | null
           subject?: string | null
@@ -731,6 +733,7 @@ export type Database = {
           requester_name?: string | null
           satisfaction_rating?: string | null
           source?: string | null
+          stale_since?: string | null
           status?: string | null
           status_id?: number | null
           subject?: string | null
@@ -1192,130 +1195,132 @@ export type Database = {
       }
       transactions: {
         Row: {
-          cloud_provider: string
+          cloud_provider: string | null
           created_at: string
           created_by: string | null
-          customer_id: string
-          customer_name: string
-          end_date: string
+          customer_id: string | null
+          customer_name: string | null
+          end_date: string | null
           id: string
           import_batch_id: string | null
           input_cost: number | null
+          addon_revenue_total: number | null
+          api_key_price_per_user: number | null
+          api_key_service: string | null
+          api_unit_label: string | null
+          api_units_consumed: number | null
+          input_cost_actual_alloc: number | null
           input_cost_auto: number | null
           input_cost_auto_run_id: string | null
-          input_cost_actual_alloc: number | null
-          input_cost_per_user: number | null
           input_cost_pct: number | null
-          is_complete: boolean
+          input_cost_per_user: number | null
+          is_complete: boolean | null
           lab_batch_id: string | null
           license_name: string | null
           license_price_per_user: number | null
           license_seats_used: number | null
           selling_price_per_user: number | null
-          vm_price_per_user: number | null
           vm_hours_consumed: number | null
-          api_key_service: string | null
-          api_key_price_per_user: number | null
-          api_units_consumed: number | null
-          api_unit_label: string | null
-          addon_revenue_total: number | null
+          vm_price_per_user: number | null
           is_deleted: boolean
-          lab_name: string
+          lab_name: string | null
           lab_type: string
-          line_of_business: string
-          month: number
-          potential_id: string
+          line_of_business: string | null
+          month: number | null
+          potential_id: string | null
           repository_type: string
-          selling_cost: number
+          selling_cost: number | null
           source_line: number | null
-          start_date: string
+          start_date: string | null
           system_config: string | null
-          total_users: number
+          total_users: number | null
           updated_at: string
           updated_by: string | null
-          year: number
+          year: number | null
         }
         Insert: {
-          cloud_provider: string
+          cloud_provider?: string | null
           created_at?: string
           created_by?: string | null
-          customer_id: string
-          customer_name: string
-          end_date: string
+          customer_id?: string | null
+          customer_name?: string | null
+          end_date?: string | null
           id?: string
           import_batch_id?: string | null
           input_cost?: number | null
+          api_key_price_per_user?: number | null
+          api_key_service?: string | null
+          api_unit_label?: string | null
+          api_units_consumed?: number | null
           input_cost_auto?: number | null
-          input_cost_per_user?: number | null
           input_cost_pct?: number | null
+          input_cost_per_user?: number | null
+          is_complete?: boolean | null
           is_deleted?: boolean
           lab_batch_id?: string | null
-          lab_name: string
+          lab_name?: string | null
           license_name?: string | null
           license_price_per_user?: number | null
           license_seats_used?: number | null
           selling_price_per_user?: number | null
-          vm_price_per_user?: number | null
           vm_hours_consumed?: number | null
-          api_key_service?: string | null
-          api_key_price_per_user?: number | null
-          api_units_consumed?: number | null
-          api_unit_label?: string | null
+          vm_price_per_user?: number | null
           lab_type: string
-          line_of_business: string
-          month: number
-          potential_id: string
+          line_of_business?: string | null
+          month?: number | null
+          potential_id?: string | null
           repository_type: string
-          selling_cost: number
+          selling_cost?: number | null
           source_line?: number | null
-          start_date: string
+          start_date?: string | null
           system_config?: string | null
-          total_users: number
+          total_users?: number | null
           updated_at?: string
           updated_by?: string | null
-          year: number
+          year?: number | null
         }
         Update: {
-          cloud_provider?: string
+          cloud_provider?: string | null
           created_at?: string
           created_by?: string | null
-          customer_id?: string
-          customer_name?: string
-          end_date?: string
+          customer_id?: string | null
+          customer_name?: string | null
+          end_date?: string | null
           id?: string
           import_batch_id?: string | null
           input_cost?: number | null
+          api_key_price_per_user?: number | null
+          api_key_service?: string | null
+          api_unit_label?: string | null
+          api_units_consumed?: number | null
+          input_cost_actual_alloc?: number | null
           input_cost_auto?: number | null
           input_cost_auto_run_id?: string | null
-          input_cost_actual_alloc?: number | null
-          input_cost_per_user?: number | null
           input_cost_pct?: number | null
+          input_cost_per_user?: number | null
+          is_complete?: boolean | null
           is_deleted?: boolean
           lab_batch_id?: string | null
-          lab_name?: string
+          lab_name?: string | null
           license_name?: string | null
           license_price_per_user?: number | null
           license_seats_used?: number | null
           selling_price_per_user?: number | null
-          vm_price_per_user?: number | null
           vm_hours_consumed?: number | null
-          api_key_service?: string | null
-          api_key_price_per_user?: number | null
-          api_units_consumed?: number | null
-          api_unit_label?: string | null
+          vm_price_per_user?: number | null
           lab_type?: string
-          line_of_business?: string
-          month?: number
-          potential_id?: string
+          line_of_business?: string | null
+          month?: number | null
+          potential_id?: string | null
           repository_type?: string
-          selling_cost?: number
+          selling_cost?: number | null
           source_line?: number | null
-          start_date?: string
+          start_date?: string | null
           system_config?: string | null
-          total_users?: number
+          total_users?: number | null
           updated_at?: string
           updated_by?: string | null
-          year?: number
+          year?: number | null
         }
         Relationships: [
           {
@@ -1430,7 +1435,7 @@ export type Database = {
         Relationships: []
       }
       lab_batch_cost_runs: {
-        Row: { id: string; lab_batch_id: string; trigger: string; inputs_hash: string; status: string; known_count: number | null; missing_count: number | null; avg_used: number | null; method: string; estimated_total: number | null; actual_total: number | null; details: Json | null; error: string | null; created_at: string }
+        Row: { id: string; lab_batch_id: string; trigger: string; inputs_hash: string; status: string; known_count: number | null; missing_count: number | null; avg_used: number | null; method: string; estimated_total: number | null; actual_total: number | null; details: Json | null; error: string | null; created_by: string | null; created_at: string }
         Insert: { lab_batch_id: string; trigger: string; inputs_hash: string; status: string }
         Update: { status?: string }
         Relationships: []
@@ -1467,6 +1472,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      clean_customer_name: { Args: { p_name: string }; Returns: string }
       clear_bulk_import_artifact_paths: {
         Args: { _run_ids: string[] }
         Returns: number
@@ -1511,6 +1517,7 @@ export type Database = {
         }
         Returns: Json
       }
+      normalize_customer_name: { Args: { p_name: string }; Returns: string }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
       verify_cron_secret: { Args: { _token: string }; Returns: boolean }

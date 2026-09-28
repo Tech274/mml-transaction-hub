@@ -97,6 +97,7 @@ function CustomersPage() {
       );
       const map = new Map<string, { count: number; users: number; revenue: number; cost: number }>();
       for (const t of tx ?? []) {
+        if (!t.customer_id) continue;
         const e = map.get(t.customer_id) ?? { count: 0, users: 0, revenue: 0, cost: 0 };
         e.count += 1;
         e.users = addNullable(e.users, t.total_users);

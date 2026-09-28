@@ -129,16 +129,17 @@ function DashboardPage() {
   }));
 
   const lobMap = new Map<string, number>();
-  for (const r of rows) lobMap.set(r.line_of_business, (lobMap.get(r.line_of_business) ?? 0) + 1);
+  for (const r of rows) { const k = r.line_of_business ?? "Unknown"; lobMap.set(k, (lobMap.get(k) ?? 0) + 1); }
   const lobSplit = Array.from(lobMap.entries()).map(([name, value]) => ({ name, value }));
 
   const custRev = new Map<string, { revenue: number; cost: number; users: number }>();
   for (const r of rows) {
-    const e = custRev.get(r.customer_name) ?? { revenue: 0, cost: 0, users: 0 };
+    const ck = r.customer_name ?? "Unknown";
+    const e = custRev.get(ck) ?? { revenue: 0, cost: 0, users: 0 };
     e.revenue = addNullable(e.revenue, r.selling_cost);
     e.cost = addNullable(e.cost, reportLineCost(r));
     e.users = addNullable(e.users, r.total_users);
-    custRev.set(r.customer_name, e);
+    custRev.set(ck, e);
   }
   const topRev = Array.from(custRev.entries())
     .sort((a, b) => b[1].revenue - a[1].revenue)
