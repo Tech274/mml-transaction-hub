@@ -1,7 +1,7 @@
 -- SCRUM-103: lenient import — blanks allowed, no strict rules.
--- approval-required: SCRUM-103. NOT APPROVED. Do not move into supabase/migrations/ until approved.
--- Status: REPO ONLY, NOT APPLIED. Waiting in supabase/migrations-pending/.
--- Do not move into supabase/migrations/ until Atlas + Vivek approve a live apply.
+-- approved-destructive: SCRUM-103 Vivek C (owner), GO 28 Sep 2026 06:35 IST; Atlas engineering go-ahead 28 Sep 2026 after re-review of PR #39 (d9d84f0).
+-- Status: APPLIED TO LIVE 28 Sep 2026 by Atlas for Vivek, right after 20260925130000_scrum103_import_batches.
+-- Moved from supabase/migrations-pending/ per its README; recorded as version 20260928031000.
 --
 -- Apply order (live):
 --   1. 20260925130000_scrum103_import_batches.sql (held; creates import_batches and
