@@ -54,4 +54,10 @@ describe("3B: legacy bulk import is insert-only", () => {
     expect(code).toMatch(/from\("transactions"\)\.insert\(fullPayload as never\)/);
     expect(code).toMatch(/Every non-blank row is a new transaction/);
   });
+  it("has no duplicate-strategy picker and no preset UI", () => {
+    expect(code).not.toMatch(/bulk_import_presets/);
+    expect(code).not.toMatch(/Save preset/);
+    expect(code).not.toMatch(/setDupStrategy/);
+    expect(code).not.toMatch(/duplicate choices/);
+  });
 });

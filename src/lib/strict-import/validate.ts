@@ -58,14 +58,15 @@ export interface StrictValidationResult {
   warnings: RowIssue[];
   records: StrictRecord[];
   summary: StrictSummary;
-  /** True only when there are no header errors and no row errors. Warnings still need acknowledgement. */
+  /** True when nothing blocks the commit. Header notes are warnings and do not affect this. */
   ok: boolean;
 }
 
 type ColumnMap = Map<StrictField, number>;
 
-export function matchHeaders(header: string[], rules: StrictRules = PROPOSED_RULES): { map: ColumnMap; errors: HeaderError[] } {
-  const errors: HeaderError[] = [];
+/** Header notes. None of these block the import. Blank header cells are ignored with no note. */
+export function matchHeaders(header: string[], rules: StrictRules = PROPOSED_RULES): { map: ColumnMap; warnings: RowIssue[] } {
+  const warnings: RowIssue[] = [];
   const map: ColumnMap = new Map();
   const byNorm = new Map<string, StrictColumn>();
   for (const col of rules.columns) byNorm.set(normalizeHeader(col.header), col);
@@ -75,24 +76,43 @@ export function matchHeaders(header: string[], rules: StrictRules = PROPOSED_RUL
   header.forEach((raw, idx) => {
     const norm = normalizeHeader(raw ?? "");
     const letter = columnLetter(idx);
-    if (norm === "") {
-      errors.push({ column: letter, header: raw ?? "", message: `Column ${letter} has no header` });
-      return;
-    }
+    if (norm === "") return;
     if (seen.has(norm)) {
-      errors.push({ column: letter, header: raw, message: `Duplicate header "${raw.trim()}" (also in column ${columnLetter(seen.get(norm)!)})` });
+      warnings.push({
+        line: 1,
+        column: letter,
+        header: raw,
+        value: raw.trim(),
+        message: `Duplicate header "${raw.trim()}" (also in column ${columnLetter(seen.get(norm)!)}). The first occurrence is used.`,
+      });
       return;
     }
     seen.set(norm, idx);
     const col = byNorm.get(norm);
     if (col) map.set(col.field, idx);
     else if (!ignored.has(norm)) {
-      errors.push({ column: letter, header: raw, message: `Unknown column "${raw.trim()}". It is not in the template.` });
+      warnings.push({
+        line: 1,
+        column: letter,
+        header: raw,
+        value: raw.trim(),
+        message: `Unknown column "${raw.trim()}" is ignored.`,
+      });
     }
   });
 
-  // A missing column is a blank field on every row, not a reason to reject the file.
-  return { map, errors };
+  for (const col of rules.columns) {
+    if (!map.has(col.field)) {
+      warnings.push({
+        line: 1,
+        column: null,
+        header: col.header,
+        value: "",
+        message: `Column "${col.header}" is missing. Those cells are stored blank.`,
+      });
+    }
+  }
+  return { map, warnings };
 }
 
 function display(v: RawCell): string {
@@ -122,9 +142,10 @@ export function toCents(n: number): number | null {
 
 export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?: StrictRules; blankRowsIgnored?: number }): StrictValidationResult {
   const rules = opts?.rules ?? PROPOSED_RULES;
-  const { map, errors: headerErrors } = matchHeaders(header, rules);
+  const { map, warnings: headerWarnings } = matchHeaders(header, rules);
   const rowErrors: RowIssue[] = [];
-  const warnings: RowIssue[] = [];
+  const warnings: RowIssue[] = [...headerWarnings];
+  const headerErrors: HeaderError[] = [];
   const records: StrictRecord[] = [];
   let blankRows = opts?.blankRowsIgnored ?? 0;
 
@@ -266,12 +287,12 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
       rowsInFile: records.length + blankRows,
       blankRowsIgnored: blankRows,
       rowsToImport: records.length,
-      errorCount: headerErrors.length + rowErrors.length,
+      errorCount: rowErrors.length,
       warningCount: warnings.length,
       totalSellingCents,
       totalInputCents,
       distinctCustomers: customers.size,
     },
-    ok: headerErrors.length === 0 && rowErrors.length === 0,
+    ok: rowErrors.length === 0,
   };
 }

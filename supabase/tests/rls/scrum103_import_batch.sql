@@ -1,6 +1,6 @@
 -- SCRUM-103 checks for import_transactions_batch(). SANDBOX ONLY, never live.
 -- Run after BOTH 20260925130000_scrum103_import_batches.sql AND
--- 20260928031000_scrum103_lenient_import.sql (both applied to live 28 Sep 2026).
+-- supabase/migrations-pending/scrum103_lenient_import.sql (moved into migrations first).
 -- Everything is inside a transaction that is rolled back. Synthetic values only.
 BEGIN;
 
@@ -171,6 +171,53 @@ BEGIN
     RAISE EXCEPTION 'FAIL: complete private row appeared in the incomplete filter';
   END IF;
   RAISE NOTICE 'PASS: is_complete matches public/private, zero, blank text, and sort';
+
+  -- Customer names: NBSP and extra spaces match an existing customer, and a
+  -- name that was not listed is created. Never 'customer not approved'.
+  res := public.import_transactions_batch(
+    'public_cloud', 'synthetic-nbsp.xlsx', repeat('c', 64), '2.0.0-proposed',
+    jsonb_build_array(
+      jsonb_build_object(
+        'source_line', 2,
+        'customer_name', 'Synthetic' || chr(160) || '  Test   Customer',
+        'lab_name', 'Lab N'
+      ),
+      jsonb_build_object(
+        'source_line', 3,
+        'customer_name', 'Nbsp' || chr(160) || '  Labs',
+        'lab_name', 'Lab N2'
+      ),
+      jsonb_build_object(
+        'source_line', 4,
+        'customer_name', 'nbsp labs',
+        'lab_name', 'Lab N3'
+      )
+    ),
+    '[]'
+  );
+  IF (res->>'inserted')::int <> 3 THEN
+    RAISE EXCEPTION 'FAIL: customer-name batch expected 3 inserted, got %', res;
+  END IF;
+  IF (
+    SELECT t.customer_id FROM public.transactions t
+    JOIN public.import_batches b ON b.id = t.import_batch_id
+    WHERE b.file_sha256 = repeat('c', 64) AND t.source_line = 2
+  ) IS DISTINCT FROM (
+    SELECT id FROM public.customers WHERE normalized_name = 'synthetic test customer'
+  ) THEN
+    RAISE EXCEPTION 'FAIL: NBSP spelling did not match the existing customer';
+  END IF;
+  IF (SELECT count(*) FROM public.customers WHERE normalized_name = 'nbsp labs') <> 1 THEN
+    RAISE EXCEPTION 'FAIL: NBSP and spaced names did not collapse to one customer';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.transactions t
+    JOIN public.import_batches b ON b.id = t.import_batch_id
+    WHERE b.file_sha256 = repeat('c', 64) AND t.customer_id IS NULL
+  ) THEN
+    RAISE EXCEPTION 'FAIL: a customer name was left unset';
+  END IF;
+  RAISE NOTICE 'PASS: customers are created and NBSP names match';
 END $$;
 
 ROLLBACK;

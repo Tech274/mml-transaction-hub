@@ -73,7 +73,9 @@ Full steps: **`docs/runbooks/publish-main.md`**. In short:
 3. Publish, avoiding ±10 min around HH:45 IST (HH:15 UTC) and 07:30 IST (02:00 UTC).
 4. Apply 8, then 9.
 5. After a fresh drift check, apply 3, 5, 6 and 7 one at a time.
-6. Apply 4, then `scrum103_lenient_import.sql` (move it into `supabase/migrations/` first), then publish. The All Transactions Complete/Incomplete filter reads `is_complete` from that file, so publish stays after the migration.
+6. Apply 4, then `scrum103_lenient_import.sql` (move it into `supabase/migrations/` first), then publish. The All Transactions Complete/Incomplete filter reads `is_complete` from that file, so publish stays after the migration. (Done 28 Sep ~07:40 / ~07:50 IST, published 07:55 IST.)
+   Next, when approved: back up, move `scrum103_customer_name_normalize.sql` into `supabase/migrations/` with a timestamp
+   later than 20260928031000, apply it, then publish the code that needs it (PR #41).
 7. Verify the next sync and snapshot runs, the 401 for the old `apikey`, and the register.
 
 ## Drift check (read-only; run on sandbox and live before a release)
@@ -122,6 +124,12 @@ Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
   Nullable transaction fields, no input-vs-selling or end-date order check, lenient
   `classify_transaction` (blank private provider filled) and `import_transactions_batch`,
   non-unique `import_batches.file_sha256` index, stored generated `is_complete`.
+- `scrum103_customer_name_normalize.sql` (SCRUM-103). Installs `clean_customer_name` /
+  `normalize_customer_name` (EXECUTE revoked from PUBLIC/anon), points the customer
+  trigger at that key, and replaces `import_transactions_batch` so a missing customer is
+  created instead of raising "not approved". The rest of the import function body is the
+  applied 20260928031000 body. **Apply after 20260928031000** (it replaces that function).
+  Rollback is in the file header and restores the applied 20260928031000 body. Not applied.
 
 Files 1–6 were merged before rule 3 existed, so their rollback lives here instead of in the file.
 Rule 6 means the files themselves are not edited.

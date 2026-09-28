@@ -289,14 +289,21 @@ describe("existing sandbox SQL checks also pass locally", () => {
   });
 
   // The lenient rules are in supabase/migrations/20260928031000_scrum103_lenient_import.sql
-  // (applied to live 28 Sep), so the local database already has them. The sandbox
-  // script runs inside its own transaction and is rolled back. It never touches live.
+  // (applied to live 28 Sep), so the local database already has them. Only the
+  // pending scrum103_customer_name_normalize.sql is injected, inside the sandbox
+  // script's own transaction, and rolled back. It never touches live.
   it("supabase/tests/rls/scrum103_import_batch.sql", async () => {
     const { readFileSync } = await import("node:fs");
     const path = await import("node:path");
     const root = path.resolve(__dirname, "../../..");
+    const customer = readFileSync(path.join(root, "supabase/migrations-pending/scrum103_customer_name_normalize.sql"), "utf8");
     const sql = readFileSync(path.join(root, "supabase/tests/rls/scrum103_import_batch.sql"), "utf8");
-    await expect(db.exec(sql)).resolves.toBeDefined();
+    const begin = sql.match(/^\s*BEGIN\s*;/m);
+    expect(begin).not.toBeNull();
+    // String#replace treats $$ in the replacement as a single $, which would
+    // break the function bodies. A function return value is inserted as-is.
+    const combined = sql.replace(begin![0], () => `${begin![0]}\n${customer}\n`);
+    await expect(db.exec(combined)).resolves.toBeDefined();
     await db.exec("rollback").catch(() => undefined);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { normalizeName, normalizeEmail, normalizePhone } from "@/lib/customer-normalize";
+import { cleanCustomerName, normalizeName, normalizeEmail, normalizePhone } from "@/lib/customer-normalize";
 
 describe("normalizeName", () => {
   it("trims, collapses spaces, lowercases", () => {
@@ -9,6 +9,13 @@ describe("normalizeName", () => {
   });
   it("treats spelling variants as identical when equal after normalization", () => {
     expect(normalizeName("ACME corp")).toBe(normalizeName("acme  CORP"));
+  });
+  it("treats NBSP like a space, matching the import RPC key", () => {
+    const nbsp = "Acme\u00A0  Labs";
+    expect(cleanCustomerName(nbsp)).toBe("Acme Labs");
+    expect(normalizeName(nbsp)).toBe("acme labs");
+    expect(normalizeName("acme\u00A0labs")).toBe(normalizeName("  ACME   labs "));
+    expect(normalizeName("\u00A0")).toBe("");
   });
 });
 

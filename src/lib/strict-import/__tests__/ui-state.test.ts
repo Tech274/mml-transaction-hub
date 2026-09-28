@@ -48,7 +48,7 @@ describe("strict import screen state", () => {
   });
   it("template CSV has exactly the strict headers and parses back cleanly", () => {
     const sheet = parseCsvText(strictTemplateCsv());
-    expect(matchHeaders(sheet.header).errors).toEqual([]);
+    expect(matchHeaders(sheet.header).warnings).toEqual([]);
     expect(sheet.rows).toEqual([]);
     expect(strictTemplateFilename()).toBe("strict-import-template-2.0.0-proposed.csv");
   });

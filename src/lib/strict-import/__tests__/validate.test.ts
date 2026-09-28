@@ -15,33 +15,75 @@ describe("template status", () => {
 describe("headers", () => {
   it("match exactly, ignoring only case and surrounding spaces", () => {
     const h = HEADER.map((x, i) => (i === 0 ? "  potential id " : x.toUpperCase()));
-    expect(matchHeaders(h).errors).toEqual([]);
+    expect(matchHeaders(h).warnings).toEqual([]);
   });
-  it("a missing column is stored blank and does not block", () => {
+  it("a missing column is stored blank, warned, and does not block", () => {
     const r = validateStrict(HEADER.slice(0, 11), [row(2)]);
     expect(r.ok).toBe(true);
     expect(r.headerErrors).toEqual([]);
     expect(r.records[0].cloud_provider).toBeNull();
+    expect(r.warnings).toEqual([
+      expect.objectContaining({ header: "Cloud Provider", message: 'Column "Cloud Provider" is missing. Those cells are stored blank.' }),
+    ]);
+    expect(commitReady(r)).toBe(true);
   });
-  it("unknown extra column is a blocking error", () => {
-    const r = validateStrict([...HEADER, "Notes"], [row(2)]);
-    expect(r.headerErrors).toEqual([{ column: "M", header: "Notes", message: 'Unknown column "Notes". It is not in the template.' }]);
+  it("unknown extra columns are ignored, listed, and do not block", () => {
+    const header = [...HEADER, "S.No", "Remarks"];
+    const cells = [...row(2).cells, "4", "bring laptop"];
+    const r = validateStrict(header, [{ line: 2, cells }]);
+    expect(r.ok).toBe(true);
+    expect(r.headerErrors).toEqual([]);
+    expect(r.records).toHaveLength(1);
+    expect(r.records[0].cloud_provider).toBe("AWS");
+    expect(r.records[0].potential_id).toBe("PID-TEST-001");
+    expect(r.warnings.map((w) => w.message)).toEqual([
+      'Unknown column "S.No" is ignored.',
+      'Unknown column "Remarks" is ignored.',
+    ]);
   });
-  it("an explicitly ignored column is allowed", () => {
+  it("a blank header cell is ignored and does not block", () => {
+    const header = ["Potential ID", "", ...HEADER.slice(2)];
+    const r = validateStrict(header, [row(2)]);
+    expect(r.ok).toBe(true);
+    expect(r.headerErrors).toEqual([]);
+    expect(r.records[0].month).toBeNull();
+    expect(r.records[0].year).toBe(2026);
+    expect(r.records[0].lab_name).toBe("Synthetic Lab A");
+    expect(r.warnings.map((w) => w.message)).toEqual(['Column "Month" is missing. Those cells are stored blank.']);
+  });
+  it("an explicitly ignored column produces no warning", () => {
     const r = validateStrict([...HEADER, "S.No"], [row(2)], { rules: { ...PROPOSED_RULES, ignoredHeaders: ["s.no"] } });
     expect(r.headerErrors).toEqual([]);
+    expect(r.warnings.filter((w) => w.header === "S.No")).toEqual([]);
+    expect(r.ok).toBe(true);
   });
-  it("near-miss headers are NOT fuzzy-matched", () => {
+  it("near-miss headers are NOT fuzzy-matched, and the file still commits", () => {
     const h = [...HEADER];
     h[10] = "Selling Price";
-    const r = validateStrict(h, [row(2)]);
-    expect(r.ok).toBe(false);
+    const r = validateStrict(h, [row(2, { "Selling Cost": 1500.5 })]);
+    expect(r.ok).toBe(true);
+    expect(r.records[0].selling_cost_cents).toBeNull();
+    expect(r.warnings.some((w) => w.message === 'Unknown column "Selling Price" is ignored.')).toBe(true);
+    expect(r.warnings.some((w) => w.message === 'Column "Selling Cost" is missing. Those cells are stored blank.')).toBe(true);
   });
-  it("duplicate header is an error", () => {
-    const h = [...HEADER, "Month"];
-    expect(matchHeaders(h).errors.some((e) => e.message.startsWith('Duplicate header "Month"'))).toBe(true);
+  it("a duplicate header uses the first occurrence and warns", () => {
+    const header = [...HEADER, "Month"];
+    const cells = [...row(2).cells, 9];
+    const r = validateStrict(header, [{ line: 2, cells }]);
+    expect(r.ok).toBe(true);
+    expect(r.records[0].month).toBe(3);
+    expect(r.warnings).toEqual([
+      expect.objectContaining({
+        column: "M",
+        message: 'Duplicate header "Month" (also in column B). The first occurrence is used.',
+      }),
+    ]);
   });
 });
+
+function commitReady(r: { ok: boolean; headerErrors: unknown[] }) {
+  return r.ok && r.headerErrors.length === 0;
+}
 
 describe("one row in = one row out", () => {
   it("repeated Potential IDs produce one record each (no merging)", () => {
