@@ -25,6 +25,12 @@ rollback. Merging a migration to `main` **does not apply it**.
   Lovable created on 28 Sep ~14:28 IST when the project was reconnected to GitHub (commit `4cbc72c`;
   the old repo is archived as `Tech274/mml-internal-archive-20260928`), then was published through
   Lovable at ~14:31 IST (deploy `0248f354`, bundle `index-CY96S2jF.js`).
+- `20260928120000_mml_cost_and_lab_catalog`, `20260928120100_mml_adr_fields_and_hybrid` and
+  `20260928120200_mml_lab_batches_and_margin` (register #12-#14, PR #44) were applied to live at
+  ~15:37, ~15:39 and ~15:41 IST with Vivek's GO (28 Sep 15:21 IST), one file per transaction, after
+  a verified backup (`/workspace/mml-backups/2026-09-28-pre-accommodations/`). Each is recorded in
+  `supabase_migrations.schema_migrations`; existing rows were unchanged (transactions 150, customers 23).
+  pg_cron 1.6.4 is installed, so the nightly job `mml-lab-batch-recompute` (21:40 UTC) is scheduled.
 - Sandbox was skipped for this release (Vivek approved applying straight to live).
 
 ## Rules
@@ -126,6 +132,9 @@ migration.
 | 9 | `20260928030000_scrum77_mcp_audit_server_writes` | SCRUM-77 | MCP audit rows written by the server only (users lose INSERT) | **Publish the app code first**, then apply (before the code, audit rows fail to save, logged) | Policy + GRANT statements in the file header | skipped (Vivek approved direct to live) | 28 Sep 04:47 IST |
 | 10 | `20260928040000_scrum103_customer_name_normalize` | SCRUM-103 | `clean_customer_name` / `normalize_customer_name` (EXECUTE: authenticated + service_role only); customer trigger uses that key; `import_transactions_batch` creates a missing customer instead of raising "not approved"; `bulk_import_runs_duplicate_strategy_check` also allows `'insert'`. Locks `customers` and stops on any key drift (preflight) | After `20260928031000`. Backup, read-only drift check = 0, then apply, then publish PR #41 code (the code writes `'insert'`) | File header: restore the trigger (with `SET search_path = public`) and the 20260928031000 `import_transactions_batch` body, drop the helpers, then the old CHECK only if no `'insert'` rows | skipped (Vivek GO direct to live, 28 Sep 09:51 IST) | 28 Sep ~09:58 IST |
 | 11 | `20260928090500_scrum78_role_check_respects_active` | SCRUM-78 | `has_role` / `has_any_role` also require `profiles.is_active IS TRUE` (fail closed on a missing profile). Same signatures, SECURITY DEFINER, STABLE, `search_path = public`; EXECUTE restated (authenticated only) | Publish PR #42 code first. Read-only check that every role holder who keeps access is active | `supabase/migrations-pending/scrum78_role_check_respects_active.rollback.sql` (original bodies; also quoted in the file header) | skipped (Vivek GO direct to live, 28 Sep 14:12 IST) | 28 Sep ~14:34 IST |
+| 12 | `20260928120000_mml_cost_and_lab_catalog` | MML-accommodations-demo | `vm_tiers`, `cost_rates` (`private_input_cost_pct` default 20), `lab_catalog`, catalog audit, admin save RPCs | After #11. Migration before any publish that reads these tables. Applied to live with Vivek's GO (28 Sep 15:21 IST) after backup `mml-backups/2026-09-28-pre-accommodations` | File header | skipped (Vivek GO direct to live) | 28 Sep ~15:37 IST |
+| 13 | `20260928120100_mml_adr_fields_and_hybrid` | MML-accommodations-demo | Nullable private-cloud price columns, generated addon total, admin-only `transaction_tags` | After #12. Additive and nullable | File header | skipped (Vivek GO direct to live) | 28 Sep ~15:39 IST |
+| 14 | `20260928120200_mml_lab_batches_and_margin` | MML-accommodations-demo | `lab_batches`, invoices, margin routine, nightly cron `mml-lab-batch-recompute` | After #13. Do not `db push` this to the hosted project (already applied). Cron runs 21:40 UTC = 03:10 IST | File header | skipped (Vivek GO direct to live) | 28 Sep ~15:41 IST |
 
 Waiting for approval, not migrations yet (`supabase/migrations-pending/`):
 

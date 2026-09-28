@@ -34,6 +34,9 @@ for publish/migration · **Open** = known gap · **Waits** = blocked on a decisi
 | Transactions `src/routes/_authenticated/transactions.tsx` | Paged list, search, soft delete | OK; unused delete grants removed in a repo-only migration (#28) | Cost columns visible to all roles (SCRUM-58) | _to do_ |
 | Public cloud `src/routes/_authenticated/public-cloud.tsx` | Transactions filtered to public cloud | OK | Classification rules (SCRUM-68, Vivek) | _to do_ |
 | Private cloud `src/routes/_authenticated/private-cloud.tsx` | Transactions filtered to private cloud | OK | Classification rules (SCRUM-68, Vivek) | _to do_ |
+| Lab catalog `src/routes/_authenticated/mml-lab.lab-catalog.tsx` | Lab offerings: draft, published, archived | Demo slice, not live. Repo-only migration | Publish needs Atlas and Vivek GO | _to do_ |
+| Cost catalog `src/routes/_authenticated/mml-lab.cost-catalog.tsx` | VM tiers, cost rates, calculator | Demo slice, not live. Viewer cannot open it | Admin rate edits need the same GO | _to do_ |
+| Lab batches `src/routes/_authenticated/mml-lab.batches.tsx` | Batch groups, invoices, auto-filled costs | Demo slice, not live. Local seed only | Do not apply the margin migration to live yet | _to do_ |
 | Customers `src/routes/_authenticated/customers.tsx` | Customer list and edit | OK (all-rows read) | Duplicate detection rules (SCRUM-67, Vivek) | _to do_ |
 | Reports `src/routes/_authenticated/reports.tsx` | Report views and Excel export | Fixed, not live: all-rows reads (#16), SheetJS upgrade (#7) | Export role visibility (SCRUM-71, after SCRUM-58) | _to do_ |
 | Tickets `src/routes/_authenticated/tickets.tsx` | Freshdesk tickets, conversations, agent claim | Fixed, not live: no 5k cap (#15), conversations limited to synced tickets and ops roles (#4), incremental sync (#14) | Server-side totals + status labels (SCRUM-94/105, paused); `agent_identities` server-only writes need their migration after publish (SCRUM-102) | _to do_ |

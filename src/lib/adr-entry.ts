@@ -5,6 +5,7 @@
 // No rule here may be stricter than what the form accepted before SCRUM-66 unless
 // the database already rejects it (existing valid workflows must keep working).
 import { z } from "zod";
+import { looksLikeSecret } from "@/lib/cost-calculator";
 
 export const PUBLIC_CLOUD_PROVIDERS = ["AWS", "Azure", "GCP"] as const;
 export const PRIVATE_CLOUD_PROVIDER = "MakeMyLabs Private Cloud";
@@ -19,6 +20,35 @@ export const SYSTEM_CONFIG_OPTIONS = [
   "32GB 8vCPUs",
 ] as const;
 export const MAX_AMOUNT = 1_000_000_000;
+export const API_UNIT_LABELS = ["calls", "tokens", "credits"] as const;
+
+/** Fields added for the MML Lab demo. Both forms render this set. */
+export const ADR_EXTRA_FIELD_NAMES = [
+  "lab_batch_id",
+  "license_name",
+  "api_key_service",
+  "selling_price_per_user",
+  "vm_price_per_user",
+  "license_price_per_user",
+  "api_key_price_per_user",
+  "input_cost_per_user",
+  "input_cost_pct",
+  "vm_hours_consumed",
+  "license_seats_used",
+  "api_units_consumed",
+  "api_unit_label",
+  "is_hybrid",
+] as const;
+
+const secretText = (max: number, label: string) =>
+  optionalText(max).superRefine((v, ctx) => {
+    if (typeof v === "string" && looksLikeSecret(v)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Don't paste secret keys here (${label})`,
+      });
+    }
+  });
 
 const blankToNull = (v: unknown) => {
   if (v === undefined || v === null) return null;
@@ -34,7 +64,11 @@ const optionalInt = (min: number, max: number, label: string) =>
     blankToNull,
     z.union([
       z.null(),
-      z.coerce.number().int(`${label} must be a whole number`).min(min, `${label} is out of range`).max(max, `${label} is out of range`),
+      z.coerce
+        .number()
+        .int(`${label} must be a whole number`)
+        .min(min, `${label} is out of range`)
+        .max(max, `${label} is out of range`),
     ]),
   );
 
@@ -76,14 +110,21 @@ export const adrEntrySchema = z.object({
   customer_id: z.preprocess(blankToNull, z.union([z.null(), z.string().uuid()])),
   customer_name: optionalText(200),
   lab_name: optionalText(200),
-  lab_type: z.enum(["public_cloud", "private_cloud"], { errorMap: () => ({ message: "Choose Public or Private Cloud" }) }),
+  lab_type: z.enum(["public_cloud", "private_cloud"], {
+    errorMap: () => ({ message: "Choose Public or Private Cloud" }),
+  }),
   cloud_provider: optionalText(200),
   system_config: optionalText(200),
   line_of_business: z.preprocess(
     blankToNull,
     z.union([
       z.null(),
-      z.string().refine((s) => (LINES_OF_BUSINESS as readonly string[]).includes(s), "Choose VILT, Standalone or Integrated"),
+      z
+        .string()
+        .refine(
+          (s) => (LINES_OF_BUSINESS as readonly string[]).includes(s),
+          "Choose VILT, Standalone or Integrated",
+        ),
     ]),
   ),
   start_date: optionalDate,
@@ -91,6 +132,37 @@ export const adrEntrySchema = z.object({
   total_users: optionalInt(1, 1_000_000_000, "Total users"),
   input_cost: optionalMoney("Input cost"),
   selling_cost: optionalMoney("Selling cost"),
+  lab_batch_id: z.preprocess(blankToNull, z.union([z.null(), z.string().uuid("Choose a batch")])),
+  license_name: secretText(200, "subscription"),
+  api_key_service: secretText(200, "API key service"),
+  selling_price_per_user: optionalMoney("Selling price per user"),
+  vm_price_per_user: optionalMoney("VM price per user"),
+  license_price_per_user: optionalMoney("Licence price per user"),
+  api_key_price_per_user: optionalMoney("API key price per user"),
+  input_cost_per_user: optionalMoney("Input cost per user"),
+  input_cost_pct: z.preprocess(
+    blankToNull,
+    z.union([
+      z.null(),
+      z.coerce.number().min(0, "Percent is out of range").max(100, "Percent is out of range"),
+    ]),
+  ),
+  vm_hours_consumed: optionalMoney("VM hours"),
+  license_seats_used: optionalInt(0, 1_000_000_000, "Licence seats"),
+  api_units_consumed: optionalMoney("API units"),
+  api_unit_label: z.preprocess(
+    blankToNull,
+    z.union([
+      z.null(),
+      z
+        .string()
+        .refine(
+          (s) => (API_UNIT_LABELS as readonly string[]).includes(s),
+          "Choose calls, tokens or credits",
+        ),
+    ]),
+  ),
+  is_hybrid: z.preprocess((v) => v === true || v === "true", z.boolean()),
 });
 
 export type AdrEntry = z.infer<typeof adrEntrySchema>;
@@ -99,20 +171,61 @@ export const adrEditSchema = adrEntrySchema;
 export type AdrEdit = AdrEntry;
 
 /** Non-blocking note when selling is below cost. Never a validation error. */
-export function marginNote(input: number | null | undefined, selling: number | null | undefined): string | null {
+export function marginNote(
+  input: number | null | undefined,
+  selling: number | null | undefined,
+): string | null {
   if (input == null || selling == null) return null;
-  if (input > selling) return "Input cost is higher than selling cost. This is allowed and will be saved.";
+  if (input > selling)
+    return "Input cost is higher than selling cost. This is allowed and will be saved.";
   return null;
 }
 
 /** Non-blocking note when the end date is before the start date. Both dates are kept. */
-export function dateOrderNote(start: string | null | undefined, end: string | null | undefined): string | null {
+export function dateOrderNote(
+  start: string | null | undefined,
+  end: string | null | undefined,
+): string | null {
   if (!start || !end) return null;
   if (end < start) return "End date is before the start date. This is allowed and will be saved.";
   return null;
 }
 
-/** Update payload. Blank fields are NULL, never 0. */
+function privateExtras(v: AdrEntry) {
+  const isPrivate = v.lab_type === "private_cloud";
+  if (!isPrivate) {
+    return {
+      license_name: null,
+      api_key_service: null,
+      selling_price_per_user: null,
+      vm_price_per_user: null,
+      license_price_per_user: null,
+      api_key_price_per_user: null,
+      input_cost_per_user: null,
+      input_cost_pct: null,
+      vm_hours_consumed: null,
+      license_seats_used: null,
+      api_units_consumed: null,
+      api_unit_label: null,
+    };
+  }
+  return {
+    license_name: v.license_name,
+    api_key_service: v.api_key_service,
+    selling_price_per_user: v.selling_price_per_user,
+    vm_price_per_user: v.vm_price_per_user,
+    license_price_per_user: v.license_name ? v.license_price_per_user : null,
+    api_key_price_per_user: v.api_key_service ? v.api_key_price_per_user : null,
+    input_cost_per_user: v.input_cost_per_user,
+    input_cost_pct: v.input_cost_pct,
+    vm_hours_consumed: v.vm_hours_consumed,
+    license_seats_used: v.license_seats_used,
+    api_units_consumed: v.api_units_consumed,
+    api_unit_label: v.api_unit_label,
+  };
+}
+
+/** Update payload. Blank fields are NULL, never 0. Public cloud clears the private-only columns. */
 export function toTransactionUpdate(v: AdrEdit) {
   return {
     potential_id: v.potential_id,
@@ -131,6 +244,8 @@ export function toTransactionUpdate(v: AdrEdit) {
     total_users: v.total_users,
     input_cost: v.input_cost,
     selling_cost: v.selling_cost,
+    lab_batch_id: v.lab_batch_id,
+    ...privateExtras(v),
   };
 }
 
@@ -155,6 +270,8 @@ export function toTransactionInsert(v: AdrEntry, userId: string) {
     total_users: v.total_users,
     input_cost: v.input_cost,
     selling_cost: v.selling_cost,
+    lab_batch_id: v.lab_batch_id,
+    ...privateExtras(v),
     created_by: userId,
   };
 }

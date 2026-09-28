@@ -4,13 +4,27 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CustomerCombobox, type CustomerOption } from "./customer-combobox";
 import { useConfig } from "@/hooks/use-config";
 import { useServerFn } from "@tanstack/react-start";
 import { checkPotentialIdUnique, createAdrTransaction } from "@/lib/transactions.functions";
-import { adrEntrySchema, dateOrderNote, marginNote, SYSTEM_CONFIG_OPTIONS, type AdrEntry } from "@/lib/adr-entry";
+import {
+  adrEntrySchema,
+  dateOrderNote,
+  marginNote,
+  SYSTEM_CONFIG_OPTIONS,
+  type AdrEntry,
+} from "@/lib/adr-entry";
+import { AdrExtraFields } from "@/components/adr-extra-fields";
+import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { MONTH_NAMES, YEARS } from "@/lib/format";
@@ -33,6 +47,7 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
   const { data: lobs = [] } = useConfig("line_of_business");
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const { isAdmin } = useAuth();
 
   const now = new Date();
   const form = useForm<FormValues>({
@@ -53,13 +68,28 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
       total_users: "" as unknown as number | null,
       input_cost: "" as unknown as number | null,
       selling_cost: "" as unknown as number | null,
+      lab_batch_id: "",
+      license_name: "",
+      api_key_service: "",
+      selling_price_per_user: "" as unknown as number | null,
+      vm_price_per_user: "" as unknown as number | null,
+      license_price_per_user: "" as unknown as number | null,
+      api_key_price_per_user: "" as unknown as number | null,
+      input_cost_per_user: "" as unknown as number | null,
+      input_cost_pct: "" as unknown as number | null,
+      vm_hours_consumed: "" as unknown as number | null,
+      license_seats_used: "" as unknown as number | null,
+      api_units_consumed: "" as unknown as number | null,
+      api_unit_label: "",
+      is_hybrid: false,
     },
   });
 
   const labType = form.watch("lab_type");
   useEffect(() => {
     if (labType === "private_cloud") form.setValue("cloud_provider", "MakeMyLabs Private Cloud");
-    else if (form.getValues("cloud_provider") === "MakeMyLabs Private Cloud") form.setValue("cloud_provider", "");
+    else if (form.getValues("cloud_provider") === "MakeMyLabs Private Cloud")
+      form.setValue("cloud_provider", "");
     if (labType !== "private_cloud") form.setValue("system_config", "");
   }, [labType, form]);
 
@@ -78,7 +108,9 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
       if (values.potential_id) {
         const { unique } = await checkUnique({ data: { potentialId: values.potential_id } });
         if (!unique) {
-          toast.message(`Potential ID ${values.potential_id} already has transactions — adding another one.`);
+          toast.message(
+            `Potential ID ${values.potential_id} already has transactions — adding another one.`,
+          );
         }
       }
 
@@ -112,11 +144,15 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
       <CardHeader>
         <CardTitle>Master ADR Entry</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Blank fields are saved empty and can be filled in later. Selling below cost, and an end date before the start date, are allowed.
+          Blank fields are saved empty and can be filled in later. Selling below cost, and an end
+          date before the start date, are allowed.
         </p>
       </CardHeader>
       <CardContent>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="grid grid-cols-1 md:grid-cols-2 gap-4"
+        >
           <Field label="Potential ID" error={form.formState.errors.potential_id?.message}>
             <Input {...form.register("potential_id")} placeholder="POT-2026-001" />
           </Field>
@@ -124,18 +160,36 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
             <CustomerCombobox value={customer} onChange={setCustomer} />
           </Field>
           <Field label="Month">
-            <Select value={String(form.watch("month"))} onValueChange={(v) => form.setValue("month", Number(v))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={String(form.watch("month"))}
+              onValueChange={(v) => form.setValue("month", Number(v))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {MONTH_NAMES.map((m, i) => <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>)}
+                {MONTH_NAMES.map((m, i) => (
+                  <SelectItem key={m} value={String(i + 1)}>
+                    {m}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Field>
           <Field label="Year">
-            <Select value={String(form.watch("year"))} onValueChange={(v) => form.setValue("year", Number(v))}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={String(form.watch("year"))}
+              onValueChange={(v) => form.setValue("year", Number(v))}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {YEARS.map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                {YEARS.map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Field>
@@ -143,10 +197,21 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
             <Input {...form.register("lab_name")} />
           </Field>
           <Field label="Lab Type">
-            <Select value={labType} onValueChange={(v) => form.setValue("lab_type", v as "public_cloud" | "private_cloud")}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+            <Select
+              value={labType}
+              onValueChange={(v) =>
+                form.setValue("lab_type", v as "public_cloud" | "private_cloud")
+              }
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                {labTypes.map((l) => <SelectItem key={l.key} value={l.key}>{l.label}</SelectItem>)}
+                {labTypes.map((l) => (
+                  <SelectItem key={l.key} value={l.key}>
+                    {l.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Field>
@@ -154,19 +219,37 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
             {labType === "private_cloud" ? (
               <Input value="MakeMyLabs Private Cloud" disabled />
             ) : (
-              <Select value={form.watch("cloud_provider") ?? ""} onValueChange={(v) => form.setValue("cloud_provider", v, { shouldValidate: true })}>
-                <SelectTrigger><SelectValue placeholder="Select provider" /></SelectTrigger>
+              <Select
+                value={form.watch("cloud_provider") ?? ""}
+                onValueChange={(v) => form.setValue("cloud_provider", v, { shouldValidate: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select provider" />
+                </SelectTrigger>
                 <SelectContent>
-                  {providerOptions.map((p) => <SelectItem key={p.key} value={p.key}>{p.label}</SelectItem>)}
+                  {providerOptions.map((p) => (
+                    <SelectItem key={p.key} value={p.key}>
+                      {p.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             )}
           </Field>
           <Field label="Line of Business" error={form.formState.errors.line_of_business?.message}>
-            <Select value={form.watch("line_of_business") ?? ""} onValueChange={(v) => form.setValue("line_of_business", v, { shouldValidate: true })}>
-              <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+            <Select
+              value={form.watch("line_of_business") ?? ""}
+              onValueChange={(v) => form.setValue("line_of_business", v, { shouldValidate: true })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
               <SelectContent>
-                {lobs.map((l) => <SelectItem key={l.key} value={l.label}>{l.label}</SelectItem>)}
+                {lobs.map((l) => (
+                  <SelectItem key={l.key} value={l.label}>
+                    {l.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </Field>
@@ -176,10 +259,14 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
                 value={form.watch("system_config") ?? ""}
                 onValueChange={(v) => form.setValue("system_config", v, { shouldValidate: true })}
               >
-                <SelectTrigger><SelectValue placeholder="Select configuration" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select configuration" />
+                </SelectTrigger>
                 <SelectContent>
                   {SYSTEM_CONFIG_OPTIONS.map((opt) => (
-                    <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                    <SelectItem key={opt} value={opt}>
+                      {opt}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -194,25 +281,50 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
           <Field label="Total Users" error={form.formState.errors.total_users?.message}>
             <Input type="number" min={1} {...form.register("total_users")} />
           </Field>
-          <Field label="Input Cost" error={form.formState.errors.input_cost?.message}>
+          <Field
+            label="Input cost (INR, estimate)"
+            error={form.formState.errors.input_cost?.message}
+          >
             <Input type="number" min={0} step="0.01" {...form.register("input_cost")} />
           </Field>
-          <Field label="Selling Cost" error={form.formState.errors.selling_cost?.message}>
+          <Field label="Selling cost (INR)" error={form.formState.errors.selling_cost?.message}>
             <Input type="number" min={0} step="0.01" {...form.register("selling_cost")} />
           </Field>
+          <AdrExtraFields form={form} isAdmin={isAdmin} mode="create" />
           {(() => {
-            const note = marginNote(moneyOrNull(form.watch("input_cost")), moneyOrNull(form.watch("selling_cost")));
+            const note = marginNote(
+              moneyOrNull(form.watch("input_cost")),
+              moneyOrNull(form.watch("selling_cost")),
+            );
             const dates = dateOrderNote(form.watch("start_date"), form.watch("end_date"));
             return (
               <>
-                {note ? <p className="md:col-span-2 text-xs text-muted-foreground" data-testid="single-entry-margin-note">{note}</p> : null}
-                {dates ? <p className="md:col-span-2 text-xs text-muted-foreground" data-testid="single-entry-date-note">{dates}</p> : null}
+                {note ? (
+                  <p
+                    className="md:col-span-2 text-xs text-muted-foreground"
+                    data-testid="single-entry-margin-note"
+                  >
+                    {note}
+                  </p>
+                ) : null}
+                {dates ? (
+                  <p
+                    className="md:col-span-2 text-xs text-muted-foreground"
+                    data-testid="single-entry-date-note"
+                  >
+                    {dates}
+                  </p>
+                ) : null}
               </>
             );
           })()}
           <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="outline" onClick={() => form.reset()}>Reset</Button>
-            <Button type="submit" disabled={submitting}>{submitting ? "Saving…" : "Save Transaction"}</Button>
+            <Button type="button" variant="outline" onClick={() => form.reset()}>
+              Reset
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Saving…" : "Save Transaction"}
+            </Button>
           </div>
         </form>
       </CardContent>
@@ -220,7 +332,15 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>

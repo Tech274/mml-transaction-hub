@@ -6,10 +6,18 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { updateAdrTransaction } from "@/lib/transactions.functions";
 import { adrEditSchema, marginNote, SYSTEM_CONFIG_OPTIONS, type AdrEdit } from "@/lib/adr-entry";
+import { AdrExtraFields } from "@/components/adr-extra-fields";
+import { useAuth } from "@/lib/auth-context";
 
 type Tx = {
   id: string;
@@ -28,6 +36,20 @@ type Tx = {
   total_users: number | null;
   input_cost: number | null;
   selling_cost: number | null;
+  lab_batch_id?: string | null;
+  license_name?: string | null;
+  api_key_service?: string | null;
+  selling_price_per_user?: number | null;
+  vm_price_per_user?: number | null;
+  license_price_per_user?: number | null;
+  api_key_price_per_user?: number | null;
+  input_cost_per_user?: number | null;
+  input_cost_pct?: number | null;
+  vm_hours_consumed?: number | null;
+  license_seats_used?: number | null;
+  api_units_consumed?: number | null;
+  api_unit_label?: string | null;
+  is_hybrid?: boolean | null;
 };
 
 const empty = (v: string | number | null | undefined) => (v == null ? "" : String(v));
@@ -37,6 +59,7 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
   const qc = useQueryClient();
   const save = useServerFn(updateAdrTransaction);
   const [submitting, setSubmitting] = useState(false);
+  const { isAdmin } = useAuth();
   const form = useForm<AdrEdit>({
     resolver: zodResolver(adrEditSchema) as Resolver<AdrEdit>,
     defaultValues: {
@@ -48,13 +71,33 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
       lab_name: tx.lab_name ?? "",
       lab_type: tx.lab_type === "private_cloud" ? "private_cloud" : "public_cloud",
       cloud_provider: tx.cloud_provider ?? "",
-      system_config: tx.system_config && (SYSTEM_CONFIG_OPTIONS as readonly string[]).includes(tx.system_config) ? tx.system_config : "",
-      line_of_business: tx.line_of_business && ["VILT", "Standalone", "Integrated"].includes(tx.line_of_business) ? tx.line_of_business : "",
+      system_config:
+        tx.system_config && (SYSTEM_CONFIG_OPTIONS as readonly string[]).includes(tx.system_config)
+          ? tx.system_config
+          : "",
+      line_of_business:
+        tx.line_of_business && ["VILT", "Standalone", "Integrated"].includes(tx.line_of_business)
+          ? tx.line_of_business
+          : "",
       start_date: tx.start_date ?? "",
       end_date: tx.end_date ?? "",
       total_users: (tx.total_users ?? "") as unknown as number | null,
       input_cost: (tx.input_cost ?? "") as unknown as number | null,
       selling_cost: (tx.selling_cost ?? "") as unknown as number | null,
+      lab_batch_id: tx.lab_batch_id ?? "",
+      license_name: tx.license_name ?? "",
+      api_key_service: tx.api_key_service ?? "",
+      selling_price_per_user: (tx.selling_price_per_user ?? "") as unknown as number | null,
+      vm_price_per_user: (tx.vm_price_per_user ?? "") as unknown as number | null,
+      license_price_per_user: (tx.license_price_per_user ?? "") as unknown as number | null,
+      api_key_price_per_user: (tx.api_key_price_per_user ?? "") as unknown as number | null,
+      input_cost_per_user: (tx.input_cost_per_user ?? "") as unknown as number | null,
+      input_cost_pct: (tx.input_cost_pct ?? "") as unknown as number | null,
+      vm_hours_consumed: (tx.vm_hours_consumed ?? "") as unknown as number | null,
+      license_seats_used: (tx.license_seats_used ?? "") as unknown as number | null,
+      api_units_consumed: (tx.api_units_consumed ?? "") as unknown as number | null,
+      api_unit_label: tx.api_unit_label ?? "",
+      is_hybrid: tx.is_hybrid === true,
     },
   });
 
@@ -82,7 +125,11 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3" data-testid="transaction-edit-form">
+    <form
+      onSubmit={form.handleSubmit(onSubmit)}
+      className="space-y-3"
+      data-testid="transaction-edit-form"
+    >
       <p className="text-xs text-muted-foreground">
         Blank fields stay blank. Nothing here is required, and selling below cost can be saved.
       </p>
@@ -103,10 +150,19 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
           <Input {...form.register("lab_name")} />
         </Field>
         <Field label="Line of business" error={form.formState.errors.line_of_business?.message}>
-          <Select value={empty(form.watch("line_of_business")) || undefined} onValueChange={(v) => form.setValue("line_of_business", v, { shouldValidate: true })}>
-            <SelectTrigger><SelectValue placeholder="Blank" /></SelectTrigger>
+          <Select
+            value={empty(form.watch("line_of_business")) || undefined}
+            onValueChange={(v) => form.setValue("line_of_business", v, { shouldValidate: true })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Blank" />
+            </SelectTrigger>
             <SelectContent>
-              {["VILT", "Standalone", "Integrated"].map((l) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+              {["VILT", "Standalone", "Integrated"].map((l) => (
+                <SelectItem key={l} value={l}>
+                  {l}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </Field>
@@ -114,10 +170,19 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
           <Input {...form.register("cloud_provider")} placeholder="Blank" />
         </Field>
         <Field label="System config" error={form.formState.errors.system_config?.message}>
-          <Select value={empty(form.watch("system_config")) || undefined} onValueChange={(v) => form.setValue("system_config", v, { shouldValidate: true })}>
-            <SelectTrigger><SelectValue placeholder="Blank" /></SelectTrigger>
+          <Select
+            value={empty(form.watch("system_config")) || undefined}
+            onValueChange={(v) => form.setValue("system_config", v, { shouldValidate: true })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Blank" />
+            </SelectTrigger>
             <SelectContent>
-              {SYSTEM_CONFIG_OPTIONS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              {SYSTEM_CONFIG_OPTIONS.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </Field>
@@ -130,22 +195,37 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
         <Field label="Total users" error={form.formState.errors.total_users?.message}>
           <Input type="number" {...form.register("total_users")} />
         </Field>
-        <Field label="Input cost" error={form.formState.errors.input_cost?.message}>
+        <Field label="Input cost (INR, estimate)" error={form.formState.errors.input_cost?.message}>
           <Input type="number" step="0.01" {...form.register("input_cost")} />
         </Field>
-        <Field label="Selling cost" error={form.formState.errors.selling_cost?.message}>
+        <Field label="Selling cost (INR)" error={form.formState.errors.selling_cost?.message}>
           <Input type="number" step="0.01" {...form.register("selling_cost")} />
         </Field>
       </div>
-      {note && <p className="text-xs text-muted-foreground" data-testid="margin-note">{note}</p>}
+      <AdrExtraFields form={form} isAdmin={isAdmin} mode="edit" />
+      {note && (
+        <p className="text-xs text-muted-foreground" data-testid="margin-note">
+          {note}
+        </p>
+      )}
       <div className="flex justify-end">
-        <Button type="submit" size="sm" disabled={submitting}>{submitting ? "Saving…" : "Save changes"}</Button>
+        <Button type="submit" size="sm" disabled={submitting}>
+          {submitting ? "Saving…" : "Save changes"}
+        </Button>
       </div>
     </form>
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1">
       <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>

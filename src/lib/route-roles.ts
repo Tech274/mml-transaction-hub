@@ -8,6 +8,9 @@ export const ROUTE_ROLES = {
   "/mcp-audit": ["admin"],
   // Master ADR Entry: ops roles enter data; leadership may view import history.
   "/entry": ["admin", "ops_lead", "ops_user", "leadership"],
+  "/mml-lab/lab-catalog": ["admin", "leadership", "finance", "ops_lead", "ops_user", "viewer"],
+  "/mml-lab/cost-catalog": ["admin", "leadership", "finance", "ops_lead", "ops_user"],
+  "/mml-lab/batches": ["admin", "leadership", "finance", "ops_lead", "ops_user", "viewer"],
 } as const satisfies Record<string, readonly AppRole[]>;
 
 export type GuardedRoute = keyof typeof ROUTE_ROLES;
