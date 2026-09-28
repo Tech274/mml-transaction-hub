@@ -2,6 +2,8 @@
 -- Status: REPO ONLY / NOT APPLIED. Apply after 20260928130000 and before 20260928130200.
 -- Release order: migration only. Safe to re-run: inserts are skipped when the row exists.
 -- Generalist and Cost / ADR are paused. Support stays active. Model agents stay draft until tests pass.
+-- ticket_triage defaults to Anthropic Claude Haiku 4.5. dashboard_qa defaults to OpenAI GPT-6 Luna.
+-- Gemini remains in the price list as a secondary provider.
 -- Nothing is deleted. The four audit-log tables are not referenced.
 --
 -- Rollback: none needed, rows are unused until the app publish. To remove them before any run exists:
@@ -90,7 +92,7 @@ Choose priority from Low, Medium, High, Urgent and a tag from lab-access, lab-pe
 Do not invent ticket ids, recipients, links or statuses. Do not include passwords, tokens or phone numbers.
 Reply with JSON only: category, priority, tag, next_step, reasoning, email_subject, email_body.
 The server fills the recipient and the ticket id.$inst$,
-  'gemini', 'gemini-3.8-flash', 0.20, 2000,
+  'anthropic', 'claude-haiku-4-5', 0.20, 2000,
   ARRAY['admin','ops_lead','ops_user']::public.app_role[],
   ARRAY['admin','ops_lead','ops_user','leadership']::public.app_role[],
   ARRAY['admin','ops_lead']::public.app_role[],
@@ -113,7 +115,7 @@ Never write SQL. Cite the tool names and filters you used.
 If a figure is shown as hidden for the role, say it is hidden and do not guess a number.
 An empty tool result is not proof that nothing happened.
 Reply with JSON only: answer, cited_tools, filters.$inst$,
-  'gemini', 'gemini-3.8-flash', 0.20, 2000,
+  'openai', 'gpt-6-luna', 0.20, 2000,
   ARRAY['admin','leadership','finance','ops_lead']::public.app_role[],
   ARRAY['admin','leadership','finance']::public.app_role[],
   ARRAY['admin','leadership','finance']::public.app_role[],

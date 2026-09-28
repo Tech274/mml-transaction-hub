@@ -339,11 +339,11 @@ ON CONFLICT (tool_key) DO UPDATE SET
 
 INSERT INTO public.ai_model_prices (model_id, provider, input_per_mtok_usd, output_per_mtok_usd, valid_from, source_url)
 VALUES
-  ('gemini-3.8-flash', 'gemini', 0.75, 3.75, '2026-01-01', 'https://ai.google.dev/gemini-api/docs/pricing'),
-  ('gemini-3.1-flash-lite', 'gemini', 0.25, 1.50, '2026-01-01', 'https://ai.google.dev/gemini-api/docs/pricing'),
   ('gpt-6-luna', 'openai', 0.10, 0.50, '2026-01-01', 'https://developers.openai.com/api/docs/pricing'),
   ('gpt-6-sol', 'openai', 2.00, 10.00, '2026-01-01', 'https://developers.openai.com/api/docs/pricing'),
   ('claude-haiku-4-5', 'anthropic', 1.00, 5.00, '2026-01-01', 'https://platform.claude.com/docs/en/about-claude/pricing'),
   ('claude-sonnet-5', 'anthropic', 2.00, 10.00, '2026-01-01', 'https://platform.claude.com/docs/en/about-claude/pricing'),
+  ('gemini-3.8-flash', 'gemini', 0.75, 3.75, '2026-01-01', 'https://ai.google.dev/gemini-api/docs/pricing'),
+  ('gemini-3.1-flash-lite', 'gemini', 0.25, 1.50, '2026-01-01', 'https://ai.google.dev/gemini-api/docs/pricing'),
   ('compat-default', 'openai_compat', 0.15, 0.60, '2026-01-01', NULL)
 ON CONFLICT (model_id, valid_from) DO NOTHING;

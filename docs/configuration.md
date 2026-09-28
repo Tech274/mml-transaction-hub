@@ -26,11 +26,11 @@ secrets today) and, for local development, in an uncommitted `.env.local`.
 | `HOOK_TIMEOUT_SECONDS` | no | `src/lib/background-hook.ts` (SCRUM-72) | `25` | time budget for each scheduled hook job (Freshdesk sync, snapshot, bulk-import cleanup). Whole seconds, 5 to 900; a bad value is logged and 25 is used. See "Scheduled hooks" below |
 | `SNAPSHOT_CRON_UTC` | no | `app-config.ts`, shown on Sync Status | current schedule | label for the snapshot job time |
 | `STRICT_IMPORT_ENABLED` | no | `src/lib/strict-import/flag.ts` | unused | The Bulk Import tab no longer reads this flag. It is on for admin, ops_lead and ops_user. |
-| `OPENAI_API_KEY` | **yes** | `src/lib/ai/providers/env.server.ts` only | provider shows as not configured; runs refuse unless `AI_AGENTS_DEMO=1` | Owner's OpenAI key. Lovable Cloud secret. Never in the database or the browser |
-| `ANTHROPIC_API_KEY` | **yes** | `src/lib/ai/providers/env.server.ts` only | same | Owner's Anthropic key |
-| `GEMINI_API_KEY` | **yes** | `src/lib/ai/providers/env.server.ts` only | same | Owner's Gemini key. Sent as the `x-goog-api-key` header, not in the URL |
-| `OPENAI_COMPAT_BASE_URL` | no | `src/lib/ai/providers/env.server.ts` | compat provider off | Optional OpenAI-compatible base URL |
-| `OPENAI_COMPAT_API_KEY` | **yes** | `src/lib/ai/providers/env.server.ts` only | compat provider off | Key for that base URL |
+| `OPENAI_API_KEY` | **yes** | `src/lib/ai/providers/env.server.ts` only | provider shows as not configured; runs refuse unless `AI_AGENTS_DEMO=1` | Primary. Owner's OpenAI key. Lovable Cloud secret. Never in the database or the browser |
+| `ANTHROPIC_API_KEY` | **yes** | `src/lib/ai/providers/env.server.ts` only | same | Primary. Owner's Anthropic key |
+| `GEMINI_API_KEY` | **yes** | `src/lib/ai/providers/env.server.ts` only | same | Secondary. Owner's Gemini key. Sent as the `x-goog-api-key` header, not in the URL |
+| `OPENAI_COMPAT_BASE_URL` | no | `src/lib/ai/providers/env.server.ts` | compat provider off | Secondary. Optional OpenAI-compatible base URL |
+| `OPENAI_COMPAT_API_KEY` | **yes** | `src/lib/ai/providers/env.server.ts` only | compat provider off | Secondary. Key for that base URL |
 | `AI_AGENTS_DEMO` | no | `src/lib/ai/providers/env.server.ts` | off | Exact string `1` uses the mock provider for the local demo when no vendor key is set. Do not set this in production |
 
 Rules:

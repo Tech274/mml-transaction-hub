@@ -8,6 +8,11 @@ nothing changes business data.
 The Lovable AI gateway is not used. The owner supplies provider keys as server
 environment variables. See `docs/configuration.md`.
 
+OpenAI and Anthropic are the primary providers. New agents start on OpenAI
+GPT-6 Luna. Ticket triage is seeded on Anthropic Claude Haiku 4.5, and dashboard
+Q&A is seeded on GPT-6 Luna. Google Gemini and an OpenAI-compatible base URL
+stay in the adapter as secondary choices.
+
 ## What an admin can do
 
 - Create and edit a model agent, including instructions, provider, model, tools and audience.
@@ -24,8 +29,8 @@ environment variables. See `docs/configuration.md`.
 | `generalist` | rules (existing brain) | paused |
 | `support` | rules (existing brain) | active |
 | `cost_adr` | rules (existing brain) | paused |
-| `ticket_triage` | model | draft until an admin activates it |
-| `dashboard_qa` | model | draft until an admin activates it |
+| `ticket_triage` | model, Anthropic Claude Haiku 4.5 | draft until an admin activates it |
+| `dashboard_qa` | model, OpenAI GPT-6 Luna | draft until an admin activates it |
 
 Ticket triage may call ticket and customer tools. Those tools require an ops role
 (`admin`, `ops_lead`, `ops_user`). The conversation is fetched at run time through

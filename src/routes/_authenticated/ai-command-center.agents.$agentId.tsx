@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { getAgentAdmin, saveAgent, setAgentLifecycle, testRunAgent } from "@/lib/ai/agent.functions";
+import { DEFAULT_MODEL_ID, DEFAULT_PROVIDER, modelsFor, PROVIDER_LABEL, PROVIDER_ORDER, providerTier, type ModelProviderId } from "@/lib/ai/model-catalog";
 
 export const Route = createFileRoute("/_authenticated/ai-command-center/agents/$agentId")({
   beforeLoad: requireRouteRoles("/ai-command-center/builder"),
@@ -53,8 +54,8 @@ function BuilderPage() {
   const [key, setKey] = useState("");
   const [purpose, setPurpose] = useState("");
   const [instructions, setInstructions] = useState("");
-  const [provider, setProvider] = useState("gemini");
-  const [modelId, setModelId] = useState("gemini-3.8-flash");
+  const [provider, setProvider] = useState<ModelProviderId>(DEFAULT_PROVIDER);
+  const [modelId, setModelId] = useState(DEFAULT_MODEL_ID);
   const [tools, setTools] = useState<string[]>([]);
   const [runRoles, setRunRoles] = useState<string[]>(["admin", "ops_lead"]);
   const [viewRoles, setViewRoles] = useState<string[]>(["admin", "leadership", "finance"]);
@@ -69,8 +70,9 @@ function BuilderPage() {
     setKey(agent.key);
     setPurpose(latest.purpose ?? "");
     setInstructions(latest.instructions ?? "");
-    setProvider(latest.model_provider === "none" ? "gemini" : latest.model_provider);
-    setModelId(latest.model_id || "gemini-3.8-flash");
+    const savedProvider = latest.model_provider === "none" ? DEFAULT_PROVIDER : latest.model_provider;
+    setProvider((PROVIDER_ORDER as readonly string[]).includes(savedProvider) ? (savedProvider as ModelProviderId) : DEFAULT_PROVIDER);
+    setModelId(latest.model_id || DEFAULT_MODEL_ID);
     setTools(toolKeysFor(latest.id));
     setRunRoles(latest.run_roles ?? []);
     setViewRoles(latest.view_roles ?? []);
@@ -90,7 +92,7 @@ function BuilderPage() {
         name,
         purpose,
         instructions,
-        modelProvider: provider as "gemini",
+        modelProvider: provider,
         modelId,
         temperature: 0.2,
         maxOutputTokens: 2000,
@@ -150,8 +152,11 @@ function BuilderPage() {
         )}
         {data && (
           <div className="flex flex-wrap gap-2 text-xs" data-testid="provider-flags">
-            {Object.entries(data.providers).map(([name, on]) => (
-              <Badge key={name} variant={on ? "default" : "outline"}>{name}: {on ? "configured" : "not configured"}</Badge>
+            {PROVIDER_ORDER.map((name) => (
+              <Badge key={name} variant={data.providers[name] ? "default" : "outline"}>
+                {PROVIDER_LABEL[name]}: {data.providers[name] ? "configured" : "not configured"}
+                {providerTier(name) === "secondary" ? " · secondary" : ""}
+              </Badge>
             ))}
           </div>
         )}
@@ -181,8 +186,21 @@ function BuilderPage() {
           <TabsContent value="model" className="space-y-3">
             <Label>Provider</Label>
             <div className="flex flex-wrap gap-2">
-              {["gemini", "openai", "anthropic", "openai_compat"].map((item) => (
-                <Button key={item} type="button" size="sm" variant={provider === item ? "default" : "outline"} onClick={() => setProvider(item)} disabled={rules}>{item}</Button>
+              {PROVIDER_ORDER.map((item) => (
+                <Button
+                  key={item}
+                  type="button"
+                  size="sm"
+                  variant={provider === item ? "default" : "outline"}
+                  onClick={() => {
+                    setProvider(item);
+                    const first = modelsFor(item)[0];
+                    if (first) setModelId(first.id);
+                  }}
+                  disabled={rules}
+                >
+                  {PROVIDER_LABEL[item]}{providerTier(item) === "secondary" ? " · secondary" : ""}
+                </Button>
               ))}
             </div>
             <Label>Model</Label>

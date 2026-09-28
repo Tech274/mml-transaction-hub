@@ -3,6 +3,12 @@
 
 export type ModelProviderId = "openai" | "anthropic" | "gemini" | "openai_compat";
 
+/** OpenAI and Anthropic are the owner's providers. Gemini and the compatible endpoint stay available. */
+export const PROVIDER_ORDER: readonly ModelProviderId[] = ["openai", "anthropic", "gemini", "openai_compat"];
+export const PRIMARY_PROVIDERS: readonly ModelProviderId[] = ["openai", "anthropic"];
+export const DEFAULT_PROVIDER: ModelProviderId = "openai";
+export const DEFAULT_MODEL_ID = "gpt-6-luna";
+
 export interface CatalogModel {
   provider: ModelProviderId;
   id: string;
@@ -14,24 +20,6 @@ export interface CatalogModel {
 }
 
 export const MODEL_CATALOG: readonly CatalogModel[] = [
-  {
-    provider: "gemini",
-    id: "gemini-3.8-flash",
-    label: "Gemini 3.8 Flash",
-    inputPerMtokUsd: 0.75,
-    outputPerMtokUsd: 3.75,
-    premium: false,
-    sourceUrl: "https://ai.google.dev/gemini-api/docs/pricing",
-  },
-  {
-    provider: "gemini",
-    id: "gemini-3.1-flash-lite",
-    label: "Gemini 3.1 Flash Lite",
-    inputPerMtokUsd: 0.25,
-    outputPerMtokUsd: 1.5,
-    premium: false,
-    sourceUrl: "https://ai.google.dev/gemini-api/docs/pricing",
-  },
   {
     provider: "openai",
     id: "gpt-6-luna",
@@ -69,6 +57,24 @@ export const MODEL_CATALOG: readonly CatalogModel[] = [
     sourceUrl: "https://platform.claude.com/docs/en/about-claude/pricing",
   },
   {
+    provider: "gemini",
+    id: "gemini-3.8-flash",
+    label: "Gemini 3.8 Flash",
+    inputPerMtokUsd: 0.75,
+    outputPerMtokUsd: 3.75,
+    premium: false,
+    sourceUrl: "https://ai.google.dev/gemini-api/docs/pricing",
+  },
+  {
+    provider: "gemini",
+    id: "gemini-3.1-flash-lite",
+    label: "Gemini 3.1 Flash Lite",
+    inputPerMtokUsd: 0.25,
+    outputPerMtokUsd: 1.5,
+    premium: false,
+    sourceUrl: "https://ai.google.dev/gemini-api/docs/pricing",
+  },
+  {
     provider: "openai_compat",
     id: "compat-default",
     label: "OpenAI-compatible default",
@@ -93,3 +99,7 @@ export const PROVIDER_LABEL: Record<ModelProviderId, string> = {
   gemini: "Google Gemini",
   openai_compat: "OpenAI-compatible",
 };
+
+export function providerTier(provider: ModelProviderId): "primary" | "secondary" {
+  return (PRIMARY_PROVIDERS as readonly string[]).includes(provider) ? "primary" : "secondary";
+}

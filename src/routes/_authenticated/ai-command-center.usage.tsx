@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { getUsage, setKillSwitch, updateCostSettings } from "@/lib/ai/agent.functions";
+import { PROVIDER_LABEL, PROVIDER_ORDER, providerTier } from "@/lib/ai/model-catalog";
 
 export const Route = createFileRoute("/_authenticated/ai-command-center/usage")({
   beforeLoad: requireRouteRoles("/ai-command-center/usage"),
@@ -80,8 +81,11 @@ function UsagePage() {
             <p className="text-2xl font-semibold" data-testid="usage-spent">${spent.toFixed(4)} <span className="text-sm font-normal text-muted-foreground">of ${cap.toFixed(2)}</span></p>
             <p className="text-xs text-muted-foreground">Tokens in {data?.tokens_in ?? 0} · out {data?.tokens_out ?? 0}</p>
             <div className="flex flex-wrap gap-2 text-xs">
-              {data && Object.entries(data.providers).map(([name, on]) => (
-                <Badge key={name} variant={on ? "default" : "outline"}>{name}: {on ? "configured" : "not configured"}</Badge>
+              {data && PROVIDER_ORDER.map((name) => (
+                <Badge key={name} variant={data.providers[name] ? "default" : "outline"}>
+                  {PROVIDER_LABEL[name]}: {data.providers[name] ? "configured" : "not configured"}
+                  {providerTier(name) === "secondary" ? " · secondary" : ""}
+                </Badge>
               ))}
             </div>
             <div className="flex items-center gap-3">
