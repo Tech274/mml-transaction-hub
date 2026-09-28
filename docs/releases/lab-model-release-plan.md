@@ -27,3 +27,15 @@ All PRs below must remain open and unmerged until the full set is complete.
 2. Roll back app code to previous known-good GitHub release tag/commit.
 3. For schema rollback, run only the explicitly approved rollback SQL from each migration header in reverse migration order.
 4. Re-run reconciliation checks (transactions, batch totals, profit fields, AI work-item state).
+
+## Demo run path (local only, example data)
+
+1. Run `bash scripts/demo-local.sh` from repo root.
+2. This starts local Supabase in `scripts/demo-local/`, applies repo migrations to local Postgres, loads `supabase/seed-demo.sql` example data, and starts the app at `http://127.0.0.1:8080`.
+3. Demo accounts are listed in `DEMO.md` (local-only credentials and roles).
+4. Do **not** run `supabase link` or `supabase db push` against hosted projects for this demo flow.
+
+## Owner open questions (blocking final combined release)
+
+1. **Hosting/deployment target remains undecided** (GitHub-only workflow in progress).  
+   We must not choose/configure Azure, AWS, Vercel, or any other target until owner decision.
