@@ -99,7 +99,7 @@ export function AgentsSummary() {
 
       const runs = runsRows as RunRow[];
       const inbox = inboxRows as InboxRow[];
-      const activeAgents = (agents as AgentSummary[]).filter((agent) => agent.status !== "disabled").length;
+      const activeAgents = (agents as AgentSummary[]).length;
       const pending = inbox.filter((row) => row.status === "pending").length;
       const confirmed = inbox.filter((row) => row.status === "confirmed").length;
       const rejected = inbox.filter((row) => row.status === "rejected").length;
