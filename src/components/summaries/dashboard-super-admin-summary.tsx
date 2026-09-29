@@ -40,9 +40,11 @@ import {
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
 import {
-  buildTimelineFromPoints,
+  buildFytdComparison,
+  financialYearWindow,
   includesDashboardPeriod,
-  previousMonth,
+  parseDashboardPeriod,
+  resolveFinancialYearEnd,
   type DashboardPeriodFilter,
   type YearMonthPoint,
 } from "@/components/summaries/dashboard-summary-utils";
@@ -109,10 +111,10 @@ type TrendPoint = {
   label: string;
   year: number;
   month: number;
-  revenue: number | null;
-  inputCost: number | null;
-  profit: number | null;
-  marginPct: number | null;
+  revenue: number;
+  inputCost: number;
+  profit: number;
+  marginPct: number;
   lineCount: number;
   publicCount: number;
   privateCount: number;
@@ -504,13 +506,13 @@ function isTicketOverdue(ticket: TicketSummaryRow): boolean {
   return new Date(ticket.due_by).getTime() < Date.now();
 }
 
-function toPctChange(current: number, previous: number): number | null {
-  if (!Number.isFinite(previous) || previous === 0) return null;
+function toPctChange(current: number, previous: number | null): number | null {
+  if (previous === null || !Number.isFinite(previous) || previous === 0) return null;
   return ((current - previous) / previous) * 100;
 }
 
-function toPointChange(current: number, previous: number): number | null {
-  if (!Number.isFinite(previous)) return null;
+function toPointChange(current: number, previous: number | null): number | null {
+  if (previous === null || !Number.isFinite(previous)) return null;
   return current - previous;
 }
 
@@ -549,14 +551,7 @@ function applyTxFilters(
   });
 }
 
-function buildTrendPoints(rows: TxRow[], periodFilter: DashboardPeriodFilter): TrendPoint[] {
-  const points: YearMonthPoint[] = rows
-    .filter(
-      (row): row is TxRow & { year: number; month: number } =>
-        typeof row.year === "number" && typeof row.month === "number",
-    )
-    .map((row) => ({ year: row.year, month: row.month }));
-  const timeline = buildTimelineFromPoints(points, periodFilter);
+function buildTrendPoints(rows: TxRow[], timeline: YearMonthPoint[]): TrendPoint[] {
   const byMonth = new Map<string, TxRow[]>();
   for (const row of rows) {
     if (!row.year || !row.month) continue;
@@ -573,21 +568,6 @@ function buildTrendPoints(rows: TxRow[], periodFilter: DashboardPeriodFilter): T
     const lineCount = bucket.length;
     const publicCount = bucket.filter((row) => row.repository_type === "public_cloud").length;
     const privateCount = bucket.filter((row) => row.repository_type === "private_cloud").length;
-    if (lineCount === 0) {
-      return {
-        key,
-        label: monthShort(point.year, point.month),
-        year: point.year,
-        month: point.month,
-        revenue: null,
-        inputCost: null,
-        profit: null,
-        marginPct: null,
-        lineCount: 0,
-        publicCount: 0,
-        privateCount: 0,
-      };
-    }
     const profit = revenue - inputCost;
     return {
       key,
@@ -597,7 +577,7 @@ function buildTrendPoints(rows: TxRow[], periodFilter: DashboardPeriodFilter): T
       revenue,
       inputCost,
       profit,
-      marginPct: revenue > 0 ? Number(((profit / revenue) * 100).toFixed(1)) : null,
+      marginPct: revenue > 0 ? Number(((profit / revenue) * 100).toFixed(1)) : 0,
       lineCount,
       publicCount,
       privateCount,
@@ -636,10 +616,6 @@ function sparklinePoints(values: number[]): string {
       return `${x.toFixed(2)},${y.toFixed(2)}`;
     })
     .join(" ");
-}
-
-function emptyIfNull(value: number | null): number {
-  return value ?? 0;
 }
 
 export function DashboardSuperAdminSummary() {
@@ -747,7 +723,7 @@ export function DashboardSuperAdminSummary() {
       { value: "all" as DashboardPeriodFilter, label: "All months · All years" },
       ...years.map((year) => ({
         value: `year:${year}` as DashboardPeriodFilter,
-        label: `All months · ${year}`,
+        label: `All months · FY ${year}`,
       })),
       ...monthEntries,
     ];
@@ -783,7 +759,7 @@ export function DashboardSuperAdminSummary() {
     [data?.txRows, cloudFilter, customerFilter, periodFilter],
   );
 
-  const deltaBaseRows = useMemo(() => {
+  const chartBaseRows = useMemo(() => {
     if (!data) return [];
     return data.txRows.filter((row) => {
       if (cloudFilter !== "all" && row.repository_type !== cloudFilter) return false;
@@ -792,9 +768,26 @@ export function DashboardSuperAdminSummary() {
     });
   }, [data, cloudFilter, customerFilter]);
 
+  const chartTimeline = useMemo(() => {
+    const fallbackPoint = {
+      year: new Date().getFullYear(),
+      month: new Date().getMonth() + 1,
+    };
+    const chartPoints: YearMonthPoint[] = chartBaseRows
+      .filter(
+        (row): row is TxRow & { year: number; month: number } =>
+          typeof row.year === "number" && typeof row.month === "number",
+      )
+      .map((row) => ({ year: row.year, month: row.month }))
+      .sort((a, b) => (a.year === b.year ? a.month - b.month : a.year - b.year));
+    const latestChartPoint = chartPoints.at(-1) ?? null;
+    const fyEndYear = resolveFinancialYearEnd(periodFilter, latestChartPoint, fallbackPoint);
+    return financialYearWindow(fyEndYear);
+  }, [chartBaseRows, periodFilter]);
+
   const trendRows = useMemo(
-    () => buildTrendPoints(filteredRows, periodFilter),
-    [filteredRows, periodFilter],
+    () => buildTrendPoints(chartBaseRows, chartTimeline),
+    [chartBaseRows, chartTimeline],
   );
 
   const topRevenue = useMemo(() => {
@@ -919,77 +912,76 @@ export function DashboardSuperAdminSummary() {
     );
   }
 
-  const totalRevenue = filteredRows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
-  const totalInputCost = filteredRows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
-  const totalProfit = totalRevenue - totalInputCost;
-  const marginPct = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
-  const publicLineCount = filteredRows.filter(
-    (row) => row.repository_type === "public_cloud",
-  ).length;
-  const privateLineCount = filteredRows.filter(
-    (row) => row.repository_type === "private_cloud",
-  ).length;
+  const periodSelection = parseDashboardPeriod(periodFilter);
+  const selectedPeriodIndex =
+    periodSelection.kind === "month"
+      ? trendRows.findIndex(
+          (row) => row.year === periodSelection.year && row.month === periodSelection.month,
+        )
+      : -1;
+  const latestDataIndex = (() => {
+    for (let idx = trendRows.length - 1; idx >= 0; idx -= 1) {
+      if (trendRows[idx].lineCount > 0) return idx;
+    }
+    return -1;
+  })();
+  const currentPeriodIndex =
+    selectedPeriodIndex >= 0
+      ? selectedPeriodIndex
+      : latestDataIndex >= 0
+        ? latestDataIndex
+        : trendRows.length > 0
+          ? trendRows.length - 1
+          : null;
+  const currentTrendPoint =
+    currentPeriodIndex !== null && currentPeriodIndex >= 0 ? trendRows[currentPeriodIndex] : null;
+  const previousTrendPoint =
+    currentPeriodIndex !== null && currentPeriodIndex > 0
+      ? trendRows[currentPeriodIndex - 1]
+      : null;
 
-  const latestPeriodPoint = trendRows
-    .filter((row) => row.lineCount > 0)
-    .sort((a, b) => (a.year === b.year ? a.month - b.month : a.year - b.year))
-    .at(-1);
-  const currentPeriodRows = latestPeriodPoint
-    ? filteredRows.filter(
-        (row) => row.year === latestPeriodPoint.year && row.month === latestPeriodPoint.month,
-      )
-    : [];
-  const currentMonthRevenue = currentPeriodRows.reduce(
-    (sum, row) => addNullable(sum, row.selling_cost),
-    0,
+  const fytd = buildFytdComparison(
+    trendRows.map((row, index) => ({ index, revenue: row.revenue, inputCost: row.inputCost })),
+    currentPeriodIndex,
   );
-  const currentMonthCost = currentPeriodRows.reduce(
-    (sum, row) => addNullable(sum, lineCost(row)),
-    0,
-  );
-  const currentMonthProfit = currentMonthRevenue - currentMonthCost;
 
-  const previousPoint = latestPeriodPoint
-    ? previousMonth({ year: latestPeriodPoint.year, month: latestPeriodPoint.month })
-    : null;
-  const previousRows = previousPoint
-    ? deltaBaseRows.filter(
-        (row) => row.year === previousPoint.year && row.month === previousPoint.month,
-      )
-    : [];
-  const previousRevenue = previousRows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
-  const previousCost = previousRows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
-  const previousProfit = previousRevenue - previousCost;
-  const previousMarginPct = previousRevenue > 0 ? (previousProfit / previousRevenue) * 100 : 0;
-  const previousPublicCount = previousRows.filter(
-    (row) => row.repository_type === "public_cloud",
-  ).length;
-  const previousPrivateCount = previousRows.filter(
-    (row) => row.repository_type === "private_cloud",
-  ).length;
+  const totalRevenue = fytd.currentRevenue;
+  const totalInputCost = fytd.currentCost;
+  const totalProfit = fytd.currentProfit;
+  const marginPct = fytd.currentMarginPct;
 
-  const revenueDelta = toPctChange(totalRevenue, previousRevenue);
-  const costDelta = toPctChange(totalInputCost, previousCost);
-  const profitDelta = toPctChange(totalProfit, previousProfit);
-  const marginDelta = toPointChange(marginPct, previousMarginPct);
+  const currentMonthRevenue = currentTrendPoint?.revenue ?? 0;
+  const currentMonthProfit = currentTrendPoint?.profit ?? 0;
+  const previousRevenue = previousTrendPoint?.revenue ?? null;
+  const previousProfit = previousTrendPoint?.profit ?? null;
+  const publicLineCount = currentTrendPoint?.publicCount ?? 0;
+  const privateLineCount = currentTrendPoint?.privateCount ?? 0;
+  const previousPublicCount = previousTrendPoint?.publicCount ?? null;
+  const previousPrivateCount = previousTrendPoint?.privateCount ?? null;
+
+  const revenueDelta = toPctChange(totalRevenue, fytd.previousRevenue);
+  const costDelta = toPctChange(totalInputCost, fytd.previousCost);
+  const profitDelta = toPctChange(totalProfit, fytd.previousProfit);
+  const marginDelta = toPointChange(marginPct, fytd.previousMarginPct);
   const monthRevenueDelta = toPctChange(currentMonthRevenue, previousRevenue);
   const monthProfitDelta = toPctChange(currentMonthProfit, previousProfit);
-  const publicCountDelta = previousRows.length > 0 ? publicLineCount - previousPublicCount : null;
+  const publicCountDelta =
+    previousPublicCount === null ? null : publicLineCount - previousPublicCount;
   const privateCountDelta =
-    previousRows.length > 0 ? privateLineCount - previousPrivateCount : null;
+    previousPrivateCount === null ? null : privateLineCount - previousPrivateCount;
 
-  const trendRevenue = trendRows.map((row) => emptyIfNull(row.revenue));
-  const trendCost = trendRows.map((row) => emptyIfNull(row.inputCost));
-  const trendProfit = trendRows.map((row) => emptyIfNull(row.profit));
-  const trendMargin = trendRows.map((row) => emptyIfNull(row.marginPct));
+  const trendRevenue = trendRows.map((row) => row.revenue);
+  const trendCost = trendRows.map((row) => row.inputCost);
+  const trendProfit = trendRows.map((row) => row.profit);
+  const trendMargin = trendRows.map((row) => row.marginPct);
   const trendPublic = trendRows.map((row) => row.publicCount);
   const trendPrivate = trendRows.map((row) => row.privateCount);
 
-  const chartRevenueTotal = trendRows.reduce((sum, row) => sum + emptyIfNull(row.revenue), 0);
-  const chartCostTotal = trendRows.reduce((sum, row) => sum + emptyIfNull(row.inputCost), 0);
+  const chartRevenueTotal = trendRows.reduce((sum, row) => sum + row.revenue, 0);
+  const chartCostTotal = trendRows.reduce((sum, row) => sum + row.inputCost, 0);
   const chartMarginPct =
     chartRevenueTotal > 0 ? ((chartRevenueTotal - chartCostTotal) / chartRevenueTotal) * 100 : 0;
-  const chartTitleSuffix = latestPeriodPoint ? latestPeriodPoint.year : new Date().getFullYear();
+  const chartTitleSuffix = chartTimeline.at(-1)?.year ?? new Date().getFullYear();
 
   const lobOrder = ["VILT", "Standalone", "Integrated"] as const;
   const lobRows = lobOrder.map((name) => ({
@@ -1047,7 +1039,7 @@ export function DashboardSuperAdminSummary() {
       className="space-y-3 rounded-xl p-3"
       style={{ background: PALETTE.pageBg, border: `1px solid ${PALETTE.border}` }}
     >
-      <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           {isExampleCaptureMode ? (
             <span
@@ -1062,7 +1054,7 @@ export function DashboardSuperAdminSummary() {
             Viewing as <strong>{viewer.viewerName}</strong> · <strong>{viewer.viewerRole}</strong>
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:overflow-visible lg:pb-0">
           <div
             className="inline-flex rounded-full border bg-white p-1"
             style={{ borderColor: PALETTE.border }}
@@ -1085,7 +1077,7 @@ export function DashboardSuperAdminSummary() {
           </div>
           <Select value={customerFilter} onValueChange={setCustomerFilter}>
             <SelectTrigger
-              className="h-8 rounded-full border bg-white px-3 text-xs font-medium"
+              className="h-8 w-[148px] rounded-full border bg-white px-3 text-xs font-medium"
               style={{ borderColor: PALETTE.border }}
             >
               <SelectValue />
@@ -1104,7 +1096,7 @@ export function DashboardSuperAdminSummary() {
             onValueChange={(value) => setPeriodFilter(value as DashboardPeriodFilter)}
           >
             <SelectTrigger
-              className="h-8 rounded-full border bg-white px-3 text-xs font-medium"
+              className="h-8 w-[170px] rounded-full border bg-white px-3 text-xs font-medium"
               style={{ borderColor: PALETTE.border }}
             >
               <SelectValue />
@@ -1127,7 +1119,7 @@ export function DashboardSuperAdminSummary() {
           tag="FYTD"
           delta={
             revenueDelta !== null
-              ? `${revenueDelta >= 0 ? "+" : ""}${revenueDelta.toFixed(1)}% vs last month`
+              ? `${revenueDelta >= 0 ? "+" : ""}${revenueDelta.toFixed(1)}% vs end of last month`
               : null
           }
           deltaTone={revenueDelta === null ? "neutral" : revenueDelta >= 0 ? "good" : "bad"}
@@ -1139,7 +1131,7 @@ export function DashboardSuperAdminSummary() {
           tag="FYTD"
           delta={
             costDelta !== null
-              ? `${costDelta >= 0 ? "+" : ""}${costDelta.toFixed(1)}% vs last month`
+              ? `${costDelta >= 0 ? "+" : ""}${costDelta.toFixed(1)}% vs end of last month`
               : null
           }
           deltaTone={costDelta === null ? "neutral" : costDelta >= 0 ? "bad" : "good"}
@@ -1151,7 +1143,7 @@ export function DashboardSuperAdminSummary() {
           tag="FYTD"
           delta={
             profitDelta !== null
-              ? `${profitDelta >= 0 ? "+" : ""}${profitDelta.toFixed(1)}% vs last month`
+              ? `${profitDelta >= 0 ? "+" : ""}${profitDelta.toFixed(1)}% vs end of last month`
               : null
           }
           deltaTone={profitDelta === null ? "neutral" : profitDelta >= 0 ? "good" : "bad"}
@@ -1163,7 +1155,7 @@ export function DashboardSuperAdminSummary() {
           tag="FYTD"
           delta={
             marginDelta !== null
-              ? `${marginDelta >= 0 ? "+" : ""}${marginDelta.toFixed(1)} pts vs last month`
+              ? `${marginDelta >= 0 ? "+" : ""}${marginDelta.toFixed(1)} pts vs end of last month`
               : null
           }
           deltaTone={marginDelta === null ? "neutral" : marginDelta >= 0 ? "good" : "bad"}
@@ -1318,7 +1310,7 @@ export function DashboardSuperAdminSummary() {
                   />
                   <Line
                     yAxisId="margin"
-                    type="monotone"
+                    type="linear"
                     dataKey="marginPct"
                     name="Margin %"
                     stroke={PALETTE.gold}
@@ -1330,7 +1322,7 @@ export function DashboardSuperAdminSummary() {
                       dataKey="marginPct"
                       position="top"
                       formatter={(value: number | null) =>
-                        value === null ? "" : `${value.toFixed(1)}%`
+                        value === null || value === 0 ? "" : `${value.toFixed(1)}%`
                       }
                     />
                   </Line>

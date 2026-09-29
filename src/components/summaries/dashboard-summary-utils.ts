@@ -1,4 +1,5 @@
 export type DashboardPeriodFilter = "all" | `year:${number}` | `month:${number}-${number}`;
+export const FINANCIAL_YEAR_START_MONTH = 10;
 
 export interface YearMonthPoint {
   year: number;
@@ -89,4 +90,109 @@ export function buildTimelineFromPoints(
     timeline.push(fromMonthIndex(idx));
   }
   return timeline;
+}
+
+export function financialYearEndForPoint(
+  point: YearMonthPoint,
+  fyStartMonth: number = FINANCIAL_YEAR_START_MONTH,
+): number {
+  return point.month >= fyStartMonth ? point.year + 1 : point.year;
+}
+
+export function financialYearWindow(
+  fyEndYear: number,
+  fyStartMonth: number = FINANCIAL_YEAR_START_MONTH,
+): YearMonthPoint[] {
+  const startYear = fyEndYear - 1;
+  const points: YearMonthPoint[] = [];
+  for (let idx = 0; idx < 12; idx += 1) {
+    const month = ((fyStartMonth - 1 + idx) % 12) + 1;
+    const year = month >= fyStartMonth ? startYear : fyEndYear;
+    points.push({ year, month });
+  }
+  return points;
+}
+
+export function resolveFinancialYearEnd(
+  period: DashboardPeriodFilter,
+  latestPoint: YearMonthPoint | null,
+  fallback: YearMonthPoint,
+  fyStartMonth: number = FINANCIAL_YEAR_START_MONTH,
+): number {
+  const parsed = parseDashboardPeriod(period);
+  if (parsed.kind === "year") return parsed.year;
+  if (parsed.kind === "month") {
+    return financialYearEndForPoint({ year: parsed.year, month: parsed.month }, fyStartMonth);
+  }
+  if (latestPoint) return financialYearEndForPoint(latestPoint, fyStartMonth);
+  return financialYearEndForPoint(fallback, fyStartMonth);
+}
+
+export type TrendMetricPoint = {
+  revenue: number;
+  inputCost: number;
+  index: number;
+};
+
+export type FytdComparison = {
+  currentRevenue: number;
+  currentCost: number;
+  currentProfit: number;
+  currentMarginPct: number;
+  previousRevenue: number | null;
+  previousCost: number | null;
+  previousProfit: number | null;
+  previousMarginPct: number | null;
+};
+
+export function buildFytdComparison(
+  points: TrendMetricPoint[],
+  currentIndex: number | null,
+): FytdComparison {
+  if (currentIndex === null || currentIndex < 0 || points.length === 0) {
+    return {
+      currentRevenue: 0,
+      currentCost: 0,
+      currentProfit: 0,
+      currentMarginPct: 0,
+      previousRevenue: null,
+      previousCost: null,
+      previousProfit: null,
+      previousMarginPct: null,
+    };
+  }
+  let currentRevenue = 0;
+  let currentCost = 0;
+  let previousRevenue = 0;
+  let previousCost = 0;
+  for (const point of points) {
+    if (point.index <= currentIndex) {
+      currentRevenue += point.revenue;
+      currentCost += point.inputCost;
+    }
+    if (point.index < currentIndex) {
+      previousRevenue += point.revenue;
+      previousCost += point.inputCost;
+    }
+  }
+  const currentProfit = currentRevenue - currentCost;
+  const currentMarginPct = currentRevenue > 0 ? (currentProfit / currentRevenue) * 100 : 0;
+  const hasPrevious = currentIndex > 0;
+  const previousProfit = hasPrevious ? previousRevenue - previousCost : null;
+  const previousMarginPct =
+    hasPrevious && previousRevenue > 0 && previousProfit !== null
+      ? (previousProfit / previousRevenue) * 100
+      : hasPrevious
+        ? 0
+        : null;
+  return {
+    currentRevenue,
+    currentCost,
+    currentProfit,
+    currentMarginPct,
+    previousRevenue: hasPrevious ? previousRevenue : null,
+    previousCost: hasPrevious ? previousCost : null,
+    previousProfit,
+    previousMarginPct,
+  };
 }

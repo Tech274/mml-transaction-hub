@@ -135,7 +135,7 @@ export const updateAdrTransaction = createServerFn({ method: "POST" })
         "validation",
       );
     }
-    const patch = toTransactionUpdate(parsed.data);
+    const patch = stripLockedCostFields(toTransactionUpdate(parsed.data));
     if (patch.customer_name) {
       const display = cleanCustomerName(patch.customer_name);
       const normalized = normalizeName(display);
@@ -170,6 +170,49 @@ export const updateAdrTransaction = createServerFn({ method: "POST" })
     await syncHybridTag(context, idParsed.data.id, parsed.data.is_hybrid === true);
     if (patch.lab_batch_id) await recomputeBatch(context, patch.lab_batch_id);
     return { id: idParsed.data.id };
+  });
+
+export function stripLockedCostFields(
+  patch: ReturnType<typeof toTransactionUpdate>,
+): Omit<ReturnType<typeof toTransactionUpdate>, "input_cost" | "selling_cost"> {
+  const { input_cost: _ignoredInputCost, selling_cost: _ignoredSellingCost, ...rest } = patch;
+  return rest;
+}
+
+export const adminCostCorrectionSchema = z.object({
+  id: z.string().uuid(),
+  input_cost: z.number().finite().min(0).max(1_000_000_000),
+  selling_cost: z.number().finite().min(0).max(1_000_000_000),
+  reason: z
+    .string()
+    .trim()
+    .min(3, "Reason must be at least 3 characters.")
+    .max(500, "Reason must be 500 characters or fewer."),
+  public_actual_consumption: z.number().finite().min(0).nullable().optional(),
+  public_credit_allocated: z.number().finite().min(0).nullable().optional(),
+});
+
+export const adminCorrectTransactionCosts = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => adminCostCorrectionSchema.parse(d))
+  .handler(async ({ data, context }) => {
+    const isAdmin = await hasAnyRole(context, ["admin"]);
+    if (!isAdmin) {
+      throw new AppError(
+        "Cost fields are locked. Only Super Admin can correct them with a reason.",
+        "forbidden",
+      );
+    }
+    const { error } = await context.supabase.rpc("admin_correct_lab_transaction_costs", {
+      p_transaction_id: data.id,
+      p_selling_cost: data.selling_cost,
+      p_input_cost: data.input_cost,
+      p_public_actual_consumption: data.public_actual_consumption ?? null,
+      p_public_credit_allocated: data.public_credit_allocated ?? null,
+      p_reason: data.reason,
+    });
+    if (error) throw dbError(error, "transactions.adminCorrectTransactionCosts");
+    return { id: data.id };
   });
 
 async function syncHybridTag(
