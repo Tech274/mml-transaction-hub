@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { AgentsSummary } from "@/components/summaries/agents-summary";
 import { requireRouteRoles } from "@/lib/route-guard";
@@ -9,9 +9,8 @@ export const Route = createFileRoute("/_authenticated/ai-command-center/agents")
 });
 
 function AgentsPage() {
-  return (
-    <AppShell title="Agents">
-      <AgentsSummary />
-    </AppShell>
-  );
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const showChildRoute = pathname.startsWith("/ai-command-center/agents/");
+
+  return <AppShell title="Agents">{showChildRoute ? <Outlet /> : <AgentsSummary />}</AppShell>;
 }

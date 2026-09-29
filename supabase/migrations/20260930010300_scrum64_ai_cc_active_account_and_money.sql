@@ -9,8 +9,31 @@
 -- Flag: SCRUM-64 is the migration-discipline ticket. There is no dedicated AI-agents Jira id yet.
 --
 -- Rollback:
---   -- First, handle rows that use new action values before restoring the old CHECK:
---   -- these values were introduced in this migration and would violate
+--   -- 0) Remove migration register rows for #16-#18 as part of rollback tracking.
+--   DELETE FROM supabase_migrations.schema_migrations
+--   WHERE version IN ('20260930010100', '20260930010200', '20260930010300');
+--
+--   -- 1) Backup and clean ai_cc_inbox rows that would violate the old checks.
+--   -- Old checks allow only:
+--   --   agent_key IN ('generalist','support','cost_adr')
+--   --   item_type IN ('solution_guide','email_draft','ticket_proposal','adr_field_map')
+--   CREATE TABLE IF NOT EXISTS public.ai_cc_inbox_rollback_backup_20260930 AS
+--   SELECT *
+--   FROM public.ai_cc_inbox
+--   WHERE agent_key NOT IN ('generalist','support','cost_adr')
+--      OR item_type NOT IN ('solution_guide','email_draft','ticket_proposal','adr_field_map');
+--   -- Delete backed-up rows before re-adding the old CHECK constraints.
+--   DELETE FROM public.ai_cc_inbox
+--   WHERE agent_key NOT IN ('generalist','support','cost_adr')
+--      OR item_type NOT IN ('solution_guide','email_draft','ticket_proposal','adr_field_map');
+--
+--   -- 2) Backup and then handle rows that use new ai_cc_audit.action values.
+--   CREATE TABLE IF NOT EXISTS public.ai_cc_audit_rollback_backup_20260930 AS
+--   SELECT *
+--   FROM public.ai_cc_audit
+--   WHERE action NOT IN ('run','propose','confirm','reject');
+--
+--   -- These values were introduced in this migration and would violate
 --   -- action IN ('run','propose','confirm','reject').
 --   UPDATE public.ai_cc_audit SET action = 'run'
 --   WHERE action IN ('kill_switch','test_run','eval_run','budget_block');
@@ -19,7 +42,7 @@
 --   DELETE FROM public.ai_cc_audit
 --   WHERE action NOT IN ('run','propose','confirm','reject');
 --
---   -- Remove new FKs/CHECKs and restore previous checks.
+--   -- 3) Remove new FKs/CHECKs and restore previous checks.
 --   ALTER TABLE public.ai_cc_runs DROP CONSTRAINT IF EXISTS ai_cc_runs_agent_key_fkey;
 --   ALTER TABLE public.ai_cc_inbox DROP CONSTRAINT IF EXISTS ai_cc_inbox_agent_key_fkey;
 --   ALTER TABLE public.ai_cc_runs DROP CONSTRAINT IF EXISTS ai_cc_runs_agent_key_check;

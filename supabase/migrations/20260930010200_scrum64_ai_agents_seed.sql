@@ -6,13 +6,11 @@
 -- Gemini remains in the price list as a secondary provider.
 -- Nothing is deleted. The four audit-log tables are not referenced.
 --
--- Rollback: none needed, rows are unused until the app publish. To remove them before any run exists:
---   DELETE FROM public.ai_agent_tools WHERE version_id IN (SELECT id FROM public.ai_agent_versions WHERE version = 1);
---   DELETE FROM public.ai_agent_evals WHERE agent_id IN (SELECT id FROM public.ai_agents);
---   UPDATE public.ai_agents SET current_version_id = NULL;
---   DELETE FROM public.ai_agent_versions WHERE version = 1;
---   DELETE FROM public.ai_agents WHERE key IN ('generalist','support','cost_adr','ticket_triage','dashboard_qa');
---   That delete needs Vivek's approval if any run already points at these rows.
+-- Rollback: this seed rollback is covered by schema rollback in 20260930010100.
+-- The append-only triggers on ai_agent_versions and ai_agent_tools block DELETEs here by design.
+-- Correct rollback order:
+--   1) Roll back 20260930010300 first (policy/check/FK rollback on ai_cc_*).
+--   2) Roll back 20260930010100 next (`DROP TABLE ... CASCADE` removes all ai_* seed rows and triggers).
 
 INSERT INTO public.ai_agents (key, name, status, engine, is_system)
 VALUES
@@ -28,7 +26,7 @@ INSERT INTO public.ai_agent_versions (
   run_roles, view_roles, approve_roles, triggers, output_types, limits, eval_status, change_note
 )
 SELECT a.id, 1,
-  'Drafts a lab solution guide from a fixed template. Quotes fixed prices. Paused by default.',
+  'Drafts a lab solution guide from a fixed template. Quotes fixed prices.',
   'Rules engine. Do not call a model.',
   'none', NULL, 0, 2000,
   ARRAY['admin','ops_lead','ops_user','leadership','finance']::public.app_role[],
@@ -66,7 +64,7 @@ INSERT INTO public.ai_agent_versions (
   run_roles, view_roles, approve_roles, triggers, output_types, limits, eval_status, change_note
 )
 SELECT a.id, 1,
-  'Maps a CONFIRMED lab request into Master ADR fields. Never writes a transaction. Paused by default.',
+  'Maps a CONFIRMED lab request into Master ADR fields. Never writes a transaction.',
   'Rules engine. Do not call a model.',
   'none', NULL, 0, 2000,
   ARRAY['admin','ops_lead','ops_user','leadership','finance']::public.app_role[],

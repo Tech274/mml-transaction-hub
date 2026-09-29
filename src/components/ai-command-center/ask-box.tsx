@@ -22,7 +22,11 @@ export function DashboardAskBox() {
   });
   const mut = useMutation({
     mutationFn: () => run({ data: { agentKey: "dashboard_qa", hint: question } }),
-    onSuccess: (result) => setAnswer(result.error || String((result.output as { answer?: string } | null)?.answer ?? result.status)),
+    onSuccess: (result) =>
+      setAnswer(
+        result.error ||
+          String((result.output as { answer?: string } | null)?.answer ?? result.status),
+      ),
     onError: (error) => setAnswer(error instanceof Error ? error.message : "Could not ask"),
   });
   if (!canAsk || !availability.data?.dashboardQaEnabled) return null;
@@ -30,13 +34,29 @@ export function DashboardAskBox() {
     <Card data-testid="dashboard-ask">
       <CardHeader>
         <CardTitle className="text-base">Ask about these figures</CardTitle>
-        <CardDescription>Dashboard Q&A drafts an answer from data you can already see. It does not change anything.</CardDescription>
+        <CardDescription>
+          Dashboard Q&A drafts an answer from data you can already see. It does not change anything.
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-2">
-        <Textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="How many transactions this year?" />
+        <Textarea
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder="How many transactions this year?"
+        />
         <div className="flex gap-2">
-          <Button size="sm" onClick={() => mut.mutate()} disabled={mut.isPending || question.trim().length < 3}>Ask</Button>
-          <Button asChild size="sm" variant="outline"><Link to="/ai-command-center/inbox" search={{ agent: "dashboard_qa" }}>Inbox</Link></Button>
+          <Button
+            size="sm"
+            onClick={() => mut.mutate()}
+            disabled={mut.isPending || question.trim().length < 3}
+          >
+            Ask
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link to="/ai-command-center/inbox" search={{ agent: "dashboard_qa" }}>
+              Inbox
+            </Link>
+          </Button>
         </div>
         {answer && <p className="text-sm whitespace-pre-wrap">{answer}</p>}
       </CardContent>
