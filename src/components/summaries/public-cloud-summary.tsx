@@ -5,7 +5,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -117,7 +116,12 @@ export function PublicCloudSummary() {
         const monthRows = rows.filter((row) => row.month === month && row.year === chartYear);
         const monthRevenue = monthRows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
         const monthCost = monthRows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
-        return { month: MONTH_NAMES[idx].slice(0, 3), revenue: monthRevenue, cost: monthCost };
+        return {
+          month: MONTH_NAMES[idx].slice(0, 3),
+          monthLabel: `${MONTH_NAMES[idx].slice(0, 3)} ${String(chartYear).slice(2)}`,
+          revenue: monthRevenue,
+          cost: monthCost,
+        };
       });
 
       const providerRevenueMap = new Map<string, number>();
@@ -202,30 +206,35 @@ export function PublicCloudSummary() {
   const hasLobSplit = data.lobSplit.length > 0;
   const hasStatusSplit = data.statusSplit.length > 0;
   const hasProviderCredit = data.providerCredit.length > 0;
+  const monthSeries = data.byMonth.filter((row) => row.revenue > 0 || row.cost > 0);
+  const lobTotal = data.lobSplit.reduce((sum, row) => sum + row.value, 0);
 
   return (
     <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-semibold">Public cloud summary</h2>
+        <p className="text-xs text-muted-foreground">Public cloud transactions, credits and customer mix.</p>
+      </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
-        <SummaryKpi label="Revenue" value={fmtCurrency(data.revenue)} />
-        <SummaryKpi label="Input cost" value={fmtCurrency(data.inputCost)} />
-        <SummaryKpi label="Profit" value={fmtCurrency(data.profit)} />
-        <SummaryKpi label="Margin" value={`${data.marginPct.toFixed(1)}%`} />
-        <SummaryKpi label="Lines" value={fmtNumber(data.rows.length)} />
-        <SummaryKpi label="Running now" value={fmtNumber(data.runningNow)} />
-        <SummaryKpi label="Ending in next 7 days" value={fmtNumber(data.endingSoon)} />
-        <SummaryKpi label="Credit used" value={fmtCurrency(data.creditUsed)} />
+        <SummaryKpi label="Revenue" value={fmtCurrency(data.revenue)} subline={`Input cost ${fmtCurrency(data.inputCost)}`} />
+        <SummaryKpi label="Profit" value={fmtCurrency(data.profit)} subline={`Margin ${data.marginPct.toFixed(1)}%`} />
+        <SummaryKpi label="Lines" value={fmtNumber(data.rows.length)} subline={`FY ${data.chartYear}`} />
+        <SummaryKpi label="Running now" value={fmtNumber(data.runningNow)} subline={`Ending soon ${fmtNumber(data.endingSoon)}`} />
+        <SummaryKpi label="Credit used" value={fmtCurrency(data.creditUsed)} subline="Across cloud providers" />
+        <SummaryKpi label="LOB entries" value={fmtNumber(lobTotal)} subline="VILT · Standalone · Integrated" />
+        <SummaryKpi label="Top customer" value={data.topCustomers[0]?.name ?? "—"} subline={data.topCustomers[0] ? fmtCurrency(data.topCustomers[0].value) : "No data"} />
+        <SummaryKpi label="Status" value={data.runningNow > 0 ? "Active" : "Quiet"} subline={data.runningNow > 0 ? "Live labs running" : "No live labs"} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Cost overview by month">
-          {hasMonthlyCostData ? (
+          {hasMonthlyCostData && monthSeries.length > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
-              <ComposedChart data={data.byMonth}>
+              <ComposedChart data={monthSeries}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                <XAxis dataKey="month" fontSize={12} />
+                <XAxis dataKey="monthLabel" fontSize={12} />
                 <YAxis fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
                 <Tooltip formatter={(value: number) => fmtCurrency(value)} />
-                <Legend />
                 <Bar dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
                 <Line dataKey="cost" name="Input cost" stroke="var(--chart-3)" strokeWidth={2} />
               </ComposedChart>
@@ -257,13 +266,15 @@ export function PublicCloudSummary() {
           {hasLobSplit ? (
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
-                <Pie data={data.lobSplit} dataKey="value" nameKey="name" outerRadius={85} label>
+                <Pie data={data.lobSplit} dataKey="value" nameKey="name" outerRadius={90} innerRadius={58}>
                   {data.lobSplit.map((_, idx) => (
                     <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
-                <Legend />
+                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-sm font-semibold">
+                  {fmtNumber(lobTotal)}
+                </text>
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -297,7 +308,6 @@ export function PublicCloudSummary() {
                 <YAxis yAxisId="money" fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
                 <YAxis yAxisId="pct" orientation="right" fontSize={12} tickFormatter={(value) => `${value}%`} />
                 <Tooltip formatter={(value: number, key) => (String(key).includes("Pct") ? `${value}%` : fmtCurrency(value))} />
-                <Legend />
                 <Bar yAxisId="money" dataKey="allocated" name="Allocated credit" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
                 <Bar yAxisId="money" dataKey="used" name="Used credit" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
                 <Line yAxisId="pct" dataKey="utilizationPct" name="Utilization %" stroke="var(--chart-4)" strokeWidth={2} />
@@ -363,12 +373,21 @@ function NoDataYet() {
   );
 }
 
-function SummaryKpi({ label, value }: { label: string; value: string }) {
+function SummaryKpi({
+  label,
+  value,
+  subline,
+}: {
+  label: string;
+  value: string;
+  subline?: string;
+}) {
   return (
     <Card>
       <CardContent className="pt-5">
         <div className="text-xs text-muted-foreground">{label}</div>
         <div className="mt-1 text-xl font-semibold">{value}</div>
+        {subline && <div className="mt-1 text-xs text-muted-foreground">{subline}</div>}
       </CardContent>
     </Card>
   );

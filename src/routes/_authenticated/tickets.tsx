@@ -32,6 +32,7 @@ import {
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
 import { requireRouteRoles } from "@/lib/route-guard";
+import { fmtNumber } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/tickets")({
   beforeLoad: requireRouteRoles("/tickets"),
@@ -253,30 +254,6 @@ function TicketsPage() {
     [scoped],
   );
 
-  const charts = useMemo(() => {
-    const tally = (pick: (r: TicketRow) => string | null | undefined) => {
-      const m = new Map<string, number>();
-      for (const r of scoped) {
-        const k = pick(r) || "Unassigned";
-        m.set(k, (m.get(k) ?? 0) + 1);
-      }
-      return [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-    };
-    const months = new Map<string, number>();
-    for (const r of scoped) {
-      if (!r.ticket_created_at) continue;
-      const dt = new Date(r.ticket_created_at);
-      const key = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
-      months.set(key, (months.get(key) ?? 0) + 1);
-    }
-    return {
-      by_status: tally((r) => r.status),
-      by_priority: tally((r) => r.priority),
-      by_agent: tally((r) => r.agent_name).slice(0, 10),
-      by_month: [...months.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-12).map(([month, value]) => ({ month, value })),
-    };
-  }, [scoped]);
-
   const pageRows = filtered.slice(page * perPage, page * perPage + perPage);
 
   const pages = Math.max(1, Math.ceil(filtered.length / perPage));
@@ -379,26 +356,10 @@ function TicketsPage() {
                 <AlertDescription>{d.connection.message}</AlertDescription>
               </Alert>
             )}
-            {d && (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                <Stat label="Total tickets" value={counts.total} active={quick === "all"} onClick={() => pick("all")} />
-                <Stat label="Open" value={counts.open} active={quick === "open"} onClick={() => pick("open")} />
-                <Stat label="Pending" value={counts.pending} active={quick === "pending"} onClick={() => pick("pending")} />
-                <Stat label="Resolved" value={counts.resolved} active={quick === "resolved"} onClick={() => pick("resolved")} />
-                <Stat label="Closed" value={counts.closed} active={quick === "closed"} onClick={() => pick("closed")} />
-                <Stat
-                  label="Overdue"
-                  value={counts.overdue}
-                  tone={counts.overdue > 0 ? "warn" : undefined}
-                  active={quick === "overdue"}
-                  onClick={() => pick("overdue")}
-                />
-              </div>
-            )}
             {quick !== "all" && (
               <div className="flex items-center gap-2 text-sm">
                 <Badge variant="secondary" className="gap-1">
-                  {QUICK_LABEL[quick]} only
+                  {QUICK_LABEL[quick]} filter is active
                   <button aria-label="Clear filter" onClick={() => pick("all")}><X className="h-3 w-3" /></button>
                 </Badge>
               </div>
@@ -446,66 +407,6 @@ function TicketsPage() {
               ))}
             </CardContent>
           </Card>
-        )}
-
-        {d && counts.total > 0 && (
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ChartCard title="Tickets by status">
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie data={charts.by_status} dataKey="value" nameKey="name" outerRadius={90} label>
-                    {charts.by_status.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartCard>
-            <ChartCard title="Tickets by priority">
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart
-                  data={charts.by_priority}
-                  onClick={(e: { activeLabel?: string }) => {
-                    if (e?.activeLabel) { setQuick("all"); setPriority(e.activeLabel); setPage(0); }
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" fontSize={12} />
-                  <YAxis fontSize={12} allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} className="cursor-pointer" />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-            <ChartCard title="Top agents by ticket volume">
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart
-                  data={charts.by_agent}
-                  layout="vertical"
-                  onClick={(e: { activeLabel?: string }) => {
-                    if (e?.activeLabel) { setQuick("all"); setAgent(e.activeLabel); setPage(0); }
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" fontSize={12} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" width={120} fontSize={12} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="var(--chart-1)" radius={[0, 4, 4, 0]} className="cursor-pointer" />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-            <ChartCard title="Tickets created per month">
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={charts.by_month}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" fontSize={12} />
-                  <YAxis fontSize={12} allowDecimals={false} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          </div>
         )}
 
         <Card>
@@ -873,30 +774,6 @@ function TicketDetailSheet({
   );
 }
 
-function Stat({
-  label, value, tone, active, onClick,
-}: { label: string; value: number; tone?: "warn"; active?: boolean; onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 ${active ? "border-primary ring-1 ring-primary" : ""}`}
-    >
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-2xl font-semibold ${tone === "warn" ? "text-destructive" : ""}`}>{value.toLocaleString()}</p>
-    </button>
-  );
-}
-
-function ChartCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  );
-}
-
 function FilterSelect({
   label, value, onChange, options,
 }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
@@ -1092,13 +969,16 @@ function SupportTicketsSummary({
         <SummaryChartCard title="Tickets by priority">
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
-              <Pie data={byPriority} dataKey="value" nameKey="name" outerRadius={85} label>
+              <Pie data={byPriority} dataKey="value" nameKey="name" outerRadius={85} innerRadius={54}>
                 {byPriority.map((_, idx) => (
                   <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
                 ))}
               </Pie>
               <Tooltip />
               <Legend />
+              <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-xs font-semibold">
+                {fmtNumber(rows.length)}
+              </text>
             </PieChart>
           </ResponsiveContainer>
         </SummaryChartCard>

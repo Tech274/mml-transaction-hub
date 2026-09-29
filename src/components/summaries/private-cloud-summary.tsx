@@ -5,7 +5,6 @@ import {
   Bar,
   CartesianGrid,
   ComposedChart,
-  Legend,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -54,6 +53,16 @@ type TxRow = {
 };
 
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
+
+function formatBatchStatus(status: string): string {
+  const map: Record<string, string> = {
+    open: "Open",
+    closed_actual: "Closed",
+    closed_estimate: "Closed (Estimate)",
+    pending: "Pending",
+  };
+  return map[status] ?? status.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 const EXAMPLE_BATCHES: BatchRow[] = [
   { id: "pb-1", batch_code: "LB-PRIV-0929-A", name: "Azure FinOps Cohort", status: "open", revenue_total: 285000, estimated_cost_total: 169500, actual_cost_total: 162300, flags: ["cost_locked"], needs_recompute: false, updated_at: "2026-09-29T05:28:00Z" },
@@ -129,6 +138,7 @@ export function PrivateCloudSummary() {
         const monthMargin = monthRevenue > 0 ? ((monthRevenue - monthCost) / monthRevenue) * 100 : 0;
         return {
           month: MONTH_NAMES[idx].slice(0, 3),
+          monthLabel: `${MONTH_NAMES[idx].slice(0, 3)} ${String(year).slice(2)}`,
           revenue: monthRevenue,
           cost: monthCost,
           marginPct: Number(monthMargin.toFixed(1)),
@@ -137,7 +147,8 @@ export function PrivateCloudSummary() {
 
       const statusMap = new Map<string, number>();
       for (const batch of batches) {
-        statusMap.set(batch.status, (statusMap.get(batch.status) ?? 0) + 1);
+        const label = formatBatchStatus(batch.status);
+        statusMap.set(label, (statusMap.get(label) ?? 0) + 1);
       }
 
       const byBatchLineActual = new Map<string, number>();
@@ -214,31 +225,36 @@ export function PrivateCloudSummary() {
   const hasStatusSplit = data.statusSplit.length > 0;
   const hasReconciliation = data.reconciliation.length > 0;
   const hasTopCustomers = data.topCustomers.length > 0;
+  const monthSeries = data.byMonth.filter((row) => row.revenue > 0 || row.cost > 0);
+  const statusTotal = data.statusSplit.reduce((sum, row) => sum + row.value, 0);
 
   return (
     <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-semibold">Private cloud summary</h2>
+        <p className="text-xs text-muted-foreground">Batches, reconciliation and customer performance.</p>
+      </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
-        <SummaryKpi label="Batches" value={fmtNumber(data.batches.length)} />
-        <SummaryKpi label="Revenue" value={fmtCurrency(data.revenue)} />
-        <SummaryKpi label="Actual cost" value={fmtCurrency(data.actualCost)} />
-        <SummaryKpi label="Estimated cost" value={fmtCurrency(data.estimatedCost)} />
-        <SummaryKpi label="Profit" value={fmtCurrency(data.profit)} />
-        <SummaryKpi label="Margin" value={`${data.marginPct.toFixed(1)}%`} />
-        <SummaryKpi label="Cost locks" value={fmtNumber(data.locked)} />
-        <SummaryKpi label="Recompute pending" value={fmtNumber(data.recomputePending)} />
+        <SummaryKpi label="Batches" value={fmtNumber(data.batches.length)} subline={`FY ${data.year}`} />
+        <SummaryKpi label="Revenue" value={fmtCurrency(data.revenue)} subline={`Profit ${fmtCurrency(data.profit)}`} />
+        <SummaryKpi label="Actual cost" value={fmtCurrency(data.actualCost)} subline={`Estimated ${fmtCurrency(data.estimatedCost)}`} />
+        <SummaryKpi label="Margin" value={`${data.marginPct.toFixed(1)}%`} subline={`Cost locks ${fmtNumber(data.locked)}`} />
+        <SummaryKpi label="Recompute pending" value={fmtNumber(data.recomputePending)} subline="Batches needing refresh" />
+        <SummaryKpi label="Top customer" value={data.topCustomers[0]?.name ?? "—"} subline={data.topCustomers[0] ? fmtCurrency(data.topCustomers[0].value) : "No data"} />
+        <SummaryKpi label="Status entries" value={fmtNumber(statusTotal)} subline="Open and closed batches" />
+        <SummaryKpi label="Reconciliation" value={hasReconciliation ? "Tracked" : "No data"} subline={`${fmtNumber(data.reconciliation.filter((batch) => batch.reconciled).length)} reconciled`} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Revenue and margin by month">
-          {hasMonthlyData ? (
+          {hasMonthlyData && monthSeries.length > 0 ? (
             <ResponsiveContainer width="100%" height={250}>
-              <ComposedChart data={data.byMonth}>
+              <ComposedChart data={monthSeries}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                <XAxis dataKey="month" fontSize={12} />
+                <XAxis dataKey="monthLabel" fontSize={12} />
                 <YAxis yAxisId="money" fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
                 <YAxis yAxisId="margin" orientation="right" fontSize={12} tickFormatter={(value) => `${value}%`} />
                 <Tooltip formatter={(value: number, name) => (String(name).includes("%") ? `${value}%` : fmtCurrency(value))} />
-                <Legend />
                 <Bar yAxisId="money" dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
                 <Line yAxisId="money" dataKey="cost" name="Cost" stroke="var(--chart-2)" strokeWidth={2} />
                 <Line yAxisId="margin" dataKey="marginPct" name="Margin %" stroke="var(--chart-3)" strokeWidth={2} />
@@ -253,13 +269,15 @@ export function PrivateCloudSummary() {
           {hasStatusSplit ? (
             <ResponsiveContainer width="100%" height={250}>
               <PieChart>
-                <Pie data={data.statusSplit} dataKey="value" nameKey="name" outerRadius={85} label>
+                <Pie data={data.statusSplit} dataKey="value" nameKey="name" outerRadius={90} innerRadius={58}>
                   {data.statusSplit.map((_, idx) => (
                     <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
-                <Legend />
+                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-sm font-semibold">
+                  {fmtNumber(statusTotal)}
+                </text>
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -337,7 +355,7 @@ export function PrivateCloudSummary() {
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-medium">{batch.batch_code}</div>
-                <Badge variant="outline">{batch.status}</Badge>
+                  <Badge variant="outline">{formatBatchStatus(batch.status)}</Badge>
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
                 Revenue {fmtCurrency(batch.revenue_total)} · Actual cost {fmtCurrency(batch.actual_cost_total)} ·
@@ -363,12 +381,21 @@ function NoDataYet({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function SummaryKpi({ label, value }: { label: string; value: string }) {
+function SummaryKpi({
+  label,
+  value,
+  subline,
+}: {
+  label: string;
+  value: string;
+  subline?: string;
+}) {
   return (
     <Card>
       <CardContent className="pt-5">
         <div className="text-xs text-muted-foreground">{label}</div>
         <div className="mt-1 text-xl font-semibold">{value}</div>
+        {subline && <div className="mt-1 text-xs text-muted-foreground">{subline}</div>}
       </CardContent>
     </Card>
   );

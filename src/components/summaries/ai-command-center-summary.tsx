@@ -21,7 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { fmtNumber } from "@/lib/format";
 import { LIVE_ROLES, PARKED_ROLES } from "@/lib/role-rollout";
-import type { AgentKey } from "@/lib/ai-command-center.functions";
+import { AGENTS, type AgentKey } from "@/lib/ai-command-center.functions";
 import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
@@ -81,6 +81,32 @@ function toAgentKey(value: string): AgentKey | undefined {
   return AGENT_KEYS.includes(value as AgentKey) ? (value as AgentKey) : undefined;
 }
 
+function formatItemType(value: string): string {
+  const map: Record<string, string> = {
+    ticket_proposal: "Ticket proposal",
+    solution_guide: "Solution guide",
+    adr_field_map: "ADR field map",
+    email_draft: "Email draft",
+  };
+  return map[value] ?? value.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatRoleName(value: string): string {
+  const map: Record<string, string> = {
+    admin: "Super Admin",
+    leadership: "Leadership",
+    finance: "Finance",
+    ops_lead: "Ops Lead",
+    ops_user: "Ops User",
+    viewer: "Viewer",
+  };
+  return map[value] ?? value;
+}
+
+function formatAgentLabel(agentKey: string): string {
+  return AGENTS.find((agent) => agent.key === agentKey)?.name ?? agentKey;
+}
+
 export function AiCommandCenterSummary() {
   const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const { data, isLoading, isError, error } = useQuery({
@@ -120,7 +146,8 @@ export function AiCommandCenterSummary() {
 
       const byTypeMap = new Map<string, number>();
       for (const row of inbox) {
-        byTypeMap.set(row.item_type, (byTypeMap.get(row.item_type) ?? 0) + 1);
+        const label = formatItemType(row.item_type);
+        byTypeMap.set(label, (byTypeMap.get(label) ?? 0) + 1);
       }
       const workByType = [...byTypeMap.entries()].map(([name, value]) => ({ name, value }));
 
@@ -129,9 +156,9 @@ export function AiCommandCenterSummary() {
       const alerts = runs.filter((row) => row.status === "error").slice(0, 5);
       const automationHealthy = alerts.length === 0;
       const governance = {
-        liveRoles: LIVE_ROLES.join(", "),
-        parkedRoles: PARKED_ROLES.join(", "),
-        leadershipAccess: "Leadership blocked from AI Command Center routes and nav.",
+        liveRoles: LIVE_ROLES.map(formatRoleName).join(", "),
+        parkedRoles: PARKED_ROLES.map(formatRoleName).join(", "),
+        leadershipAccess: "Leadership does not have AI Command Center access.",
       };
 
       const auditRuns = audit.filter((row) => row.action === "run").length;
@@ -176,9 +203,14 @@ export function AiCommandCenterSummary() {
   const hasWorkByType = data.workByType.length > 0;
   const hasReviewOutcomes = data.reviewOutcomes.some((row) => row.value > 0);
   const hasLiveWork = data.liveWork.length > 0;
+  const reviewTotal = data.reviewOutcomes.reduce((sum, row) => sum + row.value, 0);
 
   return (
     <div className="space-y-4">
+      <div>
+        <h2 className="text-base font-semibold">AI Command Center summary</h2>
+        <p className="text-xs text-muted-foreground">Review queue, automation health and governance checkpoints.</p>
+      </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
         <SummaryKpi label="Review queue" value={fmtNumber(data.pending.length)} />
         <SummaryKpi label="Alerts" value={fmtNumber(data.alerts.length)} />
@@ -204,9 +236,11 @@ export function AiCommandCenterSummary() {
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-sm font-medium">{item.title}</div>
-                    <Badge variant="outline">{item.agent_key}</Badge>
+                    <Badge variant="outline">{formatAgentLabel(item.agent_key)}</Badge>
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">{item.summary ?? item.item_type}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {item.summary ?? formatItemType(item.item_type)}
+                  </div>
                 </Link>
               ))
             ) : (
@@ -228,7 +262,7 @@ export function AiCommandCenterSummary() {
               <div key={run.id} className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2">
                 <div className="text-sm font-medium">{run.id}</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {run.agent_key} · Failed at {new Date(run.created_at).toLocaleString()}
+                  {formatAgentLabel(run.agent_key)} · Failed at {new Date(run.created_at).toLocaleString()}
                 </div>
               </div>
             ))}
@@ -257,13 +291,16 @@ export function AiCommandCenterSummary() {
           {hasReviewOutcomes ? (
             <ResponsiveContainer width="100%" height={260}>
               <PieChart>
-                <Pie data={data.reviewOutcomes} dataKey="value" nameKey="name" outerRadius={85} label>
+                <Pie data={data.reviewOutcomes} dataKey="value" nameKey="name" outerRadius={90} innerRadius={58}>
                   {data.reviewOutcomes.map((_, idx) => (
                     <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
                 <Legend />
+                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-sm font-semibold">
+                  {fmtNumber(reviewTotal)}
+                </text>
               </PieChart>
             </ResponsiveContainer>
           ) : (
@@ -304,9 +341,9 @@ export function AiCommandCenterSummary() {
             )}
             {data.liveWork.map((run) => (
               <div key={run.id} className="rounded-md border border-border px-3 py-2">
-                <div className="text-sm font-medium">{run.id}</div>
+                <div className="text-sm font-medium">{formatAgentLabel(run.agent_key)}</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {run.agent_key} · Started {new Date(run.created_at).toLocaleString()}
+                  Started {new Date(run.created_at).toLocaleString()} · Run {run.id}
                 </div>
               </div>
             ))}
@@ -318,10 +355,16 @@ export function AiCommandCenterSummary() {
         <CardHeader>
           <CardTitle className="text-sm">Governance</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2 text-xs">
-          <Badge variant="outline">Live roles: {data.governance.liveRoles}</Badge>
-          <Badge variant="secondary">Parked roles: {data.governance.parkedRoles}</Badge>
-          <Badge variant="destructive">{data.governance.leadershipAccess}</Badge>
+        <CardContent className="space-y-2 text-xs">
+          <div className="rounded-md border border-border px-3 py-2">
+            Live roles: <strong>{data.governance.liveRoles}</strong>
+          </div>
+          <div className="rounded-md border border-border px-3 py-2">
+            Parked roles: <strong>{data.governance.parkedRoles}</strong>
+          </div>
+          <div className="rounded-md border border-border px-3 py-2">
+            Access note: <strong>{data.governance.leadershipAccess}</strong>
+          </div>
         </CardContent>
       </Card>
     </div>

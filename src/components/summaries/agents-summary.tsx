@@ -63,6 +63,16 @@ const EXAMPLE_INBOX: InboxRow[] = [
   { id: "inb-6", agent_key: "cost_adr", status: "pending", created_at: "2026-09-29T02:51:14Z", decided_at: null },
 ];
 
+function formatRunStatus(status: string): string {
+  const map: Record<string, string> = {
+    done: "Completed",
+    running: "Running",
+    error: "Failed",
+    pending: "Pending",
+  };
+  return map[status] ?? status.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function AgentsSummary() {
   const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const listAgentsFn = useServerFn(listAgents);
@@ -89,7 +99,7 @@ export function AgentsSummary() {
 
       const runs = runsRows as RunRow[];
       const inbox = inboxRows as InboxRow[];
-      const activeAgents = (agents as AgentSummary[]).filter((agent) => agent.status !== "idle").length;
+      const activeAgents = (agents as AgentSummary[]).filter((agent) => agent.status !== "disabled").length;
       const pending = inbox.filter((row) => row.status === "pending").length;
       const confirmed = inbox.filter((row) => row.status === "confirmed").length;
       const rejected = inbox.filter((row) => row.status === "rejected").length;
@@ -150,6 +160,7 @@ export function AgentsSummary() {
         runsPerDay,
         recentRuns: runs.slice(0, 10),
         activeAgents,
+        totalAgents: AGENTS.length,
         totalRuns: runs.length,
         totalProposals: inbox.length,
         pending,
@@ -181,8 +192,11 @@ export function AgentsSummary() {
 
   return (
     <div className="space-y-4">
+      <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
+        <strong>Active agents: {fmtNumber(data.activeAgents)} of {fmtNumber(data.totalAgents)}</strong>
+      </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-        <SummaryKpi label="Active agents" value={fmtNumber(data.activeAgents)} />
+        <SummaryKpi label="Active agents" value={`${fmtNumber(data.activeAgents)} of ${fmtNumber(data.totalAgents)}`} />
         <SummaryKpi label="Runs" value={fmtNumber(data.totalRuns)} />
         <SummaryKpi label="Proposals" value={fmtNumber(data.totalProposals)} />
         <SummaryKpi label="Awaiting review" value={fmtNumber(data.pending)} />
@@ -307,13 +321,15 @@ export function AgentsSummary() {
                 className="block rounded-md border border-border px-3 py-2 hover:bg-muted/30"
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-medium">{run.id}</div>
+                  <div className="text-sm font-medium">
+                    {AGENTS.find((agent) => agent.key === run.agent_key)?.name ?? run.agent_key}
+                  </div>
                   <Badge variant={run.status === "done" ? "default" : run.status === "error" ? "destructive" : "secondary"}>
-                    {run.status}
+                    {formatRunStatus(run.status)}
                   </Badge>
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {run.agent_key} · {new Date(run.created_at).toLocaleString()}
+                  {new Date(run.created_at).toLocaleString()} · Run {run.id}
                 </div>
               </Link>
             ))
