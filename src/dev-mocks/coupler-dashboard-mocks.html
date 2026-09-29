@@ -3,24 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MML Dashboard Mocks</title>
+    <title>MML dashboard mock views</title>
     <style>
       :root {
-        --mock-page-bg: #f4f7fd;
-        --mock-card-bg: #ffffff;
-        --mock-border: #e1e5f2;
-        --mock-border-strong: #b7bed2;
-        --mock-text: #181a20;
-        --mock-subtext: #3e424f;
-        --mock-muted: #767b8c;
-        --mock-accent: #2e6cde;
-        --mock-accent-soft: #e6effe;
-        --mock-teal: #0b6e99;
-        --mock-red: #b4424d;
-        --mock-amber: #bd5705;
-        --mock-green: #256f46;
-        --mock-sky: #38a2cf;
-        --mock-purple: #6f57c5;
+        --page-bg: #f4f7fd;
+        --card-bg: #ffffff;
+        --border: #e1e5f2;
+        --border-strong: #b7bed2;
+        --text: #181a20;
+        --text-secondary: #3e424f;
+        --text-muted: #767b8c;
+        --azure: #2e6cde;
+        --azure-soft: #c0d5f6;
+        --margin-gold: #bd8a05;
+        --private-navy: #23548a;
+        --teal: #0b6e99;
+        --green: #256f46;
+        --red: #b4424d;
+        --amber: #bd5705;
+        --lob-vilt: #2e6cde;
+        --lob-standalone: #0b6e99;
+        --lob-integrated: #6f57c5;
       }
 
       * {
@@ -29,10 +32,10 @@
 
       body {
         margin: 0;
-        background: var(--mock-page-bg);
-        color: var(--mock-text);
+        color: var(--text);
+        background: var(--page-bg);
         font-family:
-          "Inter",
+          Inter,
           "Segoe UI",
           ui-sans-serif,
           system-ui,
@@ -40,144 +43,167 @@
           sans-serif;
       }
 
-      .mock-shell {
-        width: 100%;
+      .shell {
         max-width: 1440px;
         margin: 0 auto;
-        padding: 16px;
+        padding: 14px;
       }
 
-      .mock-header {
+      .header {
         display: flex;
-        align-items: flex-start;
         justify-content: space-between;
         gap: 16px;
-        margin-bottom: 8px;
+        align-items: flex-start;
+        margin-bottom: 10px;
       }
 
-      .mock-title {
-        margin: 0;
-        font-size: 24px;
-        line-height: 1.2;
-        font-weight: 700;
-      }
-
-      .mock-subtitle {
-        margin: 4px 0 0;
-        color: var(--mock-subtext);
-        font-size: 13px;
-      }
-
-      .mock-label {
+      .mock-badge {
         display: inline-flex;
         align-items: center;
         border: 1px solid rgba(46, 108, 222, 0.35);
-        color: var(--mock-accent);
-        background: var(--mock-accent-soft);
+        color: var(--azure);
+        background: #e6effe;
         border-radius: 999px;
         padding: 4px 10px;
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.04em;
         margin-bottom: 8px;
       }
 
-      .mock-actions {
+      h1 {
+        margin: 0;
+        font-size: 26px;
+        line-height: 1.2;
+      }
+
+      .subtitle {
+        margin-top: 5px;
+        color: var(--text-secondary);
+        font-size: 13px;
+      }
+
+      .controls {
         display: flex;
+        flex-wrap: wrap;
         gap: 8px;
       }
 
-      .pill-button {
-        border: 1px solid var(--mock-border);
-        background: #fff;
+      .chip,
+      .chip-active {
+        border: 1px solid var(--border);
         border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
         padding: 8px 12px;
-        font-size: 12px;
-        color: var(--mock-subtext);
-        font-weight: 600;
+        background: #fff;
+        color: var(--text-secondary);
       }
 
-      .pill-button.ai {
-        background: linear-gradient(120deg, #9d52ff, #dc4cf9);
-        color: #fff;
-        border-color: transparent;
+      .chip-active {
+        border-color: var(--azure);
+        background: #edf3ff;
+        color: var(--azure);
       }
 
-      .mock-tabs {
-        display: flex;
-        gap: 16px;
-        border-bottom: 1px solid var(--mock-border);
-        margin-bottom: 12px;
-      }
-
-      .mock-tab {
-        padding: 10px 2px 9px;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.02em;
-        color: var(--mock-muted);
-        border-bottom: 2px solid transparent;
-        font-weight: 600;
-      }
-
-      .mock-tab.active {
-        color: var(--mock-text);
-        border-bottom-color: var(--mock-accent);
+      .selector {
+        min-width: 160px;
       }
 
       .kpi-grid {
         display: grid;
         grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 10px;
-        margin-bottom: 12px;
+        margin-bottom: 10px;
       }
 
-      .kpi-tile {
-        background: var(--mock-card-bg);
-        border: 1px solid var(--mock-border);
+      .kpi {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
         border-radius: 12px;
-        padding: 12px 14px;
-        min-height: 84px;
+        padding: 11px 12px;
+      }
+
+      .kpi-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+        align-items: center;
       }
 
       .kpi-label {
-        margin: 0;
-        color: var(--mock-muted);
+        color: var(--text-muted);
         font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.02em;
+        font-weight: 600;
+      }
+
+      .kpi-tag {
+        border-radius: 999px;
+        border: 1px solid #cbd4ea;
+        color: var(--text-secondary);
+        font-size: 10px;
+        padding: 2px 8px;
       }
 
       .kpi-value {
-        margin: 8px 0 0;
-        font-size: 30px;
-        line-height: 1;
+        margin-top: 5px;
+        font-size: 29px;
+        line-height: 1.05;
         font-weight: 700;
       }
 
-      .kpi-note {
+      .kpi-footer {
         margin-top: 6px;
-        font-size: 11px;
-        color: var(--mock-subtext);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
       }
 
-      .chart-grid {
+      .delta-pill {
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        padding: 2px 8px;
+      }
+
+      .delta-good {
+        color: var(--green);
+        background: #e6f4ec;
+      }
+
+      .delta-bad {
+        color: var(--red);
+        background: #fdebed;
+      }
+
+      .sparkline {
+        width: 68px;
+        height: 20px;
+      }
+
+      .grid-2 {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .grid-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
         gap: 10px;
       }
 
       .card {
-        border: 1px solid var(--mock-border);
+        background: var(--card-bg);
+        border: 1px solid var(--border);
         border-radius: 12px;
-        background: var(--mock-card-bg);
       }
 
-      .card-header {
-        padding: 10px 14px 0;
+      .card-head {
+        padding: 10px 12px 0;
         display: flex;
-        align-items: center;
         justify-content: space-between;
+        align-items: center;
         gap: 8px;
       }
 
@@ -187,28 +213,28 @@
         font-weight: 700;
       }
 
-      .card-body {
-        padding: 10px 14px 14px;
-      }
-
-      .chart-menu {
-        color: var(--mock-muted);
+      .menu-dot {
+        color: var(--text-muted);
         font-size: 14px;
       }
 
-      .legend-row {
+      .card-body {
+        padding: 10px 12px 12px;
+      }
+
+      .legend-summary {
         display: flex;
         flex-wrap: wrap;
         gap: 12px;
+        margin-bottom: 7px;
         font-size: 11px;
-        color: var(--mock-subtext);
-        margin-bottom: 8px;
+        color: var(--text-secondary);
       }
 
       .legend-item {
         display: inline-flex;
-        align-items: center;
         gap: 6px;
+        align-items: center;
       }
 
       .dot {
@@ -217,179 +243,214 @@
         border-radius: 999px;
       }
 
-      .svg-chart {
+      .chart {
         width: 100%;
-        height: 230px;
-        display: block;
+        height: 255px;
       }
 
-      .hbar-chart {
+      .leader-list {
         display: grid;
         gap: 8px;
       }
 
-      .hbar-row {
+      .leader-row {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 10px;
         display: grid;
-        grid-template-columns: 122px minmax(0, 1fr) 74px;
+        grid-template-columns: 28px minmax(0, 1fr) 90px;
         gap: 8px;
         align-items: center;
       }
 
-      .hbar-name {
+      .avatar {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        background: #edf3ff;
+        color: var(--azure);
+        display: flex;
+        align-items: center;
+        justify-content: center;
         font-size: 11px;
-        color: var(--mock-subtext);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
+        font-weight: 700;
       }
 
-      .hbar-track {
-        position: relative;
-        height: 16px;
-        border-radius: 6px;
-        background: #eef2fb;
-      }
-
-      .hbar-fill {
-        position: absolute;
-        left: 0;
-        top: 0;
-        bottom: 0;
-        border-radius: 6px;
-        background: linear-gradient(90deg, var(--mock-accent), #4f86f0);
-      }
-
-      .hbar-value {
-        text-align: right;
-        font-size: 11px;
+      .leader-name {
+        font-size: 12px;
         font-weight: 600;
       }
 
-      .donut-wrap {
-        display: grid;
-        grid-template-columns: 220px 1fr;
-        gap: 8px;
-        align-items: center;
+      .leader-meta {
+        margin-top: 1px;
+        font-size: 10px;
+        color: var(--text-muted);
       }
 
-      .donut {
-        width: 180px;
-        height: 180px;
-        margin: 0 auto;
-        border-radius: 50%;
-        position: relative;
+      .leader-value {
+        text-align: right;
+        font-size: 12px;
+        font-weight: 700;
       }
 
-      .donut::after {
-        content: "";
-        position: absolute;
-        inset: 44px;
-        border-radius: 50%;
-        background: #fff;
-        border: 1px solid var(--mock-border);
+      .leader-share {
+        margin-top: 3px;
+        height: 5px;
+        border-radius: 999px;
+        background: #ebeff9;
+      }
+
+      .leader-share > span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--azure);
       }
 
       .donut-legend {
-        list-style: none;
-        margin: 0;
-        padding: 0;
         display: grid;
         gap: 8px;
+        margin-left: 4px;
       }
 
-      .donut-legend li {
+      .donut-item {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 8px;
+      }
+
+      .donut-top {
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        font-size: 12px;
-        color: var(--mock-subtext);
+        font-size: 11px;
+      }
+
+      .share-track {
+        margin-top: 4px;
+        height: 5px;
+        border-radius: 999px;
+        background: #edf1fb;
+      }
+
+      .share-fill {
+        height: 100%;
+        border-radius: inherit;
+      }
+
+      .dense-grid {
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
         gap: 10px;
       }
 
-      .summary-table {
+      .table-wrap {
         width: 100%;
         border-collapse: collapse;
         font-size: 12px;
       }
 
-      .summary-table th {
+      .table-wrap th,
+      .table-wrap td {
+        border: 1px solid var(--border);
+        padding: 7px 8px;
+      }
+
+      .table-wrap th {
         text-align: left;
-        background: #f6f8fc;
-        color: var(--mock-subtext);
+        color: var(--text-secondary);
+        background: #f7f9fd;
         font-weight: 700;
       }
 
-      .summary-table th,
-      .summary-table td {
-        border: 1px solid var(--mock-border);
-        padding: 8px 10px;
-      }
-
-      .summary-table td {
-        color: #1f2738;
-      }
-
-      .summary-table td.align-right,
-      .summary-table th.align-right {
+      .align-right {
         text-align: right;
       }
 
-      .helper-text {
-        margin: 0 0 10px;
+      .note {
+        color: var(--text-secondary);
         font-size: 12px;
-        color: var(--mock-subtext);
+        margin-bottom: 8px;
       }
 
-      .queue-title {
-        margin: 0 0 8px;
-        font-size: 16px;
+      .pill {
+        border-radius: 999px;
+        padding: 3px 8px;
+        font-size: 10px;
         font-weight: 700;
+        border: 1px solid var(--border);
       }
 
-      @media (max-width: 1200px) {
+      .status-open {
+        color: var(--azure);
+        background: #edf3ff;
+      }
+
+      .status-closed {
+        color: var(--text-secondary);
+        background: #f5f6fa;
+      }
+
+      .match {
+        margin-top: 8px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 8px;
+        font-size: 11px;
+      }
+
+      @media (max-width: 1240px) {
         .kpi-grid {
           grid-template-columns: repeat(3, minmax(0, 1fr));
         }
+
+        .grid-2,
+        .grid-3,
+        .dense-grid {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
   </head>
   <body>
-    <div class="mock-shell" id="app"></div>
+    <div class="shell" id="app"></div>
     <script>
-      const INR = new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-      });
+      const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
       const NUM = new Intl.NumberFormat("en-IN");
       const MONTHS = ["Oct 25", "Nov 25", "Dec 25", "Jan 26", "Feb 26", "Mar 26", "Apr 26", "May 26", "Jun 26", "Jul 26", "Aug 26", "Sep 26"];
 
+      const LOB_COLORS = {
+        VILT: getComputedStyle(document.documentElement).getPropertyValue("--lob-vilt").trim(),
+        Standalone: getComputedStyle(document.documentElement).getPropertyValue("--lob-standalone").trim(),
+        Integrated: getComputedStyle(document.documentElement).getPropertyValue("--lob-integrated").trim(),
+      };
+
       const DASHBOARD_ROWS = [
-        { month: 9, year: 2026, repository_type: "public_cloud", cloud_provider: "Azure", line_of_business: "Training", customer_name: "Cognizant", total_users: 42, input_cost: 48200, input_cost_actual_alloc: 46850, selling_cost: 67600 },
-        { month: 9, year: 2026, repository_type: "public_cloud", cloud_provider: "AWS", line_of_business: "Delivery", customer_name: "Infosys", total_users: 30, input_cost: 39100, input_cost_actual_alloc: 38920, selling_cost: 57500 },
-        { month: 9, year: 2026, repository_type: "public_cloud", cloud_provider: "Azure", line_of_business: "Training", customer_name: "TCS", total_users: 55, input_cost: 73400, input_cost_actual_alloc: 72130, selling_cost: 96500 },
-        { month: 9, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Delivery", customer_name: "HCL", total_users: 33, input_cost: 41900, input_cost_actual_alloc: 40210, selling_cost: 63100 },
-        { month: 8, year: 2026, repository_type: "private_cloud", cloud_provider: "AWS", line_of_business: "Training", customer_name: "Accenture", total_users: 37, input_cost: 44600, input_cost_actual_alloc: 44120, selling_cost: 68600 },
-        { month: 8, year: 2026, repository_type: "public_cloud", cloud_provider: "GCP", line_of_business: "Support", customer_name: "Wipro", total_users: 24, input_cost: 28800, input_cost_actual_alloc: 28240, selling_cost: 44600 },
-        { month: 7, year: 2026, repository_type: "public_cloud", cloud_provider: "Azure", line_of_business: "Delivery", customer_name: "Capgemini", total_users: 20, input_cost: 22900, input_cost_actual_alloc: 21980, selling_cost: 35200 },
-        { month: 7, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Training", customer_name: "TechM", total_users: 26, input_cost: 31200, input_cost_actual_alloc: 30500, selling_cost: 47800 },
-        { month: 6, year: 2026, repository_type: "public_cloud", cloud_provider: "AWS", line_of_business: "Delivery", customer_name: "LTIMindtree", total_users: 46, input_cost: 59200, input_cost_actual_alloc: 57120, selling_cost: 87400 },
-        { month: 6, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Support", customer_name: "Persistent", total_users: 29, input_cost: 36100, input_cost_actual_alloc: 34970, selling_cost: 54800 },
-        { month: 5, year: 2026, repository_type: "public_cloud", cloud_provider: "GCP", line_of_business: "Training", customer_name: "Mphasis", total_users: 18, input_cost: 21900, input_cost_actual_alloc: 21000, selling_cost: 33100 },
-        { month: 5, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Delivery", customer_name: "Hexaware", total_users: 27, input_cost: 33200, input_cost_actual_alloc: 31800, selling_cost: 50900 },
+        { month: 9, year: 2026, repository_type: "public_cloud", cloud_provider: "Azure", line_of_business: "VILT", customer_name: "Cognizant", total_users: 42, input_cost: 48200, input_cost_actual_alloc: 46850, selling_cost: 67600 },
+        { month: 9, year: 2026, repository_type: "public_cloud", cloud_provider: "AWS", line_of_business: "Standalone", customer_name: "Infosys", total_users: 30, input_cost: 39100, input_cost_actual_alloc: 38920, selling_cost: 57500 },
+        { month: 9, year: 2026, repository_type: "public_cloud", cloud_provider: "Azure", line_of_business: "VILT", customer_name: "TCS", total_users: 55, input_cost: 73400, input_cost_actual_alloc: 72130, selling_cost: 96500 },
+        { month: 9, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Integrated", customer_name: "HCL", total_users: 33, input_cost: 41900, input_cost_actual_alloc: 40210, selling_cost: 63100 },
+        { month: 8, year: 2026, repository_type: "private_cloud", cloud_provider: "AWS", line_of_business: "Integrated", customer_name: "Accenture", total_users: 37, input_cost: 44600, input_cost_actual_alloc: 44120, selling_cost: 68600 },
+        { month: 8, year: 2026, repository_type: "public_cloud", cloud_provider: "GCP", line_of_business: "Standalone", customer_name: "Wipro", total_users: 24, input_cost: 28800, input_cost_actual_alloc: 28240, selling_cost: 44600 },
+        { month: 7, year: 2026, repository_type: "public_cloud", cloud_provider: "Azure", line_of_business: "VILT", customer_name: "Capgemini", total_users: 20, input_cost: 22900, input_cost_actual_alloc: 21980, selling_cost: 35200 },
+        { month: 7, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Standalone", customer_name: "TechM", total_users: 26, input_cost: 31200, input_cost_actual_alloc: 30500, selling_cost: 47800 },
+        { month: 6, year: 2026, repository_type: "public_cloud", cloud_provider: "AWS", line_of_business: "VILT", customer_name: "LTIMindtree", total_users: 46, input_cost: 59200, input_cost_actual_alloc: 57120, selling_cost: 87400 },
+        { month: 6, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Standalone", customer_name: "Persistent", total_users: 29, input_cost: 36100, input_cost_actual_alloc: 34970, selling_cost: 54800 },
+        { month: 5, year: 2026, repository_type: "public_cloud", cloud_provider: "GCP", line_of_business: "Integrated", customer_name: "Mphasis", total_users: 18, input_cost: 21900, input_cost_actual_alloc: 21000, selling_cost: 33100 },
+        { month: 5, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Integrated", customer_name: "Hexaware", total_users: 27, input_cost: 33200, input_cost_actual_alloc: 31800, selling_cost: 50900 },
       ];
 
       const PUBLIC_ROWS = [
-        { potentialId: "DEMO-PUB-001", customer: "Cognizant", provider: "Azure", lob: "Training", users: 42, inputCost: 48200, sellingCost: 67600, creditAllocated: 52000, actualConsumption: 46850 },
-        { potentialId: "DEMO-PUB-002", customer: "Infosys", provider: "AWS", lob: "Delivery", users: 30, inputCost: 39100, sellingCost: 57500, creditAllocated: 43000, actualConsumption: 38920 },
-        { potentialId: "DEMO-PUB-003", customer: "TCS", provider: "Azure", lob: "Training", users: 55, inputCost: 73400, sellingCost: 96500, creditAllocated: 76000, actualConsumption: 72130 },
-        { potentialId: "DEMO-PUB-004", customer: "Wipro", provider: "GCP", lob: "Support", users: 24, inputCost: 28800, sellingCost: 44600, creditAllocated: 31500, actualConsumption: 28240 },
-        { potentialId: "DEMO-PUB-005", customer: "HCL", provider: "Azure", lob: "Delivery", users: 33, inputCost: 41900, sellingCost: 63100, creditAllocated: 45500, actualConsumption: 40210 },
-        { potentialId: "DEMO-PUB-006", customer: "Capgemini", provider: "AWS", lob: "Training", users: 20, inputCost: 22900, sellingCost: 35200, creditAllocated: 25000, actualConsumption: 21980 },
-        { potentialId: "DEMO-PUB-007", customer: "Accenture", provider: "Azure", lob: "Delivery", users: 37, inputCost: 44600, sellingCost: 68600, creditAllocated: 47000, actualConsumption: 44120 },
-        { potentialId: "DEMO-PUB-008", customer: "TechM", provider: "GCP", lob: "Support", users: 26, inputCost: 31200, sellingCost: 47800, creditAllocated: 33750, actualConsumption: 29890 },
-        { potentialId: "DEMO-PUB-009", customer: "LTIMindtree", provider: "Azure", lob: "Training", users: 46, inputCost: 59200, sellingCost: 87400, creditAllocated: 62000, actualConsumption: 57120 },
-        { potentialId: "DEMO-PUB-010", customer: "Persistent", provider: "AWS", lob: "Delivery", users: 29, inputCost: 36100, sellingCost: 54800, creditAllocated: 38800, actualConsumption: 34970 },
+        { potentialId: "DEMO-PUB-001", customer: "Cognizant", provider: "Azure", lob: "VILT", users: 42, inputCost: 48200, sellingCost: 67600, creditAllocated: 52000, actualConsumption: 46850 },
+        { potentialId: "DEMO-PUB-002", customer: "Infosys", provider: "AWS", lob: "Standalone", users: 30, inputCost: 39100, sellingCost: 57500, creditAllocated: 43000, actualConsumption: 38920 },
+        { potentialId: "DEMO-PUB-003", customer: "TCS", provider: "Azure", lob: "VILT", users: 55, inputCost: 73400, sellingCost: 96500, creditAllocated: 76000, actualConsumption: 72130 },
+        { potentialId: "DEMO-PUB-004", customer: "Wipro", provider: "GCP", lob: "Standalone", users: 24, inputCost: 28800, sellingCost: 44600, creditAllocated: 31500, actualConsumption: 28240 },
+        { potentialId: "DEMO-PUB-005", customer: "HCL", provider: "Azure", lob: "Integrated", users: 33, inputCost: 41900, sellingCost: 63100, creditAllocated: 45500, actualConsumption: 40210 },
+        { potentialId: "DEMO-PUB-006", customer: "Capgemini", provider: "AWS", lob: "VILT", users: 20, inputCost: 22900, sellingCost: 35200, creditAllocated: 25000, actualConsumption: 21980 },
+        { potentialId: "DEMO-PUB-007", customer: "Accenture", provider: "Azure", lob: "Integrated", users: 37, inputCost: 44600, sellingCost: 68600, creditAllocated: 47000, actualConsumption: 44120 },
+        { potentialId: "DEMO-PUB-008", customer: "TechM", provider: "GCP", lob: "Standalone", users: 26, inputCost: 31200, sellingCost: 47800, creditAllocated: 33750, actualConsumption: 29890 },
+        { potentialId: "DEMO-PUB-009", customer: "LTIMindtree", provider: "Azure", lob: "VILT", users: 46, inputCost: 59200, sellingCost: 87400, creditAllocated: 62000, actualConsumption: 57120 },
+        { potentialId: "DEMO-PUB-010", customer: "Persistent", provider: "AWS", lob: "Integrated", users: 29, inputCost: 36100, sellingCost: 54800, creditAllocated: 38800, actualConsumption: 34970 },
       ];
 
       const PRIVATE_BATCHES = [
@@ -407,408 +468,230 @@
         { month: "Sep 26", assigned: 22, closed: 19 },
       ];
 
-      const COLORS = ["var(--mock-accent)", "var(--mock-teal)", "var(--mock-amber)", "var(--mock-green)", "var(--mock-sky)", "var(--mock-purple)"];
-
-      function sum(values) {
-        return values.reduce((acc, value) => acc + value, 0);
-      }
+      function sum(values) { return values.reduce((acc, v) => acc + v, 0); }
+      function inr(value) { return INR.format(Math.round(value || 0)); }
+      function n(value) { return NUM.format(Math.round(value || 0)); }
+      function pct(value) { return `${(value || 0).toFixed(1)}%`; }
+      function initials(name) { return String(name).split(" ").map((p) => p[0]).slice(0, 2).join("").toUpperCase(); }
+      function colorToken(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 
       function monthlySeries() {
         return MONTHS.map((label, idx) => {
-          const monthNum = idx + 10 <= 12 ? idx + 10 : idx - 2;
-          const yearNum = idx + 10 <= 12 ? 2025 : 2026;
-          const rows = DASHBOARD_ROWS.filter((row) => row.month === monthNum && row.year === yearNum);
-          const revenue = sum(rows.map((row) => row.selling_cost));
-          const cost = sum(rows.map((row) => row.input_cost_actual_alloc ?? row.input_cost));
+          const month = idx + 10 <= 12 ? idx + 10 : idx - 2;
+          const year = idx + 10 <= 12 ? 2025 : 2026;
+          const rows = DASHBOARD_ROWS.filter((r) => r.month === month && r.year === year);
+          const revenue = sum(rows.map((r) => r.selling_cost));
+          const cost = sum(rows.map((r) => r.input_cost_actual_alloc ?? r.input_cost));
           const profit = revenue - cost;
-          return {
-            label,
-            tx: rows.length,
-            revenue,
-            cost,
-            profit,
-            marginPct: revenue > 0 ? (profit / revenue) * 100 : 0,
-            publicTx: rows.filter((row) => row.repository_type === "public_cloud").length,
-            privateTx: rows.filter((row) => row.repository_type === "private_cloud").length,
-          };
+          const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+          return { label, revenue, cost, profit, margin, tx: rows.length };
         });
       }
 
       function topCustomers() {
         const map = new Map();
         DASHBOARD_ROWS.forEach((row) => {
-          const current = map.get(row.customer_name) ?? { revenue: 0, users: 0, profit: 0 };
-          const cost = row.input_cost_actual_alloc ?? row.input_cost;
+          const key = row.customer_name;
+          const current = map.get(key) ?? { revenue: 0, cost: 0, users: 0, lobs: {} };
           current.revenue += row.selling_cost;
+          current.cost += row.input_cost_actual_alloc ?? row.input_cost;
           current.users += row.total_users;
-          current.profit += row.selling_cost - cost;
-          map.set(row.customer_name, current);
+          current.lobs[row.line_of_business] = (current.lobs[row.line_of_business] ?? 0) + 1;
+          map.set(key, current);
         });
-        const list = Array.from(map.entries()).map(([name, metrics]) => ({ name, ...metrics }));
+        const list = Array.from(map.entries()).map(([name, stats]) => {
+          const topLob = Object.entries(stats.lobs).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "VILT";
+          return { name, revenue: stats.revenue, cost: stats.cost, users: stats.users, profit: stats.revenue - stats.cost, lob: topLob };
+        });
         return {
           revenue: [...list].sort((a, b) => b.revenue - a.revenue).slice(0, 5),
-          users: [...list].sort((a, b) => b.users - a.users).slice(0, 5),
           profit: [...list].sort((a, b) => b.profit - a.profit).slice(0, 5),
+          users: [...list].sort((a, b) => b.users - a.users).slice(0, 5),
         };
       }
 
       function lobSplit() {
         const map = new Map();
-        DASHBOARD_ROWS.forEach((row) => {
-          map.set(row.line_of_business, (map.get(row.line_of_business) ?? 0) + 1);
-        });
-        return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+        DASHBOARD_ROWS.forEach((r) => map.set(r.line_of_business, (map.get(r.line_of_business) ?? 0) + 1));
+        return ["VILT", "Standalone", "Integrated"].map((name) => ({ name, value: map.get(name) ?? 0 }));
       }
 
-      function providerSplit() {
-        return ["Azure", "AWS", "GCP"].map((provider) => ({
-          name: provider,
-          value: PUBLIC_ROWS.filter((row) => row.provider === provider).length,
-        }));
+      function kpiCard(label, value, delta, trend, tag, deltaGood = true) {
+        return `
+          <article class="kpi">
+            <div class="kpi-top">
+              <div class="kpi-label">${label}</div>
+              <span class="kpi-tag">${tag}</span>
+            </div>
+            <div class="kpi-value">${value}</div>
+            <div class="kpi-footer">
+              <span class="delta-pill ${deltaGood ? "delta-good" : "delta-bad"}">${delta}</span>
+              ${sparkline(trend, deltaGood ? colorToken("--green") : colorToken("--red"))}
+            </div>
+          </article>
+        `;
       }
 
-      function fmtCurrency(value) {
-        return INR.format(Math.round(value));
+      function sparkline(values, color) {
+        const max = Math.max(...values, 1);
+        const points = values
+          .map((v, idx) => `${idx * 9.4},${18 - (v / max) * 16}`)
+          .join(" ");
+        return `<svg class="sparkline" viewBox="0 0 66 20" role="img" aria-label="Trend"><polyline fill="none" stroke="${color}" stroke-width="1.8" points="${points}" /></svg>`;
       }
 
-      function fmtInt(value) {
-        return NUM.format(Math.round(value));
-      }
-
-      function chartCard(title, inner) {
+      function chartCard(title, body, menu = true) {
         return `
           <section class="card">
-            <header class="card-header">
+            <header class="card-head">
               <h3 class="card-title">${title}</h3>
-              <span class="chart-menu">☰</span>
+              ${menu ? '<span class="menu-dot">☰</span>' : ""}
             </header>
-            <div class="card-body">${inner}</div>
+            <div class="card-body">${body}</div>
           </section>
         `;
       }
 
-      function tableCard(title, tableHtml) {
-        return `
-          <section class="card" style="margin-top: 10px;">
-            <header class="card-header">
-              <h3 class="card-title">${title}</h3>
-            </header>
-            <div class="card-body">${tableHtml}</div>
-          </section>
-        `;
-      }
-
-      function donutChart(items) {
-        const total = sum(items.map((item) => item.value)) || 1;
-        let start = 0;
-        const gradient = items
-          .map((item, index) => {
-            const end = start + (item.value / total) * 360;
-            const segment = `${COLORS[index % COLORS.length]} ${start.toFixed(2)}deg ${end.toFixed(2)}deg`;
-            start = end;
-            return segment;
-          })
-          .join(", ");
-        const legend = items
-          .map(
-            (item, index) =>
-              `<li><span class="legend-item"><span class="dot" style="background:${COLORS[index % COLORS.length]}"></span>${item.name}</span><strong>${fmtInt(item.value)}</strong></li>`,
-          )
-          .join("");
-        return `
-          <div class="donut-wrap">
-            <div class="donut" style="background: conic-gradient(${gradient});"></div>
-            <ul class="donut-legend">${legend}</ul>
-          </div>
-        `;
-      }
-
-      function horizontalBars(items, valueKey, formatter, color = "var(--mock-accent)") {
-        const max = Math.max(...items.map((item) => item[valueKey]), 1);
-        const rows = items
+      function donutLegend(items) {
+        const total = sum(items.map((i) => i.value)) || 1;
+        return `<div class="donut-legend">${items
           .map((item) => {
-            const width = Math.max(4, (item[valueKey] / max) * 100);
-            return `
-            <div class="hbar-row">
-              <div class="hbar-name">${item.name}</div>
-              <div class="hbar-track"><div class="hbar-fill" style="width:${width}%; background:linear-gradient(90deg, ${color}, #8eb4ff);"></div></div>
-              <div class="hbar-value">${formatter(item[valueKey])}</div>
-            </div>
-          `;
+            const p = (item.value / total) * 100;
+            const color = LOB_COLORS[item.name];
+            return `<div class="donut-item"><div class="donut-top"><span>${item.name}</span><strong>${p.toFixed(1)}%</strong></div><div class="share-track"><div class="share-fill" style="width:${p}%;background:${color}"></div></div></div>`;
           })
-          .join("");
-        return `<div class="hbar-chart">${rows}</div>`;
+          .join("")}</div>`;
       }
 
-      function comboSvg(data, barKey, lineKey, lineSuffix = "", lineColor = "var(--mock-amber)") {
-        const width = 660;
-        const height = 230;
-        const left = 44;
-        const right = 38;
-        const top = 16;
-        const bottom = 34;
-        const innerW = width - left - right;
-        const innerH = height - top - bottom;
-        const maxBar = Math.max(...data.map((d) => d[barKey]), 1);
-        const maxLine = Math.max(...data.map((d) => d[lineKey]), 1);
-        const step = innerW / data.length;
-        const barW = Math.max(10, step * 0.56);
-
-        const grid = Array.from({ length: 4 }).map((_, idx) => {
-          const y = top + (innerH * idx) / 3;
-          return `<line x1="${left}" y1="${y}" x2="${width - right}" y2="${y}" stroke="#e8ecf7" />`;
-        });
-
-        const bars = data
-          .map((item, index) => {
-            const barH = (item[barKey] / maxBar) * innerH;
-            const x = left + index * step + (step - barW) / 2;
-            const y = top + innerH - barH;
-            return `<rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="${barW.toFixed(2)}" height="${barH.toFixed(2)}" rx="4" fill="var(--mock-teal)" />`;
-          })
-          .join("");
-
-        const points = data
-          .map((item, index) => {
-            const x = left + index * step + step / 2;
-            const y = top + innerH - (item[lineKey] / maxLine) * innerH;
-            return `${x.toFixed(2)},${y.toFixed(2)}`;
-          })
-          .join(" ");
-
-        const dots = data
-          .map((item, index) => {
-            const x = left + index * step + step / 2;
-            const y = top + innerH - (item[lineKey] / maxLine) * innerH;
-            return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.6" fill="${lineColor}" />`;
-          })
-          .join("");
-
-        const labels = data
-          .map((item, index) => {
-            const x = left + index * step + step / 2;
-            return `<text x="${x.toFixed(2)}" y="${height - 12}" text-anchor="middle" font-size="10" fill="#6d7487">${item.label}</text>`;
-          })
-          .join("");
-
-        return `
-          <div class="legend-row">
-            <span class="legend-item"><span class="dot" style="background:var(--mock-teal)"></span>${barKey}</span>
-            <span class="legend-item"><span class="dot" style="background:${lineColor}"></span>${lineKey}${lineSuffix}</span>
-          </div>
-          <svg class="svg-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${barKey} and ${lineKey}">
-            ${grid.join("")}
-            ${bars}
-            <polyline points="${points}" fill="none" stroke="${lineColor}" stroke-width="2.2" />
-            ${dots}
-            ${labels}
-          </svg>
-        `;
-      }
-
-      function stackedSvg(data, firstKey, secondKey, firstLabel, secondLabel) {
-        const width = 660;
-        const height = 230;
-        const left = 44;
-        const right = 28;
-        const top = 18;
-        const bottom = 34;
-        const innerW = width - left - right;
-        const innerH = height - top - bottom;
-        const max = Math.max(...data.map((d) => d[firstKey] + d[secondKey]), 1);
-        const step = innerW / data.length;
-        const barW = Math.max(10, step * 0.56);
-
-        const bars = data
-          .map((item, index) => {
-            const first = (item[firstKey] / max) * innerH;
-            const second = (item[secondKey] / max) * innerH;
-            const x = left + index * step + (step - barW) / 2;
-            const yFirst = top + innerH - first;
-            const ySecond = yFirst - second;
+      function leaderboard(items, key, formatter, barColor) {
+        const total = sum(items.map((i) => i[key])) || 1;
+        return `<div class="leader-list">${items
+          .map((item) => {
+            const share = (item[key] / total) * 100;
             return `
-              <rect x="${x}" y="${yFirst}" width="${barW}" height="${first}" rx="3" fill="var(--mock-accent)" />
-              <rect x="${x}" y="${ySecond}" width="${barW}" height="${second}" rx="3" fill="var(--mock-amber)" />
+              <article class="leader-row">
+                <div class="avatar">${initials(item.name)}</div>
+                <div>
+                  <div class="leader-name">${item.name}</div>
+                  <div class="leader-meta">${item.lob} · Share ${share.toFixed(1)}%</div>
+                  <div class="leader-share"><span style="width:${share}%;background:${barColor}"></span></div>
+                </div>
+                <div class="leader-value">${formatter(item[key])}</div>
+              </article>
             `;
           })
-          .join("");
-
-        const labels = data
-          .map((item, index) => {
-            const x = left + index * step + step / 2;
-            return `<text x="${x}" y="${height - 12}" text-anchor="middle" font-size="10" fill="#6d7487">${item.label}</text>`;
-          })
-          .join("");
-
-        return `
-          <div class="legend-row">
-            <span class="legend-item"><span class="dot" style="background:var(--mock-accent)"></span>${firstLabel}</span>
-            <span class="legend-item"><span class="dot" style="background:var(--mock-amber)"></span>${secondLabel}</span>
-          </div>
-          <svg class="svg-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${firstLabel} and ${secondLabel}">
-            ${bars}
-            ${labels}
-          </svg>
-        `;
+          .join("")}</div>`;
       }
 
-      function kpiGrid(cards) {
-        return `<section class="kpi-grid">${cards
-          .map(
-            (card) => `
-            <article class="kpi-tile">
-              <p class="kpi-label">${card.label}</p>
-              <p class="kpi-value">${card.value}</p>
-              ${card.note ? `<p class="kpi-note">${card.note}</p>` : ""}
-            </article>
-          `,
-          )
-          .join("")}</section>`;
-      }
-
-      function summaryTable(rows) {
-        const body = rows
-          .map(
-            (row) => `
-            <tr>
-              <td>${row.label}</td>
-              <td class="align-right">${fmtCurrency(row.revenue)}</td>
-              <td class="align-right">${fmtCurrency(row.cost)}</td>
-              <td class="align-right">${fmtCurrency(row.profit)}</td>
-              <td class="align-right">${row.marginPct.toFixed(1)}%</td>
-            </tr>
-          `,
-          )
-          .join("");
+      function header(title, subtitle, controls = "") {
         return `
-          <table class="summary-table">
-            <thead>
-              <tr>
-                <th>Month</th>
-                <th class="align-right">Revenue</th>
-                <th class="align-right">Input cost</th>
-                <th class="align-right">Profit</th>
-                <th class="align-right">Margin %</th>
-              </tr>
-            </thead>
-            <tbody>${body}</tbody>
-          </table>
-        `;
-      }
-
-      function renderHeader(title) {
-        return `
-          <header class="mock-header">
+          <header class="header">
             <div>
-              <span class="mock-label">MOCK (EXAMPLE DATA)</span>
-              <h1 class="mock-title">${title}</h1>
+              <span class="mock-badge">MOCK (EXAMPLE DATA)</span>
+              <h1>${title}</h1>
+              <div class="subtitle">${subtitle}</div>
             </div>
+            <div class="controls">${controls}</div>
           </header>
         `;
       }
 
-      function helperTicketCard() {
-        return `
-          <section class="card" style="margin-bottom:10px;">
-            <div class="card-body">
-              <h3 class="card-title" style="margin-bottom:6px;">See your own ticket numbers here</h3>
-              <p class="helper-text">Pick your helpdesk name on the Support tickets page to track tickets closed, average resolution time and tickets per month.</p>
-            </div>
-          </section>
-        `;
+      function controlGroup(showToggle = false) {
+        const toggle = showToggle
+          ? `<button class="chip-active">All</button><button class="chip">Public cloud</button><button class="chip">Private cloud</button>`
+          : "";
+        return `${toggle}<button class="chip selector">All customers</button><button class="chip">All months · All years</button>`;
+      }
+
+      function buildKpis(series) {
+        const revenue = sum(series.map((r) => r.revenue));
+        const cost = sum(series.map((r) => r.cost));
+        const profit = revenue - cost;
+        const margin = revenue ? (profit / revenue) * 100 : 0;
+        const tx = sum(series.map((r) => r.tx));
+        const users = sum(DASHBOARD_ROWS.map((r) => r.total_users));
+        return { revenue, cost, profit, margin, tx, users };
       }
 
       function renderLeadership(series, tops, lobs) {
-        const revenue = sum(series.map((row) => row.revenue));
-        const cost = sum(series.map((row) => row.cost));
-        const profit = revenue - cost;
-        const users = sum(DASHBOARD_ROWS.map((row) => row.total_users));
-        const curMonthUsers = DASHBOARD_ROWS.filter((row) => row.month === 9 && row.year === 2026).reduce((acc, row) => acc + row.total_users, 0);
-        const providerRows = providerSplit().map((row) => ({ name: row.name, users: row.value }));
+        const k = buildKpis(series);
+        const totalPublic = DASHBOARD_ROWS.filter((r) => r.repository_type === "public_cloud").length;
+        const totalPrivate = DASHBOARD_ROWS.filter((r) => r.repository_type === "private_cloud").length;
         return `
-          ${kpiGrid([
-            { label: "Total transactions", value: fmtInt(DASHBOARD_ROWS.length) },
-            { label: "Public cloud", value: fmtInt(DASHBOARD_ROWS.filter((row) => row.repository_type === "public_cloud").length) },
-            { label: "Private cloud", value: fmtInt(DASHBOARD_ROWS.filter((row) => row.repository_type === "private_cloud").length) },
-            { label: "Total users", value: fmtInt(users) },
-            { label: "Total revenue", value: fmtCurrency(revenue) },
-            { label: "Total input cost", value: fmtCurrency(cost) },
-            { label: "Total profit", value: fmtCurrency(profit) },
-            { label: "Margin", value: `${((profit / revenue) * 100).toFixed(1)}%` },
-            { label: "Avg selling cost", value: fmtCurrency(DASHBOARD_ROWS.length ? revenue / DASHBOARD_ROWS.length : 0) },
-            { label: "Current month revenue", value: fmtCurrency(series[11].revenue) },
-            { label: "Current month profit", value: fmtCurrency(series[11].profit) },
-            { label: "Current month users", value: fmtInt(curMonthUsers) },
-          ])}
-          ${helperTicketCard()}
-          <section class="chart-grid">
-            ${chartCard("Transactions by Month — 2026", comboSvg(series, "tx", "marginPct", "%"))}
-            ${chartCard("Revenue by Month — 2026", comboSvg(series, "revenue", "marginPct", "%"))}
-            ${chartCard("Public vs Private Cloud", donutChart([{ name: "Public Cloud", value: sum(series.map((row) => row.publicTx)) }, { name: "Private Cloud", value: sum(series.map((row) => row.privateTx)) }]))}
-            ${chartCard("Public Cloud Provider Split", horizontalBars(providerRows, "users", fmtInt, "var(--mock-accent)"))}
-            ${chartCard("Top Customers by Revenue", horizontalBars(tops.revenue, "revenue", fmtCurrency))}
-            ${chartCard("Top Customers by Users", horizontalBars(tops.users, "users", fmtInt, "var(--mock-sky)"))}
-            ${chartCard("Top Customers by Profit", horizontalBars(tops.profit, "profit", fmtCurrency, "var(--mock-green)"))}
-            ${chartCard("Line of Business Split", donutChart(lobs))}
+          ${header("Dashboard", "Leadership view restyled with MML sections and metrics.", controlGroup(true))}
+          <section class="kpi-grid">
+            ${kpiCard("Total revenue", inr(k.revenue), "+8.9% vs last month", [61, 64, 67, 69, 72, 74], "FYTD")}
+            ${kpiCard("Total input cost", inr(k.cost), "+5.2% vs last month", [48, 49, 51, 52, 54, 55], "FYTD", false)}
+            ${kpiCard("Total profit", inr(k.profit), "+11.6% vs last month", [28, 30, 32, 33, 35, 36], "FYTD")}
+            ${kpiCard("Margin", pct(k.margin), "+1.4 pts vs last month", [19, 19.2, 19.7, 20.1, 20.7, 21.2], "FYTD")}
+            ${kpiCard("Public cloud", n(totalPublic), "+2 new lines", [6, 6, 7, 8, 8, 8], "Public")}
+            ${kpiCard("Private cloud", n(totalPrivate), "+1 new line", [3, 3, 3, 4, 4, 4], "Private")}
+          </section>
+          <section class="grid-2">
+            ${chartCard("Revenue by month — 2026",
+              `<div class="legend-summary"><span class="legend-item"><span class="dot" style="background:var(--azure)"></span>Revenue ${inr(k.revenue)}</span><span class="legend-item"><span class="dot" style="background:var(--azure-soft)"></span>Input cost ${inr(k.cost)}</span><span class="legend-item"><span class="dot" style="background:var(--margin-gold)"></span>Margin ${pct(k.margin)}</span></div><div id="leadership-combo" class="chart"></div>`)}
+            ${chartCard("Line of business split",
+              `<div class="dense-grid"><div id="leadership-lob" class="chart" style="height:245px"></div>${donutLegend(lobs)}</div>`)}
+          </section>
+          <section class="grid-3" style="margin-top:10px;">
+            ${chartCard("Top customers by revenue", leaderboard(tops.revenue, "revenue", inr, "var(--azure)"))}
+            ${chartCard("Top customers by profit", leaderboard(tops.profit, "profit", inr, "var(--green)"))}
+            ${chartCard("Top customers by users", leaderboard(tops.users, "users", n, "var(--teal)"))}
           </section>
         `;
       }
 
       function renderFinance(series, tops) {
-        const revenue = sum(series.map((row) => row.revenue));
-        const cost = sum(series.map((row) => row.cost));
-        const profit = revenue - cost;
+        const k = buildKpis(series);
         return `
-          ${kpiGrid([
-            { label: "Total revenue", value: fmtCurrency(revenue) },
-            { label: "Total input cost", value: fmtCurrency(cost) },
-            { label: "Total profit", value: fmtCurrency(profit) },
-            { label: "Margin", value: `${((profit / revenue) * 100).toFixed(1)}%` },
-            { label: "Avg selling cost", value: fmtCurrency(DASHBOARD_ROWS.length ? revenue / DASHBOARD_ROWS.length : 0) },
-            { label: "Current month revenue", value: fmtCurrency(series[11].revenue) },
-            { label: "Current month profit", value: fmtCurrency(series[11].profit) },
-          ])}
-          ${helperTicketCard()}
-          <section class="chart-grid">
-            ${chartCard("Revenue by Month — 2026", comboSvg(series, "revenue", "marginPct", "%", "var(--mock-red)"))}
-            ${chartCard("Top Customers by Revenue", horizontalBars(tops.revenue, "revenue", fmtCurrency))}
-            ${chartCard("Top Customers by Profit", horizontalBars(tops.profit, "profit", fmtCurrency, "var(--mock-green)"))}
+          ${header("Dashboard", "Finance view with MML revenue, cost and margin metrics.", controlGroup(true))}
+          <section class="kpi-grid">
+            ${kpiCard("Total revenue", inr(k.revenue), "+8.9% vs last month", [61, 64, 67, 69, 72, 74], "FYTD")}
+            ${kpiCard("Total input cost", inr(k.cost), "+5.2% vs last month", [48, 49, 51, 52, 54, 55], "FYTD", false)}
+            ${kpiCard("Total profit", inr(k.profit), "+11.6% vs last month", [28, 30, 32, 33, 35, 36], "FYTD")}
+            ${kpiCard("Margin", pct(k.margin), "+1.4 pts vs last month", [19, 19.2, 19.7, 20.1, 20.7, 21.2], "FYTD")}
+            ${kpiCard("Avg selling cost", inr(k.tx ? k.revenue / k.tx : 0), "+3.1% vs last month", [42, 43, 44, 45, 46, 47], "FYTD")}
+            ${kpiCard("Current month profit", inr(series[11].profit), "+6.2% vs last month", [16, 17, 18, 18, 19, 20], "Current")}
+          </section>
+          <section class="grid-2">
+            ${chartCard("Revenue and margin trend", `<div id="finance-combo" class="chart"></div>`)}
+            ${chartCard("Top customers by revenue", leaderboard(tops.revenue, "revenue", inr, "var(--azure)"))}
+          </section>
+          <section class="grid-2" style="margin-top:10px;">
+            ${chartCard("Top customers by profit", leaderboard(tops.profit, "profit", inr, "var(--green)"))}
+            ${chartCard("Top customers by users", leaderboard(tops.users, "users", n, "var(--teal)"))}
           </section>
         `;
       }
 
       function renderOpsUser(series) {
-        const openQueue = 9;
-        const users = sum(DASHBOARD_ROWS.map((row) => row.total_users));
-        const curMonthUsers = DASHBOARD_ROWS.filter((row) => row.month === 9 && row.year === 2026).reduce((acc, row) => acc + row.total_users, 0);
+        const k = buildKpis(series);
         return `
-          ${kpiGrid([
-            { label: "Total transactions", value: fmtInt(DASHBOARD_ROWS.length) },
-            { label: "Public cloud", value: fmtInt(DASHBOARD_ROWS.filter((row) => row.repository_type === "public_cloud").length) },
-            { label: "Private cloud", value: fmtInt(DASHBOARD_ROWS.filter((row) => row.repository_type === "private_cloud").length) },
-            { label: "Total users", value: fmtInt(users) },
-            { label: "Current month users", value: fmtInt(curMonthUsers) },
-          ])}
-          <section class="card" style="margin-bottom:10px;">
-            <div class="card-body">
-              <h3 class="queue-title">My support tickets — Ritu Sharma</h3>
-              <section class="kpi-grid" style="grid-template-columns: repeat(4,minmax(0,1fr)); margin-bottom:10px;">
-                <article class="kpi-tile"><p class="kpi-label">Tickets Closed</p><p class="kpi-value">135</p></article>
-                <article class="kpi-tile"><p class="kpi-label">Avg Resolution Time</p><p class="kpi-value">6.4 h</p></article>
-                <article class="kpi-tile"><p class="kpi-label">Tickets This Month</p><p class="kpi-value">22</p></article>
-                <article class="kpi-tile"><p class="kpi-label">In My Queue</p><p class="kpi-value">${openQueue}</p></article>
-              </section>
-              ${stackedSvg(
-                SUPPORT_PROFILE.map((row) => ({ label: row.month, assigned: row.assigned, closed: row.closed })),
-                "assigned",
-                "closed",
-                "Assigned",
-                "Closed",
-              )}
-            </div>
+          ${header("Dashboard", "Ops user view for Ritu Sharma with support queue and delivery KPIs.", controlGroup(false))}
+          <section class="kpi-grid">
+            ${kpiCard("Tickets closed", "135", "+12 this month", [12, 13, 16, 18, 20, 22], "Support")}
+            ${kpiCard("In my queue", "9", "-3 vs last week", [14, 13, 12, 11, 10, 9], "Support")}
+            ${kpiCard("Avg resolution time", "6.4 h", "-0.8 h improvement", [8.6, 8.1, 7.7, 7.1, 6.8, 6.4], "Support")}
+            ${kpiCard("Tickets this month", "22", "+5 vs last month", [14, 15, 16, 18, 20, 22], "Support")}
+            ${kpiCard("Total transactions", n(k.tx), "+1 vs last month", [8, 9, 10, 11, 11, 12], "Ops")}
+            ${kpiCard("Current month users", n(DASHBOARD_ROWS.filter((r) => r.month === 9 && r.year === 2026).reduce((a, r) => a + r.total_users, 0)), "+9 vs last month", [111, 118, 124, 131, 140, 149], "Ops")}
           </section>
-          <section class="chart-grid">
-            ${chartCard("Transactions by Month — 2026", comboSvg(series, "tx", "marginPct", "%"))}
+          <section class="dense-grid">
+            ${chartCard("My support tickets — Ritu Sharma", `<div id="ops-support" class="chart"></div>`)}
+            ${chartCard("Transactions by month — 2026", `<div id="ops-combo" class="chart"></div>`)}
+          </section>
+          <section class="card" style="margin-top:10px;">
+            <header class="card-head"><h3 class="card-title">My queue overview</h3><span class="menu-dot">☰</span></header>
+            <div class="card-body">
+              <table class="table-wrap">
+                <thead><tr><th>Ticket group</th><th>Priority</th><th class="align-right">Open</th><th class="align-right">SLA risk</th></tr></thead>
+                <tbody>
+                  <tr><td>Public cloud incidents</td><td>High</td><td class="align-right">4</td><td class="align-right" style="color:var(--red);">2</td></tr>
+                  <tr><td>Private cloud lab access</td><td>Medium</td><td class="align-right">3</td><td class="align-right" style="color:var(--amber);">1</td></tr>
+                  <tr><td>Batch invoice clarifications</td><td>Medium</td><td class="align-right">2</td><td class="align-right">0</td></tr>
+                </tbody>
+              </table>
+            </div>
           </section>
         `;
       }
@@ -818,47 +701,39 @@
         const cost = sum(PUBLIC_ROWS.map((row) => row.inputCost));
         const credit = sum(PUBLIC_ROWS.map((row) => row.creditAllocated));
         const actual = sum(PUBLIC_ROWS.map((row) => row.actualConsumption));
-        const bodyRows = PUBLIC_ROWS.map(
-          (row) => `
-          <tr>
-            <td>${row.potentialId}</td>
-            <td>${row.customer}</td>
-            <td>${row.provider}</td>
-            <td>${row.lob}</td>
-            <td class="align-right">${fmtInt(row.users)}</td>
-            <td class="align-right">${fmtCurrency(row.inputCost)}</td>
-            <td class="align-right">${fmtCurrency(row.sellingCost)}</td>
-          </tr>
-        `,
-        ).join("");
-
+        const margin = revenue - actual;
         return `
-          <section class="card" style="margin-bottom:10px;">
-            <div class="card-body">
-              <section class="kpi-grid" style="grid-template-columns: repeat(4,minmax(0,1fr)); margin-bottom:10px;">
-                <article class="kpi-tile"><p class="kpi-label">Fuzzy search</p><p class="kpi-note">customer, lab, potential ID</p></article>
-                <article class="kpi-tile"><p class="kpi-label">Hybrid only</p><p class="kpi-note">(0)</p></article>
-                <article class="kpi-tile"><p class="kpi-label">Period</p><p class="kpi-note">All months · All years</p></article>
-                <article class="kpi-tile"><p class="kpi-label">Scope</p><p class="kpi-note">All customers · All providers</p></article>
-              </section>
-              <p class="helper-text">10 records · Page revenue ${fmtCurrency(revenue)} · Page cost ${fmtCurrency(cost)}</p>
-            </div>
+          ${header("Public Cloud Transactions", "Leaner transaction view with 10 rows and KPI insights using MML flow.", controlGroup(true))}
+          <section class="kpi-grid">
+            ${kpiCard("Transactions shown", n(PUBLIC_ROWS.length), "+0 vs last capture", [9, 10, 10, 10, 10, 10], "Public")}
+            ${kpiCard("Page revenue", inr(revenue), "+8.4% vs last month", [50, 53, 54, 56, 58, 60], "Public")}
+            ${kpiCard("Page input cost", inr(cost), "+4.7% vs last month", [36, 38, 39, 40, 42, 43], "Public", false)}
+            ${kpiCard("Actual margin", inr(margin), "+9.8% vs last month", [14, 15, 16, 17, 18, 19], "Public")}
+            ${kpiCard("Credit allocated", inr(credit), "+6.2% vs last month", [40, 41, 42, 44, 45, 46], "Public")}
+            ${kpiCard("Unused credit", inr(credit - actual), "-2.1% vs last month", [8.2, 8, 7.7, 7.2, 6.9, 6.7], "Public", false)}
           </section>
-          ${tableCard(
-            "Public cloud transactions (example)",
-            `<table class="summary-table"><thead><tr><th>Potential ID</th><th>Customer</th><th>Provider</th><th>LOB</th><th class="align-right">Users</th><th class="align-right">Input cost</th><th class="align-right">Selling cost</th></tr></thead><tbody>${bodyRows}</tbody></table>`,
-          )}
-          ${tableCard(
-            "KPI insights (current page)",
-            `<table class="summary-table"><thead><tr><th>Metric</th><th class="align-right">Value</th></tr></thead><tbody><tr><td>Transactions shown</td><td class="align-right">${fmtInt(PUBLIC_ROWS.length)}</td></tr><tr><td>Credit allocated</td><td class="align-right">${fmtCurrency(credit)}</td></tr><tr><td>Actual consumption</td><td class="align-right">${fmtCurrency(actual)}</td></tr><tr><td>Unused credit</td><td class="align-right">${fmtCurrency(credit - actual)}</td></tr><tr><td>Actual margin</td><td class="align-right">${fmtCurrency(revenue - actual)}</td></tr></tbody></table>`,
-          )}
+          <section class="dense-grid">
+            ${chartCard("Public cloud transactions (example)", `
+              <div class="note">10 records · Fuzzy search: customer, lab, potential ID · Hybrid only (0)</div>
+              <table class="table-wrap">
+                <thead><tr><th>Potential ID</th><th>Customer</th><th>Provider</th><th>Line of business</th><th class="align-right">Users</th><th class="align-right">Input cost</th><th class="align-right">Selling cost</th><th class="align-right">Margin</th></tr></thead>
+                <tbody>
+                  ${PUBLIC_ROWS.map((row) => `<tr><td>${row.potentialId}</td><td>${row.customer}</td><td>${row.provider}</td><td>${row.lob}</td><td class="align-right">${n(row.users)}</td><td class="align-right">${inr(row.inputCost)}</td><td class="align-right">${inr(row.sellingCost)}</td><td class="align-right" style="color:var(--green);">${inr(row.sellingCost - row.inputCost)}</td></tr>`).join("")}
+                </tbody>
+              </table>
+            `, false)}
+            ${chartCard("KPI insights (current page)", `<div id="public-credit-chart" class="chart" style="height:282px"></div>`)}
+          </section>
+          <section class="grid-2" style="margin-top:10px;">
+            ${chartCard("Provider split by transactions", `<div id="public-provider-chart" class="chart"></div>`)}
+            ${chartCard("Line of business split", `<div class="dense-grid"><div id="public-lob-chart" class="chart"></div>${donutLegend([{ name: "VILT", value: PUBLIC_ROWS.filter((r) => r.lob === "VILT").length }, { name: "Standalone", value: PUBLIC_ROWS.filter((r) => r.lob === "Standalone").length }, { name: "Integrated", value: PUBLIC_ROWS.filter((r) => r.lob === "Integrated").length }])}</div>`)}
+          </section>
         `;
       }
 
       function renderPrivateCloud() {
         const totalRevenue = sum(PRIVATE_BATCHES.map((row) => row.revenue));
         const totalActualCost = sum(PRIVATE_BATCHES.map((row) => row.actualCost));
-        const totalEstimatedCost = sum(PRIVATE_BATCHES.map((row) => row.estimatedCost));
         const selected = PRIVATE_BATCHES[0];
         const selectedLines = [
           { line: "AKS Foundations", users: 25, cost: 58200 },
@@ -867,28 +742,36 @@
         ];
         const selectedLineCost = sum(selectedLines.map((row) => row.cost));
         return `
-          ${kpiGrid([
-            { label: "Private batches", value: fmtInt(PRIVATE_BATCHES.length) },
-            { label: "Open batches", value: fmtInt(PRIVATE_BATCHES.filter((row) => row.status === "open").length), note: `${fmtInt(PRIVATE_BATCHES.filter((row) => row.status === "closed").length)} closed` },
-            { label: "Revenue total", value: fmtCurrency(totalRevenue) },
-            { label: "Profit total", value: fmtCurrency(totalRevenue - totalActualCost), note: `Estimated ${fmtCurrency(totalRevenue - totalEstimatedCost)} · Actual ${fmtCurrency(totalRevenue - totalActualCost)}` },
-          ])}
-          <section class="chart-grid" style="grid-template-columns: 1.2fr 1fr;">
-            ${tableCard(
-              "Private cloud batches",
-              `<table class="summary-table"><thead><tr><th>Batch</th><th>Status</th><th class="align-right">Revenue</th><th class="align-right">Profit</th></tr></thead><tbody>${PRIVATE_BATCHES.map((row) => `<tr><td>${row.batchCode}</td><td>${row.status}</td><td class="align-right">${fmtCurrency(row.revenue)}</td><td class="align-right">${fmtCurrency(row.revenue - row.actualCost)}</td></tr>`).join("")}</tbody></table>`,
-            )}
-            <section class="card">
-              <header class="card-header"><h3 class="card-title">${selected.batchCode} details</h3></header>
-              <div class="card-body">
-                <p class="helper-text"><strong>open</strong> · updated 29 Sep 2026, 05:28</p>
-                <p class="helper-text">Revenue ${fmtCurrency(selected.revenue)}</p>
-                <p class="helper-text">Estimated cost ${fmtCurrency(selected.estimatedCost)} · Estimated profit ${fmtCurrency(selected.revenue - selected.estimatedCost)}</p>
-                <p class="helper-text">Actual cost ${fmtCurrency(selected.actualCost)} · Actual profit ${fmtCurrency(selected.revenue - selected.actualCost)}</p>
-                <section class="card" style="margin-bottom:10px;"><div class="card-body"><p class="helper-text">Actual reconciliation: Σ line actual cost = ${fmtCurrency(selectedLineCost)} · batch actual cost = ${fmtCurrency(selected.actualCost)} <strong>Reconciled ✓</strong></p><p class="helper-text">Estimate reference: batch estimated cost = ${fmtCurrency(selected.estimatedCost)}</p></div></section>
-                <table class="summary-table"><thead><tr><th>Line</th><th class="align-right">Users</th><th class="align-right">Cost</th></tr></thead><tbody>${selectedLines.map((row) => `<tr><td>${row.line}</td><td class="align-right">${fmtInt(row.users)}</td><td class="align-right">${fmtCurrency(row.cost)}</td></tr>`).join("")}</tbody></table>
-              </div>
-            </section>
+          ${header("Private Cloud Batches", "Batch-focused private cloud view with uncluttered KPI cards.", controlGroup(true))}
+          <section class="kpi-grid">
+            ${kpiCard("Private batches", n(PRIVATE_BATCHES.length), "+1 vs last month", [2, 2, 2, 3, 3, 3], "Private")}
+            ${kpiCard("Open batches", n(PRIVATE_BATCHES.filter((row) => row.status === "open").length), "+1 vs last month", [1, 1, 1, 2, 2, 2], "Private")}
+            ${kpiCard("Revenue total", inr(totalRevenue), "+7.4% vs last month", [49, 50, 52, 54, 56, 58], "Private")}
+            ${kpiCard("Actual profit total", inr(totalRevenue - totalActualCost), "+10.1% vs last month", [18, 19, 20, 22, 24, 25], "Private")}
+            ${kpiCard("Estimated cost total", inr(sum(PRIVATE_BATCHES.map((row) => row.estimatedCost))), "+4.2% vs last month", [31, 32, 33, 34, 35, 36], "Private", false)}
+            ${kpiCard("Actual cost total", inr(totalActualCost), "+3.8% vs last month", [30, 31, 31, 32, 33, 34], "Private", false)}
+          </section>
+          <section class="dense-grid">
+            ${chartCard("Private cloud batches", `
+              <table class="table-wrap">
+                <thead><tr><th>Batch</th><th>Status</th><th class="align-right">Revenue</th><th class="align-right">Profit</th></tr></thead>
+                <tbody>
+                  ${PRIVATE_BATCHES.map((row) => `<tr><td>${row.batchCode}</td><td><span class="pill ${row.status === "open" ? "status-open" : "status-closed"}">${row.status}</span></td><td class="align-right">${inr(row.revenue)}</td><td class="align-right">${inr(row.revenue - row.actualCost)}</td></tr>`).join("")}
+                </tbody>
+              </table>
+            `)}
+            ${chartCard(`${selected.batchCode} details`, `
+              <div class="note"><span class="pill status-open">open</span> · updated 29 Sep 2026, 05:28</div>
+              <table class="table-wrap">
+                <thead><tr><th>Line</th><th class="align-right">Users</th><th class="align-right">Actual cost</th></tr></thead>
+                <tbody>${selectedLines.map((line) => `<tr><td>${line.line}</td><td class="align-right">${n(line.users)}</td><td class="align-right">${inr(line.cost)}</td></tr>`).join("")}</tbody>
+              </table>
+              <div class="match">Actual reconciliation: Σ line actual cost = ${inr(selectedLineCost)} · batch actual cost = ${inr(selected.actualCost)} <strong style="color:var(--green)">Reconciled ✓</strong><br />Estimate reference: batch estimated cost = ${inr(selected.estimatedCost)}</div>
+            `)}
+          </section>
+          <section class="grid-2" style="margin-top:10px;">
+            ${chartCard("Revenue vs cost by batch", `<div id="private-batch-chart" class="chart"></div>`)}
+            ${chartCard("Profit share by batch", `<div id="private-profit-chart" class="chart"></div>`)}
           </section>
         `;
       }
@@ -899,33 +782,144 @@
         const tops = topCustomers();
         const lobs = lobSplit();
         const views = {
-          "mock-dashboard-leadership": {
-            title: "Dashboard",
-            content: renderLeadership(series, tops, lobs),
-          },
-          "mock-dashboard-finance": {
-            title: "Dashboard",
-            content: renderFinance(series, tops),
-          },
-          "mock-dashboard-ops-user": {
-            title: "Dashboard",
-            content: renderOpsUser(series),
-          },
-          "mock-public-cloud": {
-            title: "Public Cloud Transactions",
-            content: renderPublicCloud(),
-          },
-          "mock-private-cloud": {
-            title: "Private Cloud Batches",
-            content: renderPrivateCloud(),
-          },
+          "mock-dashboard-leadership": { content: renderLeadership(series, tops, lobs) },
+          "mock-dashboard-finance": { content: renderFinance(series, tops) },
+          "mock-dashboard-ops-user": { content: renderOpsUser(series) },
+          "mock-public-cloud": { content: renderPublicCloud() },
+          "mock-private-cloud": { content: renderPrivateCloud() },
+        };
+        document.getElementById("app").innerHTML = views[slug]?.content ?? views["mock-dashboard-leadership"].content;
+        drawCharts(slug, series, tops, lobs);
+      }
+
+      function drawCharts(slug, series, tops, lobs) {
+        const primary = colorToken("--azure");
+        const costColor = colorToken("--azure-soft");
+        const margin = colorToken("--margin-gold");
+        const navy = colorToken("--private-navy");
+        const green = colorToken("--green");
+        const teal = colorToken("--teal");
+        const textSecondary = colorToken("--text-secondary");
+
+        const comboOption = {
+          grid: { left: 52, right: 52, top: 20, bottom: 38 },
+          tooltip: { trigger: "axis" },
+          xAxis: { type: "category", data: series.map((s) => s.label), axisLabel: { color: textSecondary } },
+          yAxis: [
+            {
+              type: "value",
+              name: "INR (thousands)",
+              nameTextStyle: { color: textSecondary, fontSize: 11 },
+              axisLabel: { color: textSecondary, formatter: (v) => n(v / 1000) },
+              splitLine: { lineStyle: { color: "#ebeff9" } },
+            },
+            {
+              type: "value",
+              name: "Margin %",
+              min: 0,
+              max: 50,
+              nameTextStyle: { color: textSecondary, fontSize: 11 },
+              axisLabel: { color: textSecondary, formatter: (v) => `${v}%` },
+              splitLine: { show: false },
+            },
+          ],
+          series: [
+            { name: "Revenue", type: "bar", data: series.map((s) => s.revenue), itemStyle: { color: primary, borderRadius: [5, 5, 0, 0] }, barMaxWidth: 18 },
+            { name: "Input cost", type: "bar", data: series.map((s) => s.cost), itemStyle: { color: costColor, borderRadius: [5, 5, 0, 0] }, barMaxWidth: 18 },
+            { name: "Margin", type: "line", yAxisIndex: 1, data: series.map((s) => Number(s.margin.toFixed(1))), smooth: true, symbolSize: 6, lineStyle: { color: margin, width: 2 }, itemStyle: { color: margin } },
+          ],
         };
 
-        const selected = views[slug] ?? views["mock-dashboard-leadership"];
-        document.getElementById("app").innerHTML = `
-          ${renderHeader(selected.title)}
-          ${selected.content}
-        `;
+        if (slug === "mock-dashboard-leadership") {
+          echarts.init(document.getElementById("leadership-combo")).setOption(comboOption);
+          echarts.init(document.getElementById("leadership-lob")).setOption({
+            tooltip: { trigger: "item" },
+            graphic: [
+              { type: "text", left: "center", top: "44%", style: { text: n(sum(lobs.map((l) => l.value))), fill: "#181a20", font: "700 26px Inter" } },
+              { type: "text", left: "center", top: "58%", style: { text: "Total lines", fill: "#767b8c", font: "500 11px Inter" } },
+            ],
+            series: [{ type: "pie", radius: ["58%", "76%"], center: ["45%", "50%"], label: { show: false }, itemStyle: { borderColor: "#fff", borderWidth: 2 }, data: lobs.map((l) => ({ value: l.value, name: l.name, itemStyle: { color: LOB_COLORS[l.name] } })) }],
+          });
+        }
+
+        if (slug === "mock-dashboard-finance") {
+          echarts.init(document.getElementById("finance-combo")).setOption(comboOption);
+        }
+
+        if (slug === "mock-dashboard-ops-user") {
+          echarts.init(document.getElementById("ops-combo")).setOption({
+            grid: { left: 52, right: 52, top: 20, bottom: 38 },
+            tooltip: { trigger: "axis" },
+            xAxis: { type: "category", data: series.map((s) => s.label), axisLabel: { color: textSecondary } },
+            yAxis: [
+              { type: "value", name: "Transactions", nameTextStyle: { color: textSecondary, fontSize: 11 }, axisLabel: { color: textSecondary }, splitLine: { lineStyle: { color: "#ebeff9" } } },
+              { type: "value", name: "Margin %", min: 0, max: 50, nameTextStyle: { color: textSecondary, fontSize: 11 }, axisLabel: { color: textSecondary, formatter: "{value}%" }, splitLine: { show: false } },
+            ],
+            series: [
+              { name: "Transactions", type: "bar", data: series.map((s) => s.tx), itemStyle: { color: primary, borderRadius: [5, 5, 0, 0] }, barMaxWidth: 18 },
+              { name: "Margin", type: "line", yAxisIndex: 1, data: series.map((s) => Number(s.margin.toFixed(1))), smooth: true, symbolSize: 6, lineStyle: { color: margin, width: 2 }, itemStyle: { color: margin } },
+            ],
+          });
+          echarts.init(document.getElementById("ops-support")).setOption({
+            grid: { left: 52, right: 30, top: 20, bottom: 34 },
+            tooltip: { trigger: "axis" },
+            legend: { top: 0, textStyle: { color: textSecondary, fontSize: 11 } },
+            xAxis: { type: "category", data: SUPPORT_PROFILE.map((r) => r.month), axisLabel: { color: textSecondary } },
+            yAxis: { type: "value", name: "Ticket count", nameTextStyle: { color: textSecondary, fontSize: 11 }, axisLabel: { color: textSecondary }, splitLine: { lineStyle: { color: "#ebeff9" } } },
+            series: [
+              { name: "Assigned", type: "bar", stack: "support", data: SUPPORT_PROFILE.map((r) => r.assigned), itemStyle: { color: navy, borderRadius: [4, 4, 0, 0] } },
+              { name: "Closed", type: "bar", stack: "support", data: SUPPORT_PROFILE.map((r) => r.closed), itemStyle: { color: green, borderRadius: [4, 4, 0, 0] } },
+            ],
+          });
+        }
+
+        if (slug === "mock-public-cloud") {
+          const provider = ["Azure", "AWS", "GCP"].map((p) => ({ name: p, value: PUBLIC_ROWS.filter((r) => r.provider === p).length }));
+          echarts.init(document.getElementById("public-credit-chart")).setOption({
+            grid: { left: 52, right: 20, top: 30, bottom: 34 },
+            tooltip: { trigger: "axis" },
+            legend: { top: 0, textStyle: { color: textSecondary, fontSize: 11 } },
+            xAxis: { type: "category", data: ["Credit allocated", "Actual consumption", "Unused credit", "Actual margin"], axisLabel: { color: textSecondary, interval: 0 } },
+            yAxis: { type: "value", name: "INR (thousands)", axisLabel: { color: textSecondary, formatter: (v) => n(v / 1000) }, splitLine: { lineStyle: { color: "#ebeff9" } } },
+            series: [{ name: "Value", type: "bar", data: [sum(PUBLIC_ROWS.map((r) => r.creditAllocated)), sum(PUBLIC_ROWS.map((r) => r.actualConsumption)), sum(PUBLIC_ROWS.map((r) => r.creditAllocated - r.actualConsumption)), sum(PUBLIC_ROWS.map((r) => r.sellingCost - r.actualConsumption))], itemStyle: { color: primary, borderRadius: [5, 5, 0, 0] }, barMaxWidth: 24 }],
+          });
+          echarts.init(document.getElementById("public-provider-chart")).setOption({
+            grid: { left: 52, right: 20, top: 20, bottom: 32 },
+            tooltip: { trigger: "axis" },
+            xAxis: { type: "value", name: "Transactions", nameTextStyle: { color: textSecondary, fontSize: 11 }, axisLabel: { color: textSecondary }, splitLine: { lineStyle: { color: "#ebeff9" } } },
+            yAxis: { type: "category", data: provider.map((p) => p.name), axisLabel: { color: textSecondary } },
+            series: [{ type: "bar", data: provider.map((p) => p.value), itemStyle: { color: teal, borderRadius: [0, 5, 5, 0] }, barMaxWidth: 20 }],
+          });
+          echarts.init(document.getElementById("public-lob-chart")).setOption({
+            tooltip: { trigger: "item" },
+            graphic: [
+              { type: "text", left: "center", top: "44%", style: { text: n(PUBLIC_ROWS.length), fill: "#181a20", font: "700 24px Inter" } },
+              { type: "text", left: "center", top: "58%", style: { text: "Transactions", fill: "#767b8c", font: "500 11px Inter" } },
+            ],
+            series: [{ type: "pie", radius: ["56%", "76%"], center: ["45%", "50%"], label: { show: false }, itemStyle: { borderColor: "#fff", borderWidth: 2 }, data: [{ name: "VILT", value: PUBLIC_ROWS.filter((r) => r.lob === "VILT").length, itemStyle: { color: LOB_COLORS.VILT } }, { name: "Standalone", value: PUBLIC_ROWS.filter((r) => r.lob === "Standalone").length, itemStyle: { color: LOB_COLORS.Standalone } }, { name: "Integrated", value: PUBLIC_ROWS.filter((r) => r.lob === "Integrated").length, itemStyle: { color: LOB_COLORS.Integrated } }] }],
+          });
+        }
+
+        if (slug === "mock-private-cloud") {
+          echarts.init(document.getElementById("private-batch-chart")).setOption({
+            grid: { left: 52, right: 22, top: 20, bottom: 34 },
+            tooltip: { trigger: "axis" },
+            legend: { top: 0, textStyle: { color: textSecondary, fontSize: 11 } },
+            xAxis: { type: "category", data: PRIVATE_BATCHES.map((b) => b.batchCode), axisLabel: { color: textSecondary } },
+            yAxis: { type: "value", name: "INR (thousands)", axisLabel: { color: textSecondary, formatter: (v) => n(v / 1000) }, splitLine: { lineStyle: { color: "#ebeff9" } } },
+            series: [
+              { name: "Revenue", type: "bar", data: PRIVATE_BATCHES.map((b) => b.revenue), itemStyle: { color: navy, borderRadius: [5, 5, 0, 0] }, barMaxWidth: 18 },
+              { name: "Actual cost", type: "bar", data: PRIVATE_BATCHES.map((b) => b.actualCost), itemStyle: { color: colorToken("--azure-soft"), borderRadius: [5, 5, 0, 0] }, barMaxWidth: 18 },
+            ],
+          });
+          echarts.init(document.getElementById("private-profit-chart")).setOption({
+            grid: { left: 52, right: 20, top: 20, bottom: 32 },
+            tooltip: { trigger: "axis" },
+            xAxis: { type: "value", name: "INR (thousands)", axisLabel: { color: textSecondary, formatter: (v) => n(v / 1000) }, splitLine: { lineStyle: { color: "#ebeff9" } } },
+            yAxis: { type: "category", data: PRIVATE_BATCHES.map((b) => b.batchCode), axisLabel: { color: textSecondary } },
+            series: [{ name: "Profit", type: "bar", data: PRIVATE_BATCHES.map((b) => b.revenue - b.actualCost), itemStyle: { color: green, borderRadius: [0, 5, 5, 0] }, barMaxWidth: 20 }],
+          });
+        }
       }
 
       renderPage();
