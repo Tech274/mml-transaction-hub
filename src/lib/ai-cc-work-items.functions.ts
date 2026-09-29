@@ -108,37 +108,42 @@ export const enqueueAiWorkItem = createServerFn({ method: "POST" })
     }
 
     const nextStatus = statusAfterPreparation(toWorkType(data.work_type));
-    const nowIso = new Date().toISOString();
+    const claim = await sb.rpc("claim_ai_cc_worker_slot", { p_worker_id: picked.id });
+    if (claim.error) throw dbError(claim.error, "ai-cc-work-items.worker-load-claim");
+    const claimed = Array.isArray(claim.data) ? claim.data[0] : null;
+    if (!claimed) {
+      return {
+        id: workItemId,
+        status: "queued",
+        auto_assigned: false,
+        feature_flag: true,
+        approval_required: approvalRequired,
+      };
+    }
 
     const updateItem = await sb
       .from("ai_cc_work_items")
       .update({
-        assigned_worker_id: picked.id,
-        assigned_agent_key: picked.agent_key,
+        assigned_worker_id: String(claimed.id),
+        assigned_agent_key: String(claimed.agent_key),
         status: nextStatus,
-        updated_at: nowIso,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", workItemId);
-    if (updateItem.error) throw dbError(updateItem.error, "ai-cc-work-items.assign");
-
-    const updateWorker = await sb
-      .from("ai_cc_agent_workers")
-      .update({
-        current_load: picked.current_load + 1,
-        last_assigned_at: nowIso,
-      })
-      .eq("id", picked.id);
-    if (updateWorker.error) throw dbError(updateWorker.error, "ai-cc-work-items.worker-load");
+    if (updateItem.error) {
+      await sb.rpc("release_ai_cc_worker_slot", { p_worker_id: picked.id });
+      throw dbError(updateItem.error, "ai-cc-work-items.assign");
+    }
 
     const audit = await sb.from("ai_cc_audit").insert({
       actor_id: ctx.userId,
       actor_email: email,
-      agent_key: picked.agent_key,
+      agent_key: String(claimed.agent_key),
       action: "run",
       detail: {
         work_item_id: workItemId,
         work_type: data.work_type,
-        assigned_worker_id: picked.id,
+        assigned_worker_id: String(claimed.id),
         status: nextStatus,
         approval_required: approvalRequired,
       },
@@ -151,7 +156,7 @@ export const enqueueAiWorkItem = createServerFn({ method: "POST" })
       auto_assigned: true,
       feature_flag: true,
       approval_required: approvalRequired,
-      assigned_agent_key: picked.agent_key,
+      assigned_agent_key: String(claimed.agent_key),
     };
   });
 

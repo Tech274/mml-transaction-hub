@@ -74,6 +74,7 @@ beforeAll(async () => {
      ) on conflict (id) do nothing`,
     [U.admin, worker.rows[0].id],
   );
+  await db.query("update public.ai_cc_agent_workers set current_load = 1 where id = $1", [worker.rows[0].id]);
 }, 120_000);
 
 describe("structure", () => {
@@ -180,6 +181,18 @@ describe("finance data (transactions)", () => {
     expect(await asActor(db, as(U.admin), (q) => outcome(q.query("delete from public.transactions")))).toBe("42501");
     expect(await count(db, "transactions")).toBe(1);
   });
+  it("service-role updates of locked costs require explicit admin override", async () => {
+    const blocked = await asActor(db, { role: "service_role" }, (q) =>
+      outcome(q.query("update public.transactions set input_cost = 222 where id = $1", [TX_BY_OPS2])),
+    );
+    expect(blocked).toBe("42501");
+
+    const allowed = await asActor(db, { role: "service_role" }, async (q) => {
+      await q.query("select set_config('mml.admin_cost_override', '1', true)");
+      return outcome(q.query("update public.transactions set input_cost = 333 where id = $1", [TX_BY_OPS2]));
+    });
+    expect(allowed).toBe("ok");
+  });
 });
 
 describe("audit tables are written by triggers only", () => {
@@ -224,6 +237,36 @@ describe("Freshdesk tickets and AI Command Center tables", () => {
     expect(await asActor(db, as(U.viewer), (q) => count(q, "ai_cc_agent_workers"))).toBeGreaterThanOrEqual(1);
     expect(await asActor(db, as(U.viewer), (q) => count(q, "ai_cc_work_items"))).toBeGreaterThanOrEqual(1);
     expect(await asActor(db, as(U.noRole), (q) => count(q, "ai_cc_agent_workers"))).toBe(0);
+  });
+  it.each([
+    ["done", "00000000-0000-4000-8000-0000000000f1"],
+    ["rejected", "00000000-0000-4000-8000-0000000000f2"],
+    ["failed", "00000000-0000-4000-8000-0000000000f3"],
+  ] as const)("status %s releases one worker load slot", async (terminalStatus, workItemId) => {
+    const workerId = (
+      await db.query<{ assigned_worker_id: string }>(
+        "select assigned_worker_id from public.ai_cc_work_items where id = '00000000-0000-4000-8000-0000000000e1'",
+      )
+    ).rows[0].assigned_worker_id;
+    await db.query("update public.ai_cc_agent_workers set current_load = 1 where id = $1", [workerId]);
+    await db.query(
+      `insert into public.ai_cc_work_items (
+         id, title, work_type, status, assigned_agent_key, assigned_worker_id, created_by, created_by_email
+       ) values ($1, 'Release path check', 'analysis', 'needs_approval', 'generalist', $2, $3, 'admin@example.test')
+       on conflict (id) do update set status = excluded.status, assigned_worker_id = excluded.assigned_worker_id`,
+      [workItemId, workerId, U.admin],
+    );
+    const before = (await db.query<{ current_load: number }>("select current_load from public.ai_cc_agent_workers where id = $1", [workerId])).rows[0].current_load;
+    expect(before).toBe(1);
+    const inTx = await asActor(db, { role: "service_role" }, async (q) => {
+      const out = await outcome(q.query("update public.ai_cc_work_items set status = $1 where id = $2", [terminalStatus, workItemId]));
+      const after = (await q.query<{ current_load: number }>("select current_load from public.ai_cc_agent_workers where id = $1", [workerId])).rows[0].current_load;
+      return { out, after };
+    });
+    expect(inTx.out).toBe("ok");
+    expect(inTx.after).toBe(0);
+    const afterRollback = (await db.query<{ current_load: number }>("select current_load from public.ai_cc_agent_workers where id = $1", [workerId])).rows[0].current_load;
+    expect(afterRollback).toBe(1);
   });
 });
 

@@ -1314,6 +1314,11 @@ export type Database = {
           license_name: string | null
           license_price_per_user: number | null
           license_seats_used: number | null
+          public_actual_consumption: number | null
+          public_credit_allocated: number | null
+          public_service_margin: number | null
+          public_total_margin_actual: number | null
+          public_unused_credit: number | null
           selling_price_per_user: number | null
           vm_hours_consumed: number | null
           vm_price_per_user: number | null
@@ -1343,11 +1348,13 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           input_cost?: number | null
+          input_cost_actual_alloc?: number | null
           api_key_price_per_user?: number | null
           api_key_service?: string | null
           api_unit_label?: string | null
           api_units_consumed?: number | null
           input_cost_auto?: number | null
+          input_cost_auto_run_id?: string | null
           input_cost_pct?: number | null
           input_cost_per_user?: number | null
           is_complete?: boolean | null
@@ -1357,6 +1364,8 @@ export type Database = {
           license_name?: string | null
           license_price_per_user?: number | null
           license_seats_used?: number | null
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
           selling_price_per_user?: number | null
           vm_hours_consumed?: number | null
           vm_price_per_user?: number | null
@@ -1430,6 +1439,13 @@ export type Database = {
             columns: ["import_batch_id"]
             isOneToOne: false
             referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "lab_batches"
             referencedColumns: ["id"]
           },
         ]
@@ -1535,6 +1551,62 @@ export type Database = {
         Update: { status?: string }
         Relationships: []
       }
+      lab_transaction_cost_corrections: {
+        Row: {
+          corrected_at: string
+          corrected_by: string | null
+          id: string
+          new_actual_consumption: number | null
+          new_credit_allocated: number | null
+          new_input_cost: number | null
+          new_selling_cost: number | null
+          old_actual_consumption: number | null
+          old_credit_allocated: number | null
+          old_input_cost: number | null
+          old_selling_cost: number | null
+          reason: string
+          transaction_id: string
+        }
+        Insert: {
+          corrected_at?: string
+          corrected_by?: string | null
+          id?: string
+          new_actual_consumption?: number | null
+          new_credit_allocated?: number | null
+          new_input_cost?: number | null
+          new_selling_cost?: number | null
+          old_actual_consumption?: number | null
+          old_credit_allocated?: number | null
+          old_input_cost?: number | null
+          old_selling_cost?: number | null
+          reason: string
+          transaction_id: string
+        }
+        Update: {
+          corrected_at?: string
+          corrected_by?: string | null
+          id?: string
+          new_actual_consumption?: number | null
+          new_credit_allocated?: number | null
+          new_input_cost?: number | null
+          new_selling_cost?: number | null
+          old_actual_consumption?: number | null
+          old_credit_allocated?: number | null
+          old_input_cost?: number | null
+          old_selling_cost?: number | null
+          reason?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_transaction_cost_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transaction_tags: {
         Row: { transaction_id: string; tag: string; created_by: string | null; created_at: string }
         Insert: { transaction_id: string; tag: string; created_by?: string | null }
@@ -1564,9 +1636,100 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_lab_batch_transaction_totals: {
+        Row: {
+          actual_cost_total_derived: number | null
+          auto_line_count_derived: number
+          estimated_cost_total_derived: number
+          known_line_count_derived: number
+          lab_batch_id: string
+          line_count_derived: number
+          revenue_total_derived: number
+        }
+        Insert: {
+          actual_cost_total_derived?: number | null
+          auto_line_count_derived?: number
+          estimated_cost_total_derived?: number
+          known_line_count_derived?: number
+          lab_batch_id?: string
+          line_count_derived?: number
+          revenue_total_derived?: number
+        }
+        Update: {
+          actual_cost_total_derived?: number | null
+          auto_line_count_derived?: number
+          estimated_cost_total_derived?: number
+          known_line_count_derived?: number
+          lab_batch_id?: string
+          line_count_derived?: number
+          revenue_total_derived?: number
+        }
+        Relationships: []
+      }
+      v_lab_transaction_profit_breakdown: {
+        Row: {
+          effective_cost: number | null
+          input_cost_locked: number | null
+          lab_batch_id: string | null
+          lab_type: string
+          public_actual_consumption: number | null
+          public_credit_allocated: number | null
+          selling_cost: number | null
+          service_margin: number | null
+          total_profit_actual: number | null
+          transaction_id: string
+          unused_credit: number | null
+        }
+        Insert: {
+          effective_cost?: number | null
+          input_cost_locked?: number | null
+          lab_batch_id?: string | null
+          lab_type?: string
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          selling_cost?: number | null
+          service_margin?: number | null
+          total_profit_actual?: number | null
+          transaction_id?: string
+          unused_credit?: number | null
+        }
+        Update: {
+          effective_cost?: number | null
+          input_cost_locked?: number | null
+          lab_batch_id?: string | null
+          lab_type?: string
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          selling_cost?: number | null
+          service_margin?: number | null
+          total_profit_actual?: number | null
+          transaction_id?: string
+          unused_credit?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      admin_correct_lab_transaction_costs: {
+        Args: {
+          p_input_cost: number
+          p_public_actual_consumption?: number | null
+          p_public_credit_allocated?: number | null
+          p_reason?: string | null
+          p_selling_cost: number
+          p_transaction_id: string
+        }
+        Returns: undefined
+      }
+      claim_ai_cc_worker_slot: {
+        Args: { p_worker_id: string }
+        Returns: {
+          agent_key: string
+          current_load: number
+          id: string
+          last_assigned_at: string | null
+        }[]
+      }
       clean_customer_name: { Args: { p_name: string }; Returns: string }
       clear_bulk_import_artifact_paths: {
         Args: { _run_ids: string[] }
@@ -1624,6 +1787,13 @@ export type Database = {
       request_lab_batch_recompute: { Args: { p_batch_id: string }; Returns: Json }
       record_lab_batch_invoice: { Args: { p_batch_id: string; p_vendor: string; p_invoice_ref: string; p_invoice_date: string; p_currency: string; p_amount: number; p_fx: number | null; p_source: string; p_note: string | null }; Returns: Json }
       recompute_lab_batch_costs: { Args: { p_batch_id: string; p_trigger: string }; Returns: Json }
+      release_ai_cc_worker_slot: {
+        Args: { p_worker_id: string }
+        Returns: {
+          current_load: number
+          id: string
+        }[]
+      }
     }
     Enums: {
       app_role:

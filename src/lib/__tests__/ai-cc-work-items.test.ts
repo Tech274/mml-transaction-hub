@@ -17,6 +17,11 @@ describe("AI Command Center work-item server flow", () => {
     expect(code).toContain("\"needs_approval\"");
   });
 
+  it("claims worker load atomically through SQL RPC", () => {
+    expect(code).toContain("claim_ai_cc_worker_slot");
+    expect(code).toContain("release_ai_cc_worker_slot");
+  });
+
   it("requires admin role for live-work approval", () => {
     expect(code).toContain("requireRole(ctx, [\"admin\"], \"Only admin can approve live AI work\")");
     expect(code).toContain("status: \"approved\"");

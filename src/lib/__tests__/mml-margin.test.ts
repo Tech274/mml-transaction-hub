@@ -143,7 +143,18 @@ describe("derived batch totals and locked costs", () => {
       actual_cost_total: null,
     });
 
-    await db.query("update public.transactions set selling_cost = 5000, input_cost = 2500 where id = $1", [b]);
+    await db.exec("begin");
+    await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: U.admin, role: "authenticated" })]);
+    await db.exec("set local role authenticated");
+    await expect(
+      db.query(
+        `select public.admin_correct_lab_transaction_costs(
+           $1, 5000, 2500, null, null, 'Batch totals test correction via admin RPC'
+         )`,
+        [b],
+      ),
+    ).resolves.toBeDefined();
+    await db.exec("commit");
     const afterUpdate = await db.query<{ revenue_total: string; estimated_cost_total: string }>(
       "select revenue_total::text, estimated_cost_total::text from public.lab_batches where id = $1",
       [batch],

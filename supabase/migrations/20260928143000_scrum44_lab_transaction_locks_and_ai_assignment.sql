@@ -8,7 +8,11 @@
 --
 -- Rollback:
 --   DROP TRIGGER IF EXISTS ai_cc_work_items_touch ON public.ai_cc_work_items;
+--   DROP TRIGGER IF EXISTS ai_cc_work_items_release_worker_load ON public.ai_cc_work_items;
 --   DROP FUNCTION IF EXISTS public.touch_ai_cc_work_items();
+--   DROP FUNCTION IF EXISTS public.release_ai_cc_worker_on_terminal_status();
+--   DROP FUNCTION IF EXISTS public.release_ai_cc_worker_slot(uuid);
+--   DROP FUNCTION IF EXISTS public.claim_ai_cc_worker_slot(uuid);
 --   DROP TABLE IF EXISTS public.ai_cc_work_items;
 --   DROP TABLE IF EXISTS public.ai_cc_agent_workers;
 --   DROP VIEW IF EXISTS public.v_lab_transaction_profit_breakdown;
@@ -99,7 +103,7 @@ BEGIN
   IF TG_OP <> 'UPDATE' THEN
     RETURN NEW;
   END IF;
-  IF auth.uid() IS NULL OR current_setting('mml.admin_cost_override', true) = '1' THEN
+  IF current_setting('mml.admin_cost_override', true) = '1' THEN
     RETURN NEW;
   END IF;
   IF NEW.selling_cost IS DISTINCT FROM OLD.selling_cost OR NEW.input_cost IS DISTINCT FROM OLD.input_cost THEN
@@ -405,6 +409,56 @@ CREATE INDEX IF NOT EXISTS ai_cc_work_items_agent_idx
 CREATE INDEX IF NOT EXISTS ai_cc_agent_workers_active_idx
   ON public.ai_cc_agent_workers (is_active, agent_key, current_load, last_assigned_at);
 
+CREATE OR REPLACE FUNCTION public.claim_ai_cc_worker_slot(p_worker_id uuid)
+RETURNS TABLE (
+  id uuid,
+  agent_key text,
+  current_load int,
+  last_assigned_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  UPDATE public.ai_cc_agent_workers
+     SET current_load = ai_cc_agent_workers.current_load + 1,
+         last_assigned_at = now()
+   WHERE ai_cc_agent_workers.id = p_worker_id
+     AND ai_cc_agent_workers.is_active = true
+  RETURNING
+    ai_cc_agent_workers.id,
+    ai_cc_agent_workers.agent_key,
+    ai_cc_agent_workers.current_load,
+    ai_cc_agent_workers.last_assigned_at;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.claim_ai_cc_worker_slot(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_ai_cc_worker_slot(uuid) TO service_role;
+
+CREATE OR REPLACE FUNCTION public.release_ai_cc_worker_slot(p_worker_id uuid)
+RETURNS TABLE (
+  id uuid,
+  current_load int
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY
+  UPDATE public.ai_cc_agent_workers
+     SET current_load = GREATEST(ai_cc_agent_workers.current_load - 1, 0)
+   WHERE ai_cc_agent_workers.id = p_worker_id
+  RETURNING ai_cc_agent_workers.id, ai_cc_agent_workers.current_load;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.release_ai_cc_worker_slot(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.release_ai_cc_worker_slot(uuid) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.touch_ai_cc_work_items()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -420,6 +474,35 @@ DROP TRIGGER IF EXISTS ai_cc_work_items_touch ON public.ai_cc_work_items;
 CREATE TRIGGER ai_cc_work_items_touch
   BEFORE UPDATE ON public.ai_cc_work_items
   FOR EACH ROW EXECUTE FUNCTION public.touch_ai_cc_work_items();
+
+CREATE OR REPLACE FUNCTION public.release_ai_cc_worker_on_terminal_status()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_old_terminal boolean;
+  v_new_terminal boolean;
+BEGIN
+  IF TG_OP <> 'UPDATE' THEN
+    RETURN NEW;
+  END IF;
+  v_old_terminal := OLD.status IN ('done', 'rejected', 'failed');
+  v_new_terminal := NEW.status IN ('done', 'rejected', 'failed');
+
+  IF OLD.assigned_worker_id IS NOT NULL AND NOT v_old_terminal AND v_new_terminal THEN
+    PERFORM public.release_ai_cc_worker_slot(OLD.assigned_worker_id);
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS ai_cc_work_items_release_worker_load ON public.ai_cc_work_items;
+CREATE TRIGGER ai_cc_work_items_release_worker_load
+  AFTER UPDATE OF status ON public.ai_cc_work_items
+  FOR EACH ROW EXECUTE FUNCTION public.release_ai_cc_worker_on_terminal_status();
 
 ALTER TABLE public.ai_cc_agent_workers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ai_cc_work_items ENABLE ROW LEVEL SECURITY;
@@ -437,6 +520,7 @@ GRANT SELECT ON public.ai_cc_agent_workers, public.ai_cc_work_items TO authentic
 GRANT ALL ON public.ai_cc_agent_workers, public.ai_cc_work_items TO service_role;
 
 REVOKE ALL ON FUNCTION public.touch_ai_cc_work_items() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.release_ai_cc_worker_on_terminal_status() FROM PUBLIC, anon, authenticated;
 
 INSERT INTO public.ai_cc_agent_workers (worker_name, agent_key, is_active, current_load)
 VALUES

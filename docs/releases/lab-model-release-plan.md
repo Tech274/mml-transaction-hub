@@ -11,23 +11,20 @@ All PRs below must remain open and unmerged until the full set is complete.
 - Public cloud margin breakdown (service margin + unused credit from actual consumption).
 - Lab batch totals hard invariant: batch totals always equal the sum of transactions.
 - AI Command Center backend auto-assignment with strict admin approval gate for live-impacting work (`publish`, `deploy`, `live_write`).
-- Mockup-first workflow completed before UI implementation.
+- Chief-approved UI implementation (29 Sep) for Public Cloud + Private Cloud screens and Azure design-system sweep, guarded behind `VITE_SCRUM44_UI_REVIEW_ENABLED` and kept HOLD.
 
 ### Post-demo / production hardening (by Mon 5 Oct 2026)
 
-- UI implementation after explicit owner mockup approval (feature-flagged rollout).
-- Optional PR-C follow-up hardening and review-driven refinements.
+- Optional follow-up hardening and review-driven refinements.
 - Final hosting/deployment target selection and environment-specific release wiring (owner decision required).
 
 ## Planned PR set and merge order
 
-1. **PR-A: non-UI foundations** (`#46`, HOLD)
+1. **PR-A: combined HOLD foundations + approved UI review slice** (`#46`, HOLD)
    - https://github.com/Tech274/mml-transaction-hub/pull/46
-   - Proposed migrations (not applied), DB invariants, locked-cost correction path, AI work-item auto-assignment backend, and tests.
-2. **PR-B (pending owner design approval): UI implementation**
-   - Screen implementation for lab transaction, lab batch, and KPI profit/margin views behind feature flags.
-3. **PR-C (optional hardening/follow-up if needed)**
-   - Any review fixes required after PR-A and PR-B are both green.
+   - Proposed migrations (not applied), DB invariants, locked-cost correction path, AI work-item auto-assignment backend, approved UI implementation behind feature flags, and tests.
+2. **PR-B (optional hardening/follow-up if needed)**
+   - Any additional review fixes required after PR-A is green.
 
 ## Single combined deploy step (after all PRs merge)
 
