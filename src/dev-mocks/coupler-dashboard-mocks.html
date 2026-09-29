@@ -589,7 +589,7 @@
             <div>
               <span class="mock-badge">MOCK (EXAMPLE DATA)</span>
               <h1>${title}</h1>
-              <div class="subtitle">${subtitle}</div>
+              ${subtitle ? `<div class="subtitle">${subtitle}</div>` : ""}
             </div>
             <div class="controls">${controls}</div>
           </header>
@@ -618,7 +618,7 @@
         const totalPublic = DASHBOARD_ROWS.filter((r) => r.repository_type === "public_cloud").length;
         const totalPrivate = DASHBOARD_ROWS.filter((r) => r.repository_type === "private_cloud").length;
         return `
-          ${header("Dashboard", "Leadership view restyled with MML sections and metrics.", controlGroup(true))}
+          ${header("Dashboard", "", controlGroup(true))}
           <section class="kpi-grid">
             ${kpiCard("Total revenue", inr(k.revenue), "+8.9% vs last month", [61, 64, 67, 69, 72, 74], "FYTD")}
             ${kpiCard("Total input cost", inr(k.cost), "+5.2% vs last month", [48, 49, 51, 52, 54, 55], "FYTD", false)}
@@ -644,7 +644,7 @@
       function renderFinance(series, tops) {
         const k = buildKpis(series);
         return `
-          ${header("Dashboard", "Finance view with MML revenue, cost and margin metrics.", controlGroup(true))}
+          ${header("Dashboard", "", controlGroup(true))}
           <section class="kpi-grid">
             ${kpiCard("Total revenue", inr(k.revenue), "+8.9% vs last month", [61, 64, 67, 69, 72, 74], "FYTD")}
             ${kpiCard("Total input cost", inr(k.cost), "+5.2% vs last month", [48, 49, 51, 52, 54, 55], "FYTD", false)}
@@ -667,7 +667,7 @@
       function renderOpsUser(series) {
         const k = buildKpis(series);
         return `
-          ${header("Dashboard", "Ops user view for Ritu Sharma with support queue and delivery KPIs.", controlGroup(false))}
+          ${header("Dashboard", "", controlGroup(false))}
           <section class="kpi-grid">
             ${kpiCard("Tickets closed", "135", "+12 this month", [12, 13, 16, 18, 20, 22], "Support")}
             ${kpiCard("In my queue", "9", "-3 vs last week", [14, 13, 12, 11, 10, 9], "Support")}
@@ -703,7 +703,7 @@
         const actual = sum(PUBLIC_ROWS.map((row) => row.actualConsumption));
         const margin = revenue - actual;
         return `
-          ${header("Public Cloud Transactions", "Leaner transaction view with 10 rows and KPI insights using MML flow.", controlGroup(true))}
+          ${header("Public Cloud Transactions", "", controlGroup(true))}
           <section class="kpi-grid">
             ${kpiCard("Transactions shown", n(PUBLIC_ROWS.length), "+0 vs last capture", [9, 10, 10, 10, 10, 10], "Public")}
             ${kpiCard("Page revenue", inr(revenue), "+8.4% vs last month", [50, 53, 54, 56, 58, 60], "Public")}
@@ -742,7 +742,7 @@
         ];
         const selectedLineCost = sum(selectedLines.map((row) => row.cost));
         return `
-          ${header("Private Cloud Batches", "Batch-focused private cloud view with uncluttered KPI cards.", controlGroup(true))}
+          ${header("Private Cloud Batches", "", controlGroup(true))}
           <section class="kpi-grid">
             ${kpiCard("Private batches", n(PRIVATE_BATCHES.length), "+1 vs last month", [2, 2, 2, 3, 3, 3], "Private")}
             ${kpiCard("Open batches", n(PRIVATE_BATCHES.filter((row) => row.status === "open").length), "+1 vs last month", [1, 1, 1, 2, 2, 2], "Private")}
@@ -802,13 +802,16 @@
         const textSecondary = colorToken("--text-secondary");
 
         const comboOption = {
-          grid: { left: 52, right: 52, top: 20, bottom: 38 },
+          grid: { left: 70, right: 70, top: 30, bottom: 42, containLabel: true },
           tooltip: { trigger: "axis" },
           xAxis: { type: "category", data: series.map((s) => s.label), axisLabel: { color: textSecondary } },
           yAxis: [
             {
               type: "value",
               name: "INR (thousands)",
+              nameLocation: "middle",
+              nameGap: 54,
+              nameRotate: 90,
               nameTextStyle: { color: textSecondary, fontSize: 11 },
               axisLabel: { color: textSecondary, formatter: (v) => n(v / 1000) },
               splitLine: { lineStyle: { color: "#ebeff9" } },
@@ -818,6 +821,9 @@
               name: "Margin %",
               min: 0,
               max: 50,
+              nameLocation: "middle",
+              nameGap: 52,
+              nameRotate: -90,
               nameTextStyle: { color: textSecondary, fontSize: 11 },
               axisLabel: { color: textSecondary, formatter: (v) => `${v}%` },
               splitLine: { show: false },
@@ -848,12 +854,12 @@
 
         if (slug === "mock-dashboard-ops-user") {
           echarts.init(document.getElementById("ops-combo")).setOption({
-            grid: { left: 52, right: 52, top: 20, bottom: 38 },
+            grid: { left: 70, right: 70, top: 30, bottom: 42, containLabel: true },
             tooltip: { trigger: "axis" },
             xAxis: { type: "category", data: series.map((s) => s.label), axisLabel: { color: textSecondary } },
             yAxis: [
-              { type: "value", name: "Transactions", nameTextStyle: { color: textSecondary, fontSize: 11 }, axisLabel: { color: textSecondary }, splitLine: { lineStyle: { color: "#ebeff9" } } },
-              { type: "value", name: "Margin %", min: 0, max: 50, nameTextStyle: { color: textSecondary, fontSize: 11 }, axisLabel: { color: textSecondary, formatter: "{value}%" }, splitLine: { show: false } },
+              { type: "value", name: "Transactions", nameLocation: "middle", nameGap: 48, nameRotate: 90, nameTextStyle: { color: textSecondary, fontSize: 11 }, axisLabel: { color: textSecondary }, splitLine: { lineStyle: { color: "#ebeff9" } } },
+              { type: "value", name: "Margin %", min: 0, max: 50, nameLocation: "middle", nameGap: 48, nameRotate: -90, nameTextStyle: { color: textSecondary, fontSize: 11 }, axisLabel: { color: textSecondary, formatter: "{value}%" }, splitLine: { show: false } },
             ],
             series: [
               { name: "Transactions", type: "bar", data: series.map((s) => s.tx), itemStyle: { color: primary, borderRadius: [5, 5, 0, 0] }, barMaxWidth: 18 },
@@ -913,10 +919,10 @@
             ],
           });
           echarts.init(document.getElementById("private-profit-chart")).setOption({
-            grid: { left: 52, right: 20, top: 20, bottom: 32 },
+            grid: { left: 116, right: 20, top: 20, bottom: 32, containLabel: true },
             tooltip: { trigger: "axis" },
             xAxis: { type: "value", name: "INR (thousands)", axisLabel: { color: textSecondary, formatter: (v) => n(v / 1000) }, splitLine: { lineStyle: { color: "#ebeff9" } } },
-            yAxis: { type: "category", data: PRIVATE_BATCHES.map((b) => b.batchCode), axisLabel: { color: textSecondary } },
+            yAxis: { type: "category", data: PRIVATE_BATCHES.map((b) => b.batchCode), axisLabel: { color: textSecondary, interval: 0 } },
             series: [{ name: "Profit", type: "bar", data: PRIVATE_BATCHES.map((b) => b.revenue - b.actualCost), itemStyle: { color: green, borderRadius: [0, 5, 5, 0] }, barMaxWidth: 20 }],
           });
         }
