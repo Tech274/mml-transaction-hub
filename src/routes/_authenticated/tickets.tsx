@@ -56,12 +56,12 @@ export const Route = createFileRoute("/_authenticated/tickets")({
 });
 
 const COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
-  "hsl(var(--muted-foreground))",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--muted-foreground)",
 ];
 
 const OPEN_LIKE = ["Open", "Waiting on Customer", "Waiting on Third Party"];
@@ -463,7 +463,7 @@ function TicketsPage() {
                   <XAxis dataKey="name" fontSize={12} />
                   <YAxis fontSize={12} allowDecimals={false} />
                   <Tooltip />
-                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} className="cursor-pointer" />
+                  <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} className="cursor-pointer" />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -480,7 +480,7 @@ function TicketsPage() {
                   <XAxis type="number" fontSize={12} allowDecimals={false} />
                   <YAxis type="category" dataKey="name" width={120} fontSize={12} />
                   <Tooltip />
-                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} className="cursor-pointer" />
+                  <Bar dataKey="value" fill="var(--chart-1)" radius={[0, 4, 4, 0]} className="cursor-pointer" />
                 </BarChart>
               </ResponsiveContainer>
             </ChartCard>
@@ -491,7 +491,7 @@ function TicketsPage() {
                   <XAxis dataKey="month" fontSize={12} />
                   <YAxis fontSize={12} allowDecimals={false} />
                   <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} />
+                  <Line type="monotone" dataKey="value" stroke="var(--chart-1)" strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             </ChartCard>

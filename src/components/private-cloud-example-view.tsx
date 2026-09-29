@@ -92,6 +92,7 @@ export function PrivateCloudExampleView() {
   }, []);
 
   const lineCostTotal = lines.reduce((sum, line) => sum + line.cost, 0);
+  const isReconciled = Math.abs(lineCostTotal - selected.actualCost) < 0.01;
 
   return (
     <div className="space-y-4">
@@ -157,7 +158,14 @@ export function PrivateCloudExampleView() {
             <div>Estimated cost {fmtCurrency(selected.estimatedCost)} · Estimated profit {fmtCurrency(selected.revenue - selected.estimatedCost)}</div>
             <div>Actual cost {fmtCurrency(selected.actualCost)} · Actual profit {fmtCurrency(selected.revenue - selected.actualCost)}</div>
             <div className="rounded-md border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
-              Reconciliation: Σ transaction effective cost = {fmtCurrency(lineCostTotal)} · batch estimated cost = {fmtCurrency(selected.estimatedCost)}
+              <div className="flex items-center gap-2">
+                <span>
+                  Actual reconciliation: Σ line actual cost = {fmtCurrency(lineCostTotal)} · batch actual cost ={" "}
+                  {fmtCurrency(selected.actualCost)}
+                </span>
+                {isReconciled ? <Badge variant="default">Reconciled ✓</Badge> : <Badge variant="destructive">Mismatch</Badge>}
+              </div>
+              <div className="mt-1">Estimate reference: batch estimated cost = {fmtCurrency(selected.estimatedCost)}</div>
             </div>
             <Table>
               <TableHeader>

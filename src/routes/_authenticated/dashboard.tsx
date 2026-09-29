@@ -45,14 +45,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: DashboardPage,
 });
 
-const COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--accent-foreground))",
-  "#0ea5e9",
-  "#22c55e",
-  "#f59e0b",
-  "#ef4444",
-];
+const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--muted-foreground)"];
 
 const EXAMPLE_DASHBOARD_ROWS: ReportRow[] = [
   { month: 9, year: 2026, repository_type: "public_cloud", cloud_provider: "Azure", line_of_business: "Training", customer_name: "Cognizant", lab_name: "DevOps Pro", total_users: 42, input_cost: 48200, input_cost_auto: null, input_cost_actual_alloc: 46850, selling_cost: 67600 },
@@ -268,7 +261,7 @@ function DashboardPage() {
                   <Tooltip />
                   <Bar
                     dataKey="transactions"
-                    fill="hsl(var(--primary))"
+                    fill="var(--chart-1)"
                     radius={[4, 4, 0, 0]}
                     className="cursor-pointer"
                   />
@@ -296,7 +289,7 @@ function DashboardPage() {
                     type="monotone"
                     dataKey="revenue"
                     name="Revenue"
-                    stroke="hsl(var(--primary))"
+                    stroke="var(--chart-1)"
                     strokeWidth={2}
                   />
                   <Line
@@ -361,7 +354,7 @@ function DashboardPage() {
                   <Tooltip />
                   <Bar
                     dataKey="value"
-                    fill="hsl(var(--primary))"
+                    fill="var(--chart-1)"
                     radius={[4, 4, 0, 0]}
                     className="cursor-pointer"
                   />
@@ -391,7 +384,7 @@ function DashboardPage() {
                   <Tooltip formatter={(v: number) => fmtCurrency(v)} />
                   <Bar
                     dataKey="revenue"
-                    fill="hsl(var(--primary))"
+                    fill="var(--chart-1)"
                     radius={[0, 4, 4, 0]}
                     className="cursor-pointer"
                   />
@@ -417,7 +410,7 @@ function DashboardPage() {
                   <Tooltip />
                   <Bar
                     dataKey="users"
-                    fill="hsl(var(--primary))"
+                    fill="var(--chart-1)"
                     radius={[0, 4, 4, 0]}
                     className="cursor-pointer"
                   />
@@ -764,7 +757,7 @@ function CustomersByAccountManager() {
                 <Line
                   type="monotone"
                   dataKey="count"
-                  stroke="hsl(var(--primary))"
+                  stroke="var(--chart-1)"
                   strokeWidth={2}
                 />
               </LineChart>
@@ -843,7 +836,7 @@ function ExampleMyAgentTicketKpis() {
             <YAxis fontSize={12} />
             <Tooltip />
             <Legend />
-            <Bar dataKey="total" name="Assigned" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="total" name="Assigned" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
             <Bar dataKey="closed" name="Closed" fill="#22c55e" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -946,7 +939,7 @@ function MyAgentTicketKpis() {
               <Bar
                 dataKey="total"
                 name="Assigned"
-                fill="hsl(var(--primary))"
+                fill="var(--chart-1)"
                 radius={[4, 4, 0, 0]}
               />
               <Bar dataKey="closed" name="Closed" fill="#22c55e" radius={[4, 4, 0, 0]} />

@@ -97,10 +97,17 @@ export function PrivateCloudBatchesView() {
     );
   }, [batches]);
 
-  const lineCostTotal = useMemo(
-    () => lines.reduce((sum, line) => addNullable(sum, effectiveCost(line).amount), 0),
+  const lineActualCostTotal = useMemo(
+    () => lines.reduce((sum, line) => addNullable(sum, line.input_cost_actual_alloc), 0),
     [lines],
   );
+  const hasCompleteActualLineCosts = lines.length > 0 && lines.every((line) => line.input_cost_actual_alloc != null);
+  const selectedActualCost = selectedBatch?.actual_cost_total != null ? Number(selectedBatch.actual_cost_total) : null;
+  const actualCostDiff =
+    selectedActualCost != null && hasCompleteActualLineCosts
+      ? Math.abs(lineActualCostTotal - selectedActualCost)
+      : null;
+  const isReconciled = actualCostDiff != null && actualCostDiff < 0.01;
 
   return (
     <div className="space-y-4">
@@ -202,14 +209,6 @@ export function PrivateCloudBatchesView() {
                 </div>
                 <div>Revenue {fmtCurrency(selectedBatch.revenue_total)}</div>
                 <div>
-                  Estimated cost {fmtCurrency(selectedBatch.estimated_cost_total)} · Estimated profit{" "}
-                  {fmtCurrency(
-                    selectedBatch.revenue_total != null && selectedBatch.estimated_cost_total != null
-                      ? Number(selectedBatch.revenue_total) - Number(selectedBatch.estimated_cost_total)
-                      : null,
-                  )}
-                </div>
-                <div>
                   Actual cost {fmtCurrency(selectedBatch.actual_cost_total)} · Actual profit{" "}
                   {fmtCurrency(
                     selectedBatch.revenue_total != null && selectedBatch.actual_cost_total != null
@@ -217,9 +216,31 @@ export function PrivateCloudBatchesView() {
                       : null,
                   )}
                 </div>
+                <div>
+                  Estimated cost {fmtCurrency(selectedBatch.estimated_cost_total)} · Estimated profit{" "}
+                  {fmtCurrency(
+                    selectedBatch.revenue_total != null && selectedBatch.estimated_cost_total != null
+                      ? Number(selectedBatch.revenue_total) - Number(selectedBatch.estimated_cost_total)
+                      : null,
+                  )}
+                </div>
                 <div className="rounded-md border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
-                  Reconciliation: Σ transaction effective cost = {fmtCurrency(lineCostTotal)} · batch
-                  estimated cost = {fmtCurrency(selectedBatch.estimated_cost_total)}
+                  <div className="flex items-center gap-2">
+                    <span>
+                      Actual reconciliation: Σ line actual cost = {fmtCurrency(lineActualCostTotal)} · batch
+                      actual cost = {fmtCurrency(selectedBatch.actual_cost_total)}
+                    </span>
+                    {isReconciled ? (
+                      <Badge variant="default">Reconciled ✓</Badge>
+                    ) : hasCompleteActualLineCosts ? (
+                      <Badge variant="destructive">Mismatch</Badge>
+                    ) : (
+                      <Badge variant="secondary">Incomplete actual line costs</Badge>
+                    )}
+                  </div>
+                  <div className="mt-1">
+                    Estimate reference: batch estimated cost = {fmtCurrency(selectedBatch.estimated_cost_total)}
+                  </div>
                 </div>
                 <Table>
                   <TableHeader>
