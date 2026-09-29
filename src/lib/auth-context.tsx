@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseConfigError, supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
@@ -63,6 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const configError = getSupabaseConfigError();
+    if (configError) {
+      console.error(`[Auth] ${configError}`);
+      setUser(null);
+      setRoles([]);
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
     const loadRoles = async (u: User | null) => {
       if (!u) {
@@ -102,6 +111,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     if (isCaptureMode) {
       window.location.href = "/dashboard";
+      return;
+    }
+    if (getSupabaseConfigError()) {
+      window.location.href = "/auth";
       return;
     }
     await qc.cancelQueries();
