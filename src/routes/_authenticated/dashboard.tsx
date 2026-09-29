@@ -18,6 +18,7 @@ import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
+import { CAPTURE_PERSONAS, getCaptureRole, type CaptureRole } from "@/lib/capture-persona";
 import {
   Select,
   SelectContent,
@@ -65,6 +66,12 @@ const EXAMPLE_DASHBOARD_ROWS: ReportRow[] = [
 function DashboardPage() {
   const { can, orderedKpis, isPreviewing, previewRole } = usePermissions();
   const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
+  const captureRole = isExampleCaptureMode
+    ? (getCaptureRole(
+        getSuperadminCaptureModeEnvForClient(),
+        typeof window !== "undefined" ? window.location.search : "",
+      ) as CaptureRole)
+    : null;
   const { data } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
@@ -244,7 +251,7 @@ function DashboardPage() {
           {basis.none ? ` · ${COST_BASIS_LABEL.none} ${basis.none}` : ""}.
         </p>
 
-        {isExampleCaptureMode ? <ExampleMyAgentTicketKpis /> : <MyAgentTicketKpis />}
+        {isExampleCaptureMode ? <ExampleMyAgentTicketKpis role={captureRole ?? "admin"} /> : <MyAgentTicketKpis />}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {can("chart_tx_by_month") && (
@@ -799,20 +806,68 @@ function Stat({
 }
 
 /** Agent-specific support KPIs, linked straight into the agent's ticket queue. */
-function ExampleMyAgentTicketKpis() {
-  const byMonth = [
-    { month: "Apr 26", total: 18, closed: 16 },
-    { month: "May 26", total: 24, closed: 21 },
-    { month: "Jun 26", total: 29, closed: 26 },
-    { month: "Jul 26", total: 27, closed: 25 },
-    { month: "Aug 26", total: 31, closed: 28 },
-    { month: "Sep 26", total: 22, closed: 19 },
-  ];
+function ExampleMyAgentTicketKpis({ role }: { role: CaptureRole }) {
+  const queueOwnerProfiles: Partial<
+    Record<CaptureRole, { closed: number; avg: string; thisMonth: number; queue: number; byMonth: { month: string; total: number; closed: number }[] }>
+  > = {
+    ops_user: {
+      closed: 135,
+      avg: "6.4 h",
+      thisMonth: 22,
+      queue: 9,
+      byMonth: [
+        { month: "Apr 26", total: 18, closed: 16 },
+        { month: "May 26", total: 24, closed: 21 },
+        { month: "Jun 26", total: 29, closed: 26 },
+        { month: "Jul 26", total: 27, closed: 25 },
+        { month: "Aug 26", total: 31, closed: 28 },
+        { month: "Sep 26", total: 22, closed: 19 },
+      ],
+    },
+    ops_lead: {
+      closed: 102,
+      avg: "7.1 h",
+      thisMonth: 17,
+      queue: 6,
+      byMonth: [
+        { month: "Apr 26", total: 15, closed: 13 },
+        { month: "May 26", total: 20, closed: 18 },
+        { month: "Jun 26", total: 24, closed: 21 },
+        { month: "Jul 26", total: 23, closed: 20 },
+        { month: "Aug 26", total: 26, closed: 23 },
+        { month: "Sep 26", total: 17, closed: 14 },
+      ],
+    },
+  };
+  const profile = queueOwnerProfiles[role];
+  if (!profile) {
+    return (
+      <Card>
+        <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-sm font-medium">See your own ticket numbers here</div>
+            <p className="text-xs text-muted-foreground">
+              Pick your helpdesk name on the Support tickets page to track tickets closed, average
+              resolution time and tickets per month.
+            </p>
+          </div>
+          <Link
+            to="/tickets"
+            search={{ view: "mine" as const, quick: "all" as const }}
+            className="text-xs text-primary hover:underline"
+          >
+            Go to my tickets →
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+  const persona = CAPTURE_PERSONAS[role];
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-sm">My support tickets — Ritu Sharma</CardTitle>
+          <CardTitle className="text-sm">My support tickets — {persona.personName}</CardTitle>
           <Link
             to="/tickets"
             search={{ view: "mine" as const, quick: "all" as const }}
@@ -824,13 +879,13 @@ function ExampleMyAgentTicketKpis() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <KPI label="Tickets Closed" value="135" to="/tickets" search={{ view: "mine", quick: "closed" }} />
-          <KPI label="Avg Resolution Time" value="6.4 h" to="/tickets" search={{ view: "mine", quick: "resolved" }} />
-          <KPI label="Tickets This Month" value="22" to="/tickets" search={{ view: "mine", quick: "all" }} />
-          <KPI label="In My Queue" value="9" to="/tickets" search={{ view: "mine", quick: "open" }} />
+          <KPI label="Tickets Closed" value={fmtNumber(profile.closed)} to="/tickets" search={{ view: "mine", quick: "closed" }} />
+          <KPI label="Avg Resolution Time" value={profile.avg} to="/tickets" search={{ view: "mine", quick: "resolved" }} />
+          <KPI label="Tickets This Month" value={fmtNumber(profile.thisMonth)} to="/tickets" search={{ view: "mine", quick: "all" }} />
+          <KPI label="In My Queue" value={fmtNumber(profile.queue)} to="/tickets" search={{ view: "mine", quick: "open" }} />
         </div>
         <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={byMonth}>
+          <BarChart data={profile.byMonth}>
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
             <XAxis dataKey="month" fontSize={12} />
             <YAxis fontSize={12} />
