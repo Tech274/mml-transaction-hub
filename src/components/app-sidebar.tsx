@@ -38,6 +38,9 @@ import {
 import { useAuth, type AppRole } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import { isLeadershipOnlyRoleSet } from "@/lib/leadership-access";
 
 type NavItem = {
@@ -109,8 +112,9 @@ const aiCommandCenterNav: NavItem[] = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, hoverExpanded, setOpen } = useSidebar();
   const collapsed = state === "collapsed";
+  const showLabels = state === "expanded" || hoverExpanded;
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { hasAnyRole, user, roles, signOut } = useAuth();
   const { can } = usePermissions();
@@ -124,19 +128,17 @@ export function AppSidebar() {
         (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
       );
   const visibleWorkspaceNav = nav
-    .filter(
-      (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
-    )
+    .filter((i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)))
     .filter((i) => !isLeadershipOnly || i.to === "/dashboard");
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" hoverExpandOnRail>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-3">
           <div className="h-8 w-8 rounded-md bg-sidebar-primary text-sidebar-primary-foreground grid place-items-center font-bold">
             M
           </div>
-          {!collapsed && (
+          {showLabels && (
             <div className="leading-tight">
               <div className="text-sm font-semibold">MakeMyLabs</div>
               <div className="text-xs text-sidebar-foreground/60">Transaction Platform</div>
@@ -147,17 +149,23 @@ export function AppSidebar() {
       <SidebarContent>
         {visibleAiCommandCenterNav.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>AI Command Center</SidebarGroupLabel>
+            <SidebarGroupLabel className="group-data-[hover-expanded=true]:mt-0 group-data-[hover-expanded=true]:opacity-100">
+              AI Command Center
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {visibleAiCommandCenterNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={active}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        className="group-data-[hover-expanded=true]:!h-8 group-data-[hover-expanded=true]:!w-full group-data-[hover-expanded=true]:!p-2"
+                      >
                         <Link to={item.to}>
                           <item.icon className="h-4 w-4" />
-                          {!collapsed && <span>{item.label}</span>}
+                          {showLabels && <span>{item.label}</span>}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -169,17 +177,23 @@ export function AppSidebar() {
         )}
         {visibleMmlLabNav.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>MML Lab</SidebarGroupLabel>
+            <SidebarGroupLabel className="group-data-[hover-expanded=true]:mt-0 group-data-[hover-expanded=true]:opacity-100">
+              MML Lab
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {visibleMmlLabNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={active}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        className="group-data-[hover-expanded=true]:!h-8 group-data-[hover-expanded=true]:!w-full group-data-[hover-expanded=true]:!p-2"
+                      >
                         <Link to={item.to}>
                           <item.icon className="h-4 w-4" />
-                          {!collapsed && <span>{item.label}</span>}
+                          {showLabels && <span>{item.label}</span>}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -191,17 +205,23 @@ export function AppSidebar() {
         )}
         {visibleWorkspaceNav.length > 0 && (
           <SidebarGroup>
-            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+            <SidebarGroupLabel className="group-data-[hover-expanded=true]:mt-0 group-data-[hover-expanded=true]:opacity-100">
+              Workspace
+            </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {visibleWorkspaceNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={active}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        className="group-data-[hover-expanded=true]:!h-8 group-data-[hover-expanded=true]:!w-full group-data-[hover-expanded=true]:!p-2"
+                      >
                         <Link to={item.to}>
                           <item.icon className="h-4 w-4" />
-                          {!collapsed && <span>{item.label}</span>}
+                          {showLabels && <span>{item.label}</span>}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -214,7 +234,23 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
-        {!collapsed && user && (
+        <div
+          className={cn("flex items-center gap-2 px-2 py-1", !showLabels && "justify-center")}
+          data-testid="collapse-menu-toggle-row"
+        >
+          <Switch
+            id="collapse-menu-toggle"
+            aria-label="Collapse menu"
+            checked={collapsed}
+            onCheckedChange={(checked) => setOpen(!checked)}
+          />
+          {showLabels && (
+            <Label htmlFor="collapse-menu-toggle" className="text-xs text-sidebar-foreground/70">
+              Collapse menu
+            </Label>
+          )}
+        </div>
+        {showLabels && user && (
           <div className="px-2 py-2 text-xs">
             <div className="font-medium truncate">{user.email}</div>
             <div className="text-sidebar-foreground/60 capitalize">
@@ -229,7 +265,7 @@ export function AppSidebar() {
           onClick={signOut}
         >
           <LogOut className="h-4 w-4" />
-          {!collapsed && <span className="ml-2">Sign out</span>}
+          {showLabels && <span className="ml-2">Sign out</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>
