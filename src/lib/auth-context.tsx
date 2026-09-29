@@ -7,6 +7,7 @@ import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
+import { CAPTURE_PERSONAS, getCaptureRole } from "@/lib/capture-persona";
 
 export type AppRole = "admin" | "leadership" | "finance" | "ops_lead" | "ops_user" | "viewer";
 
@@ -23,16 +24,6 @@ interface AuthState {
 
 const Ctx = createContext<AuthState | null>(null);
 
-const SUPERADMIN_CAPTURE_USER = {
-  id: "00000000-0000-4000-8000-000000000044",
-  aud: "authenticated",
-  role: "authenticated",
-  email: "admin.demo@mml.local",
-  created_at: "2026-01-01T00:00:00.000Z",
-  app_metadata: { provider: "email", providers: ["email"] },
-  user_metadata: { full_name: "Super Admin Demo User" },
-} as unknown as User;
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
@@ -43,8 +34,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (isCaptureMode) {
-      setUser(SUPERADMIN_CAPTURE_USER);
-      setRoles(["admin"]);
+      const captureEnv = getSuperadminCaptureModeEnvForClient();
+      const captureRole = getCaptureRole(
+        captureEnv,
+        typeof window !== "undefined" ? window.location.search : "",
+      ) as AppRole;
+      const persona = CAPTURE_PERSONAS[captureRole];
+      const captureIdByRole: Record<AppRole, string> = {
+        admin: "00000000-0000-4000-8000-000000000001",
+        leadership: "00000000-0000-4000-8000-000000000002",
+        finance: "00000000-0000-4000-8000-000000000003",
+        ops_lead: "00000000-0000-4000-8000-000000000004",
+        ops_user: "00000000-0000-4000-8000-000000000005",
+        viewer: "00000000-0000-4000-8000-000000000006",
+      };
+      const captureUser = {
+        id: captureIdByRole[captureRole],
+        aud: "authenticated",
+        role: "authenticated",
+        email: persona.email,
+        created_at: "2026-01-01T00:00:00.000Z",
+        app_metadata: { provider: "email", providers: ["email"] },
+        user_metadata: { full_name: persona.personName },
+      } as unknown as User;
+      setUser(captureUser);
+      setRoles([captureRole]);
       setLoading(false);
       return;
     }
