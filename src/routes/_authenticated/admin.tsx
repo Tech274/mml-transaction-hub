@@ -44,6 +44,7 @@ import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
+import { ASSIGNABLE_ROLES, isParkedRole } from "@/lib/role-rollout";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -51,7 +52,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
 });
 
-const ROLES: AppRole[] = ["admin", "leadership", "finance", "ops_lead", "ops_user", "viewer"];
+const ROLE_ASSIGNMENT_ROLES: AppRole[] = [...ASSIGNABLE_ROLES];
 const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Super Admin",
   leadership: "Leadership",
@@ -1047,7 +1048,9 @@ function UserRow({
   onResetPassword: (tempPassword: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [selected, setSelected] = useState<AppRole[]>(user.roles.map((r) => r.role));
+  const [selected, setSelected] = useState<AppRole[]>(
+    user.roles.map((r) => r.role).filter((role) => !isParkedRole(role)),
+  );
   const [fullName, setFullName] = useState(user.full_name ?? "");
   const [email, setEmail] = useState(user.email ?? "");
   const [active, setActive] = useState(user.is_active);
@@ -1061,8 +1064,14 @@ function UserRow({
     setSelected((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
 
   async function save() {
-    if (selected.length === 0) return toast.error("Pick at least one role.");
     if (!email.trim()) return toast.error("Email is required.");
+    const preservedParkedRoles = user.roles
+      .map((r) => r.role)
+      .filter((role) => isParkedRole(role));
+    const nextRoles = Array.from(
+      new Set<AppRole>([...selected.filter((role) => !isParkedRole(role)), ...preservedParkedRoles]),
+    );
+    if (nextRoles.length === 0) return toast.error("Pick at least one role.");
     setBusy(true);
     try {
       const payload: { fullName?: string; email?: string; isActive?: boolean; roles?: AppRole[] } = {};
@@ -1070,8 +1079,8 @@ function UserRow({
       const nextEmail = email.trim().toLowerCase();
       if (nextEmail !== (user.email ?? "").toLowerCase()) payload.email = nextEmail;
       const before = user.roles.map((r) => r.role).sort().join(",");
-      const after = [...selected].sort().join(",");
-      if (before !== after) payload.roles = selected;
+      const after = [...nextRoles].sort().join(",");
+      if (before !== after) payload.roles = nextRoles;
       if (active !== user.is_active) payload.isActive = active;
       if (Object.keys(payload).length === 0) { setEditing(false); return; }
       await onSave(payload);
@@ -1127,7 +1136,7 @@ function UserRow({
               onOpenChange={(o) => {
                 setEditing(o);
                 if (o) {
-                  setSelected(user.roles.map((r) => r.role));
+                  setSelected(user.roles.map((r) => r.role).filter((role) => !isParkedRole(role)));
                   setFullName(user.full_name ?? "");
                   setEmail(user.email ?? "");
                   setActive(user.is_active);
@@ -1152,7 +1161,7 @@ function UserRow({
                   <div className="space-y-2">
                     <Label>Roles</Label>
                     <div className="grid grid-cols-2 gap-2">
-                      {ROLES.map((r) => (
+                      {ROLE_ASSIGNMENT_ROLES.map((r) => (
                         <label key={r} className="flex items-center gap-2 text-sm rounded-md border border-border p-2">
                           <Checkbox checked={selected.includes(r)} onCheckedChange={() => toggle(r)} />
                           <span>{ROLE_LABEL[r]}</span>
@@ -1247,7 +1256,7 @@ function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; passwor
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [roles, setRoles] = useState<AppRole[]>(["viewer"]);
+  const [roles, setRoles] = useState<AppRole[]>(["leadership"]);
   const [isActive, setIsActive] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -1259,7 +1268,7 @@ function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; passwor
     setBusy(true);
     try {
       await onCreate({ email: email.trim().toLowerCase(), password, fullName: fullName.trim(), roles, isActive });
-      setOpen(false); setEmail(""); setPassword(""); setFullName(""); setRoles(["viewer"]); setIsActive(true);
+      setOpen(false); setEmail(""); setPassword(""); setFullName(""); setRoles(["leadership"]); setIsActive(true);
     } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
 
@@ -1284,7 +1293,7 @@ function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; passwor
           <div className="space-y-2">
             <Label>Roles</Label>
             <div className="grid grid-cols-2 gap-2">
-              {ROLES.map((r) => (
+              {ROLE_ASSIGNMENT_ROLES.map((r) => (
                 <label key={r} className="flex items-center gap-2 text-sm rounded-md border border-border p-2">
                   <Checkbox checked={roles.includes(r)} onCheckedChange={() => toggle(r)} />
                   <span>{ROLE_LABEL[r]}</span>

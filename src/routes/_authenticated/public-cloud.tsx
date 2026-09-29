@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { TransactionsTable } from "@/components/transactions-table";
 import { PublicCloudExampleView } from "@/components/public-cloud-example-view";
+import { PublicCloudSummary } from "@/components/summaries/public-cloud-summary";
 import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
@@ -24,7 +25,9 @@ function PublicCloudPage() {
 
   return (
     <AppShell title={uiRefreshEnabled ? "Public Cloud Transactions" : "Public Cloud Repository"}>
-      {isExampleCaptureMode ? (
+      {uiRefreshEnabled ? (
+        <PublicCloudSummary />
+      ) : isExampleCaptureMode ? (
         <PublicCloudExampleView />
       ) : (
         <TransactionsTable

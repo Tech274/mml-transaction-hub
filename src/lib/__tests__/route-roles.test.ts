@@ -15,6 +15,15 @@ describe("ROUTE_ROLES", () => {
     expect(ROUTE_ROLES["/mml-lab/lab-catalog"]).toContain("viewer");
     expect(ROUTE_ROLES["/mml-lab/batches"]).toContain("finance");
   });
+  it("blocks leadership from support, sync and ai command center routes", () => {
+    expect(ROUTE_ROLES["/tickets"]).toEqual(["admin"]);
+    expect(ROUTE_ROLES["/sync-status"]).toEqual(["admin"]);
+    expect(ROUTE_ROLES["/ai-command-center"]).toEqual(["admin"]);
+    expect(ROUTE_ROLES["/ai-command-center/agents"]).toEqual(["admin"]);
+    expect(ROUTE_ROLES["/ai-command-center/inbox"]).toEqual(["admin"]);
+    expect(ROUTE_ROLES["/ai-command-center/run-now"]).toEqual(["admin"]);
+    expect(ROUTE_ROLES["/ai-command-center/audit"]).toEqual(["admin"]);
+  });
   it("returns a copy, not the shared constant", () => {
     const a = rolesFor("/admin");
     a.push("viewer");

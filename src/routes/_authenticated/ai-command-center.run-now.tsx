@@ -20,10 +20,12 @@ import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
+import { requireRouteRoles } from "@/lib/route-guard";
 
 const AGENT_KEYS: AgentKey[] = ["generalist", "support", "cost_adr"];
 
 export const Route = createFileRoute("/_authenticated/ai-command-center/run-now")({
+  beforeLoad: requireRouteRoles("/ai-command-center/run-now"),
   validateSearch: (search: Record<string, unknown>) => ({
     agent: AGENT_KEYS.includes(search.agent as AgentKey) ? (search.agent as AgentKey) : ("generalist" as AgentKey),
   }),

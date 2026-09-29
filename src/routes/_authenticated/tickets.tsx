@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -31,8 +31,10 @@ import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
+import { requireRouteRoles } from "@/lib/route-guard";
 
 export const Route = createFileRoute("/_authenticated/tickets")({
+  beforeLoad: requireRouteRoles("/tickets"),
   validateSearch: (search: Record<string, unknown>) => ({
     view: search.view === "mine" ? ("mine" as const) : ("all" as const),
     quick: (["all", "open", "pending", "resolved", "closed", "overdue", "escalated"] as const).includes(
@@ -301,6 +303,14 @@ function TicketsPage() {
   return (
     <AppShell title="Support tickets">
       <div className="space-y-4">
+        <SupportTicketsSummary
+          rows={scoped}
+          counts={counts}
+          canSync={canSync}
+          syncPending={sync.isPending}
+          onSyncNow={() => sync.mutate()}
+        />
+
         <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
@@ -878,7 +888,7 @@ function Stat({
   );
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
+function ChartCard({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card>
       <CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader>
@@ -908,4 +918,341 @@ function Field({ label, value }: { label: string; value: string | null | undefin
       <p className="font-medium">{value || "—"}</p>
     </div>
   );
+}
+
+function SupportTicketsSummary({
+  rows,
+  counts,
+  canSync,
+  syncPending,
+  onSyncNow,
+}: {
+  rows: TicketRow[];
+  counts: {
+    total: number;
+    open: number;
+    pending: number;
+    resolved: number;
+    closed: number;
+    overdue: number;
+    escalated: number;
+  };
+  canSync: boolean;
+  syncPending: boolean;
+  onSyncNow: () => void;
+}) {
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+  const resolvedLast7 = rows.filter(
+    (row) =>
+      row.ticket_updated_at &&
+      new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo &&
+      row.status === "Resolved",
+  ).length;
+  const closedLast7 = rows.filter(
+    (row) =>
+      row.ticket_updated_at &&
+      new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo &&
+      row.status === "Closed",
+  ).length;
+  const dueResolvedRows = rows.filter(
+    (row) =>
+      row.ticket_updated_at &&
+      row.due_by &&
+      ["Resolved", "Closed"].includes(row.status ?? "") &&
+      new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo,
+  );
+  const resolvedWithinDue = dueResolvedRows.filter(
+    (row) => new Date(row.ticket_updated_at as string).getTime() <= new Date(row.due_by as string).getTime(),
+  ).length;
+  const resolvedWithinDuePct =
+    dueResolvedRows.length > 0 ? Math.round((resolvedWithinDue / dueResolvedRows.length) * 100) : 0;
+
+  const resolutionDurationsHours = rows
+    .filter(
+      (row) =>
+        row.ticket_created_at &&
+        row.ticket_updated_at &&
+        ["Resolved", "Closed"].includes(row.status ?? "") &&
+        new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo,
+    )
+    .map(
+      (row) =>
+        (new Date(row.ticket_updated_at as string).getTime() - new Date(row.ticket_created_at as string).getTime()) /
+        (1000 * 60 * 60),
+    );
+  const avgResolutionHours =
+    resolutionDurationsHours.length > 0
+      ? resolutionDurationsHours.reduce((sum, value) => sum + value, 0) / resolutionDurationsHours.length
+      : 0;
+
+  const dueTodayCount = rows.filter((row) => {
+    if (!row.due_by || ["Resolved", "Closed"].includes(row.status ?? "")) return false;
+    const due = new Date(row.due_by);
+    const current = new Date();
+    return (
+      due.getUTCFullYear() === current.getUTCFullYear() &&
+      due.getUTCMonth() === current.getUTCMonth() &&
+      due.getUTCDate() === current.getUTCDate()
+    );
+  }).length;
+  const dueThisWeekCount = rows.filter((row) => {
+    if (!row.due_by || ["Resolved", "Closed"].includes(row.status ?? "")) return false;
+    const dueTs = new Date(row.due_by).getTime();
+    return dueTs >= now && dueTs <= now + 7 * 24 * 60 * 60 * 1000;
+  }).length;
+
+  const byPriority = tallyBy(rows, (row) => row.priority ?? "Unassigned");
+  const byAgent = tallyBy(rows, (row) => row.agent_name ?? "Unassigned").slice(0, 6);
+  const byCustomer = tallyBy(rows, (row) => row.company_name ?? "Unknown").slice(0, 6);
+
+  const weeklyTrend = buildWeeklyTrend(rows);
+  const recentActivity = [...rows]
+    .sort(
+      (a, b) =>
+        new Date(b.ticket_updated_at ?? b.ticket_created_at ?? 0).getTime() -
+        new Date(a.ticket_updated_at ?? a.ticket_created_at ?? 0).getTime(),
+    )
+    .slice(0, 6);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <div>
+            <CardTitle className="text-base">Support tickets summary</CardTitle>
+            <CardDescription>At-a-glance support health with one-click drill-downs into the list.</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/tickets" search={{ quick: "all", view: "all" }}>
+                Open full list
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            <SummaryLinkCard label="Open" value={counts.open} quick="open" />
+            <SummaryLinkCard label="Pending" value={counts.pending} quick="pending" />
+            <SummaryLinkCard label="Overdue" value={counts.overdue} quick="overdue" />
+            <SummaryLinkCard label="Escalated" value={counts.escalated} quick="escalated" />
+            <SummaryLinkCard label="Resolved" value={counts.resolved} quick="resolved" />
+            <SummaryLinkCard label="Closed" value={counts.closed} quick="closed" />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard label="Resolved (last 7 days)" value={resolvedLast7.toLocaleString()} />
+            <MetricCard label="Closed (last 7 days)" value={closedLast7.toLocaleString()} />
+            <MetricCard label="Avg resolution time" value={`${avgResolutionHours.toFixed(1)} h`} />
+            <MetricCard
+              label="Resolved within due by"
+              value={`${resolvedWithinDuePct}%`}
+              sublabel={`${resolvedWithinDue.toLocaleString()} of ${dueResolvedRows.length.toLocaleString()}`}
+            />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="text-sm">Due-by status</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2 sm:grid-cols-3">
+                <MetricCard label="Overdue" value={counts.overdue.toLocaleString()} />
+                <MetricCard label="Due today" value={dueTodayCount.toLocaleString()} />
+                <MetricCard label="Due in next 7 days" value={dueThisWeekCount.toLocaleString()} />
+              </CardContent>
+            </Card>
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="text-sm">Freshdesk ticket sync</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  Keep support data current before review captures and triage actions.
+                </div>
+                <div className="flex items-center gap-2">
+                  {canSync && (
+                    <Button size="sm" onClick={onSyncNow} disabled={syncPending}>
+                      {syncPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                      Sync now
+                    </Button>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    Sync now is available to Super Admin.
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SummaryChartCard title="Tickets by priority">
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie data={byPriority} dataKey="value" nameKey="name" outerRadius={85} label>
+                {byPriority.map((_, idx) => (
+                  <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </SummaryChartCard>
+        <SummaryChartCard title="Opened vs resolved (weekly)">
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={weeklyTrend}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="week" fontSize={11} />
+              <YAxis fontSize={11} allowDecimals={false} />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="opened" name="Opened" stroke="var(--chart-1)" strokeWidth={2} />
+              <Line type="monotone" dataKey="resolved" name="Resolved/Closed" stroke="var(--chart-3)" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        </SummaryChartCard>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Recent ticket activity</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {recentActivity.map((ticket) => (
+              <button
+                key={ticket.id}
+                type="button"
+                className="w-full rounded-md border border-border px-3 py-2 text-left hover:bg-muted/30"
+              >
+                <div className="text-sm font-medium">#{ticket.id} · {ticket.subject ?? "—"}</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {ticket.company_name ?? "Unknown"} · {ticket.status ?? "—"} · {ticket.priority ?? "—"}
+                </div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Tickets by agent</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {byAgent.map((entry) => (
+              <Link
+                key={entry.name}
+                to="/tickets"
+                search={{ quick: "all", view: "all" }}
+                className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+              >
+                <span className="text-sm">{entry.name}</span>
+                <Badge variant="outline">{entry.value.toLocaleString()}</Badge>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Tickets by customer</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {byCustomer.map((entry) => (
+              <Link
+                key={entry.name}
+                to="/tickets"
+                search={{ quick: "all", view: "all" }}
+                className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+              >
+                <span className="text-sm">{entry.name}</span>
+                <Badge variant="outline">{entry.value.toLocaleString()}</Badge>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function SummaryLinkCard({ label, value, quick }: { label: string; value: number; quick: Quick }) {
+  return (
+    <Link
+      to="/tickets"
+      search={{ quick, view: "all" }}
+      className="rounded-md border border-border px-3 py-2 transition hover:bg-muted/30"
+    >
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-xl font-semibold">{value.toLocaleString()}</div>
+    </Link>
+  );
+}
+
+function MetricCard({ label, value, sublabel }: { label: string; value: string; sublabel?: string }) {
+  return (
+    <div className="rounded-md border border-border p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-lg font-semibold">{value}</div>
+      {sublabel && <div className="mt-1 text-xs text-muted-foreground">{sublabel}</div>}
+    </div>
+  );
+}
+
+function SummaryChartCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+function tallyBy(rows: TicketRow[], key: (row: TicketRow) => string) {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const value = key(row);
+    map.set(value, (map.get(value) ?? 0) + 1);
+  }
+  return [...map.entries()]
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function buildWeeklyTrend(rows: TicketRow[]) {
+  const now = new Date();
+  const buckets: { week: string; opened: number; resolved: number }[] = [];
+  for (let index = 7; index >= 0; index--) {
+    const start = new Date(now);
+    start.setDate(now.getDate() - index * 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    buckets.push({
+      week: `${String(start.getMonth() + 1).padStart(2, "0")}/${String(start.getDate()).padStart(2, "0")}`,
+      opened: 0,
+      resolved: 0,
+    });
+    rows.forEach((row) => {
+      const created = row.ticket_created_at ? new Date(row.ticket_created_at).getTime() : null;
+      const updated = row.ticket_updated_at ? new Date(row.ticket_updated_at).getTime() : null;
+      const startTs = start.getTime();
+      const endTs = end.getTime() + 24 * 60 * 60 * 1000;
+      if (created && created >= startTs && created < endTs) buckets[buckets.length - 1].opened += 1;
+      if (
+        updated &&
+        updated >= startTs &&
+        updated < endTs &&
+        ["Resolved", "Closed"].includes(row.status ?? "")
+      ) {
+        buckets[buckets.length - 1].resolved += 1;
+      }
+    });
+  }
+  return buckets;
 }

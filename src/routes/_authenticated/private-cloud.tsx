@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { TransactionsTable } from "@/components/transactions-table";
-import { PrivateCloudBatchesView } from "@/components/private-cloud-batches-view";
 import { PrivateCloudExampleView } from "@/components/private-cloud-example-view";
+import { PrivateCloudSummary } from "@/components/summaries/private-cloud-summary";
 import { validateTxSearch } from "@/lib/tx-search";
 import {
   getScrum44UiReviewEnvForClient,
@@ -25,10 +25,10 @@ function PrivateCloudPage() {
 
   return (
     <AppShell title={uiRefreshEnabled ? "Private Cloud Batches" : "Private Cloud Repository"}>
-      {isExampleCaptureMode ? (
+      {uiRefreshEnabled ? (
+        <PrivateCloudSummary />
+      ) : isExampleCaptureMode ? (
         <PrivateCloudExampleView />
-      ) : uiRefreshEnabled ? (
-        <PrivateCloudBatchesView />
       ) : (
         <TransactionsTable
           repoFilter="private_cloud"

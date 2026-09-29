@@ -20,6 +20,11 @@ import {
 } from "@/lib/superadmin-capture-mode";
 import { CAPTURE_PERSONAS, getCaptureRole, type CaptureRole } from "@/lib/capture-persona";
 import {
+  getScrum44UiReviewEnvForClient,
+  isScrum44UiReviewEnabled,
+} from "@/lib/scrum44-ui-review-flag";
+import { DashboardSummary } from "@/components/summaries/dashboard-summary";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -66,6 +71,7 @@ const EXAMPLE_DASHBOARD_ROWS: ReportRow[] = [
 function DashboardPage() {
   const { can, orderedKpis, isPreviewing, previewRole } = usePermissions();
   const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
+  const uiRefreshEnabled = isScrum44UiReviewEnabled(getScrum44UiReviewEnvForClient());
   const captureRole = isExampleCaptureMode
     ? (getCaptureRole(
         getSuperadminCaptureModeEnvForClient(),
@@ -113,6 +119,13 @@ function DashboardPage() {
   const curUsers = curRows.reduce((s, r) => addNullable(s, r.total_users), 0);
 
   const navigate = useNavigate();
+  if (uiRefreshEnabled) {
+    return (
+      <AppShell title="Dashboard">
+        <DashboardSummary />
+      </AppShell>
+    );
+  }
   const reportsTo = can("feature_reports_access") ? "/reports" : "/transactions";
   const curMonthSearch = { month: curMonth, year: curYear };
   const goMonth = (name?: string) => {

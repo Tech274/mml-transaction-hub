@@ -26,8 +26,10 @@ import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
+import { requireRouteRoles } from "@/lib/route-guard";
 
 export const Route = createFileRoute("/_authenticated/sync-status")({
+  beforeLoad: requireRouteRoles("/sync-status"),
   component: SyncStatusPage,
 });
 
