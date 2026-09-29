@@ -22,7 +22,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
 import { addNullable } from "@/lib/nullable-sum";
-import { reportLineCost } from "@/lib/reports-metrics";
 import { readAllRows } from "@/lib/read-all";
 import {
   getSuperadminCaptureModeEnvForClient,
@@ -60,6 +59,12 @@ const EXAMPLE_ROWS: PublicCloudRow[] = [
   { id: "tx-5", potential_id: "DEMO-PUB-005", customer_name: "Capgemini", lab_name: "Platform SRE", cloud_provider: "Azure", line_of_business: "Integrated", selling_cost: 35200, input_cost: 22900, input_cost_auto: null, input_cost_actual_alloc: 21980, total_users: 20, start_date: "2026-08-10", end_date: "2026-08-27", public_credit_allocated: 25000, public_actual_consumption: 21980, public_unused_credit: 3020, month: 8, year: 2026 },
 ];
 
+function lineCost(
+  row: Pick<PublicCloudRow, "input_cost_actual_alloc" | "input_cost" | "input_cost_auto">,
+): number {
+  return row.input_cost_actual_alloc ?? row.input_cost ?? row.input_cost_auto ?? 0;
+}
+
 export function PublicCloudSummary() {
   const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const { data, isLoading, isError, error } = useQuery({
@@ -83,7 +88,7 @@ export function PublicCloudSummary() {
       const nowTs = now.getTime();
       const nextWeekTs = nowTs + 7 * 24 * 60 * 60 * 1000;
       const revenue = rows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
-      const inputCost = rows.reduce((sum, row) => addNullable(sum, reportLineCost(row)), 0);
+      const inputCost = rows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
       const profit = revenue - inputCost;
       const marginPct = revenue > 0 ? (profit / revenue) * 100 : 0;
       const runningNow = rows.filter((row) => {
@@ -103,7 +108,7 @@ export function PublicCloudSummary() {
         const month = idx + 1;
         const monthRows = rows.filter((row) => row.month === month && row.year === now.getFullYear());
         const monthRevenue = monthRows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
-        const monthCost = monthRows.reduce((sum, row) => addNullable(sum, reportLineCost(row)), 0);
+        const monthCost = monthRows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
         return { month: MONTH_NAMES[idx].slice(0, 3), revenue: monthRevenue, cost: monthCost };
       });
 
@@ -294,7 +299,7 @@ export function PublicCloudSummary() {
               </div>
               <div className="mt-1 text-xs text-muted-foreground">
                 {row.customer_name ?? "Unknown customer"} · Revenue {fmtCurrency(row.selling_cost)} · Cost{" "}
-                {fmtCurrency(reportLineCost(row))}
+                {fmtCurrency(lineCost(row))}
               </div>
             </Link>
           ))}

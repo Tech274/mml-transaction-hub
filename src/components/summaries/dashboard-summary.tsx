@@ -19,7 +19,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
 import { addNullable } from "@/lib/nullable-sum";
-import { reportLineCost } from "@/lib/reports-metrics";
 import { readAllRows } from "@/lib/read-all";
 import { getSyncOverview } from "@/lib/sync.functions";
 import {
@@ -53,6 +52,10 @@ const EXAMPLE_ROWS: TxRow[] = [
   { month: 7, year: 2026, customer_name: "Capgemini", line_of_business: "VILT", cloud_provider: "Azure", selling_cost: 35200, input_cost: 22900, input_cost_actual_alloc: 21980, input_cost_auto: null, total_users: 20, repository_type: "public_cloud", start_date: "2026-07-02", end_date: "2026-07-25" },
 ];
 
+function lineCost(row: Pick<TxRow, "input_cost_actual_alloc" | "input_cost" | "input_cost_auto">): number {
+  return row.input_cost_actual_alloc ?? row.input_cost ?? row.input_cost_auto ?? 0;
+}
+
 export function DashboardSummary() {
   const syncOverviewFn = useServerFn(getSyncOverview);
   const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
@@ -67,7 +70,7 @@ export function DashboardSummary() {
           const month = idx + 1;
           const rows = txRows.filter((row) => row.year === year && row.month === month);
           const revenue = rows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
-          const cost = rows.reduce((sum, row) => addNullable(sum, reportLineCost(row)), 0);
+          const cost = rows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
           const marginPct = revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0;
           return {
             month: MONTH_NAMES[idx].slice(0, 3),
@@ -77,7 +80,7 @@ export function DashboardSummary() {
           };
         });
         const revenue = txRows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
-        const cost = txRows.reduce((sum, row) => addNullable(sum, reportLineCost(row)), 0);
+        const cost = txRows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
         const profit = revenue - cost;
         const marginPct = revenue > 0 ? (profit / revenue) * 100 : 0;
         return {
@@ -103,7 +106,7 @@ export function DashboardSummary() {
           },
         };
       }
-      const [{ count: customerCount }, { count: activeResources }, { count: openTickets }, txRows, syncOverview, pendingProposals] =
+      const [customerCountResult, activeResourcesResult, openTicketsResult, txRows, syncOverview, pendingProposals] =
         await Promise.all([
           supabase.from("customers").select("id", { head: true, count: "exact" }).eq("is_active", true),
           supabase.from("profiles").select("id", { head: true, count: "exact" }).eq("is_active", true),
@@ -130,7 +133,7 @@ export function DashboardSummary() {
         const month = idx + 1;
         const rows = txRows.filter((row) => row.year === year && row.month === month);
         const revenue = rows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
-        const cost = rows.reduce((sum, row) => addNullable(sum, reportLineCost(row)), 0);
+        const cost = rows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
         const marginPct = revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0;
         return {
           month: MONTH_NAMES[idx].slice(0, 3),
@@ -141,7 +144,7 @@ export function DashboardSummary() {
       });
 
       const revenue = txRows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
-      const cost = txRows.reduce((sum, row) => addNullable(sum, reportLineCost(row)), 0);
+      const cost = txRows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
       const profit = revenue - cost;
       const marginPct = revenue > 0 ? (profit / revenue) * 100 : 0;
 
@@ -150,7 +153,7 @@ export function DashboardSummary() {
         const key = row.customer_name ?? "Unknown";
         const prev = customerMap.get(key) ?? { revenue: 0, cost: 0, users: 0 };
         prev.revenue = addNullable(prev.revenue, row.selling_cost);
-        prev.cost = addNullable(prev.cost, reportLineCost(row));
+        prev.cost = addNullable(prev.cost, lineCost(row));
         prev.users = addNullable(prev.users, row.total_users);
         customerMap.set(key, prev);
       }
@@ -165,7 +168,10 @@ export function DashboardSummary() {
         .slice(0, 5);
 
       const keyAlerts: string[] = [];
-      if ((openTickets.count ?? 0) > 0) keyAlerts.push(`${fmtNumber(openTickets.count ?? 0)} support tickets are open.`);
+      const customerCount = customerCountResult.count ?? 0;
+      const activeResources = activeResourcesResult.count ?? 0;
+      const openTicketsCount = openTicketsResult.count ?? 0;
+      if (openTicketsCount > 0) keyAlerts.push(`${fmtNumber(openTicketsCount)} support tickets are open.`);
       if (syncOverview.freshdesk.health.state !== "ok") keyAlerts.push(syncOverview.freshdesk.health.message);
       if ((pendingProposals.count ?? 0) > 0) {
         keyAlerts.push(`${fmtNumber(pendingProposals.count ?? 0)} AI proposals are awaiting review.`);
@@ -179,8 +185,8 @@ export function DashboardSummary() {
         revenue,
         profit,
         marginPct,
-        openTickets: openTickets.count ?? 0,
-        activeResources: activeResources.count ?? 0,
+        openTickets: openTicketsCount,
+        activeResources,
         topCustomers,
         keyAlerts,
         syncOverview,

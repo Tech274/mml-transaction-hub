@@ -23,7 +23,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
 import { addNullable } from "@/lib/nullable-sum";
 import { readAllRows } from "@/lib/read-all";
-import { reportLineCost } from "@/lib/reports-metrics";
 import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
@@ -72,6 +71,10 @@ const EXAMPLE_TRANSACTIONS: TxRow[] = [
   { id: "t7", lab_batch_id: "pb-3", customer_name: "Capgemini", month: 7, year: 2026, selling_cost: 98000, input_cost: 57000, input_cost_auto: null, input_cost_actual_alloc: 56900 },
 ];
 
+function lineCost(row: Pick<TxRow, "input_cost_actual_alloc" | "input_cost" | "input_cost_auto">): number {
+  return row.input_cost_actual_alloc ?? row.input_cost ?? row.input_cost_auto ?? 0;
+}
+
 export function PrivateCloudSummary() {
   const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const { data, isLoading, isError, error } = useQuery({
@@ -116,7 +119,7 @@ export function PrivateCloudSummary() {
         const month = idx + 1;
         const monthRows = tx.filter((row) => row.year === year && row.month === month);
         const monthRevenue = monthRows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
-        const monthCost = monthRows.reduce((sum, row) => addNullable(sum, reportLineCost(row)), 0);
+        const monthCost = monthRows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
         const monthMargin = monthRevenue > 0 ? ((monthRevenue - monthCost) / monthRevenue) * 100 : 0;
         return {
           month: MONTH_NAMES[idx].slice(0, 3),

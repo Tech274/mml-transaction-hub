@@ -21,6 +21,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
 import { fmtNumber } from "@/lib/format";
 import { LIVE_ROLES, PARKED_ROLES } from "@/lib/role-rollout";
+import type { AgentKey } from "@/lib/ai-command-center.functions";
 import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
@@ -73,6 +74,12 @@ const EXAMPLE_AUDIT: AuditRow[] = [
   { id: "au-3", action: "confirm", actor_email: "admin.demo@mml.local", created_at: "2026-09-29T05:33:40Z" },
   { id: "au-4", action: "reject", actor_email: "admin.demo@mml.local", created_at: "2026-09-29T04:33:40Z" },
 ];
+
+const AGENT_KEYS: readonly AgentKey[] = ["generalist", "support", "cost_adr"];
+
+function toAgentKey(value: string): AgentKey | undefined {
+  return AGENT_KEYS.includes(value as AgentKey) ? (value as AgentKey) : undefined;
+}
 
 export function AiCommandCenterSummary() {
   const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
@@ -186,6 +193,7 @@ export function AiCommandCenterSummary() {
               <Link
                 key={item.id}
                 to="/ai-command-center/inbox"
+                search={{ agent: toAgentKey(item.agent_key) }}
                 className="block rounded-md border border-border px-3 py-2 hover:bg-muted/30"
               >
                 <div className="flex items-center justify-between gap-2">
