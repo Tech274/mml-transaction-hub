@@ -14,8 +14,14 @@ import {
 import { format } from "date-fns";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { listAudit, AGENTS, type AuditItem } from "@/lib/ai-command-center.functions";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
+import { requireRouteRoles } from "@/lib/route-guard";
 
 export const Route = createFileRoute("/_authenticated/ai-command-center/audit")({
+  beforeLoad: requireRouteRoles("/ai-command-center/audit"),
   component: AuditPage,
 });
 
@@ -27,12 +33,22 @@ const ACTION_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 };
 
 function AuditPage() {
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const [agentFilter, setAgentFilter] = useState("all");
   const fn = useServerFn(listAudit);
   const q = useQuery({
     queryKey: ["ai-cc", "audit", agentFilter],
     queryFn: () => fn({ data: { agent_key: agentFilter } }) as Promise<AuditItem[]>,
+    enabled: !isExampleCaptureMode,
   });
+  const rows: AuditItem[] = isExampleCaptureMode
+    ? [
+        { id: "au-1", actor_email: "admin.demo@mml.local", agent_key: "support", action: "run", run_id: "run-901", inbox_id: null, detail: { title: "Daily support queue sweep", job_hint: "Escalated and overdue tickets" }, created_at: "2026-09-29T05:31:00Z" },
+        { id: "au-2", actor_email: "opslead.demo@mml.local", agent_key: "support", action: "propose", run_id: "run-901", inbox_id: "inb-55", detail: { title: "Ticket #5142 response draft", write_result: { performed: false, stubbed: true } }, created_at: "2026-09-29T05:31:14Z" },
+        { id: "au-3", actor_email: "admin.demo@mml.local", agent_key: "support", action: "confirm", run_id: "run-901", inbox_id: "inb-55", detail: { title: "Approved ticket update", write_result: { performed: true } }, created_at: "2026-09-29T05:33:40Z" },
+        { id: "au-4", actor_email: "admin.demo@mml.local", agent_key: "generalist", action: "propose", run_id: "run-902", inbox_id: "inb-58", detail: { title: "Lab solution guide for Cognizant BPMN cohort" }, created_at: "2026-09-29T05:35:05Z" },
+      ]
+    : (q.data ?? []);
 
   const agentName = (k: string | null) => AGENTS.find((a) => a.key === k)?.name ?? k ?? "—";
 
@@ -99,7 +115,7 @@ function AuditPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {(q.data ?? []).map((a) => {
+              {rows.map((a) => {
                 const d = a.detail as Record<string, any>;
                 const write = d['write_result'] as { performed?: boolean; stubbed?: boolean } | undefined;
                 return (

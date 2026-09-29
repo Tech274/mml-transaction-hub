@@ -34,7 +34,7 @@ beforeAll(async () => {
   );
 }, 120_000);
 
-async function insertLine(id: string, input: number | null, selling = 5500) {
+async function insertLine(id: string, input: number | null, selling = 5500, batchId = BATCH) {
   await db.query(
     `insert into public.transactions (
        id, potential_id, month, year, customer_id, customer_name, lab_name, lab_type,
@@ -42,7 +42,7 @@ async function insertLine(id: string, input: number | null, selling = 5500) {
        created_by, lab_batch_id
      ) values ($1, $2, 9, 2026, $3, 'Synthetic Co', 'Azure Admin Batch Lab', 'public_cloud',
        'Azure', 'VILT', '2026-09-01', '2026-09-30', 10, $4, $5, $6, $7)`,
-    [id, `SYN-${id.slice(-2)}`, CUSTOMER, selling, input, U.admin, BATCH],
+    [id, `SYN-${id.slice(-2)}`, CUSTOMER, selling, input, U.admin, batchId],
   );
 }
 
@@ -117,6 +117,109 @@ describe("margin routine", () => {
       ),
     );
     expect(code).not.toBe("ok");
+  });
+});
+
+describe("derived batch totals and locked costs", () => {
+  it("keeps batch totals equal to the sum of transactions after insert/update/delete", async () => {
+    const batch = "00000000-0000-4000-8000-0000000000c0";
+    const a = "00000000-0000-4000-8000-0000000000c2";
+    const b = "00000000-0000-4000-8000-0000000000c3";
+    await db.query(
+      `insert into public.lab_batches (id, batch_code, name, status, created_by)
+       values ($1, 'LB-TEST-DERIVE', 'Derived totals', 'open', $2)`,
+      [batch, U.admin],
+    );
+    await insertLine(a, 1000, 3500, batch);
+    await insertLine(b, 2000, 4500, batch);
+
+    const afterInsert = await db.query<{ revenue_total: string; estimated_cost_total: string; actual_cost_total: string | null }>(
+      "select revenue_total::text, estimated_cost_total::text, actual_cost_total::text from public.lab_batches where id = $1",
+      [batch],
+    );
+    expect(afterInsert.rows[0]).toEqual({
+      revenue_total: "8000.00",
+      estimated_cost_total: "3000.00",
+      actual_cost_total: null,
+    });
+
+    await db.exec("begin");
+    await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: U.admin, role: "authenticated" })]);
+    await db.exec("set local role authenticated");
+    await expect(
+      db.query(
+        `select public.admin_correct_lab_transaction_costs(
+           $1, 5000, 2500, null, null, 'Batch totals test correction via admin RPC'
+         )`,
+        [b],
+      ),
+    ).resolves.toBeDefined();
+    await db.exec("commit");
+    const afterUpdate = await db.query<{ revenue_total: string; estimated_cost_total: string }>(
+      "select revenue_total::text, estimated_cost_total::text from public.lab_batches where id = $1",
+      [batch],
+    );
+    expect(afterUpdate.rows[0]).toEqual({ revenue_total: "8500.00", estimated_cost_total: "3500.00" });
+
+    await db.query("delete from public.transactions where id = $1", [a]);
+    const afterDelete = await db.query<{ revenue_total: string; estimated_cost_total: string }>(
+      "select revenue_total::text, estimated_cost_total::text from public.lab_batches where id = $1",
+      [batch],
+    );
+    expect(afterDelete.rows[0]).toEqual({ revenue_total: "5000.00", estimated_cost_total: "2500.00" });
+  });
+
+  it("locks selling/input costs after creation and allows only admin correction path", async () => {
+    const tx = "00000000-0000-4000-8000-0000000000c4";
+    await db.query(
+      `insert into public.transactions (
+         id, potential_id, month, year, customer_id, customer_name, lab_name, lab_type,
+         cloud_provider, line_of_business, start_date, end_date, total_users, selling_cost, input_cost, created_by
+       ) values ($1, 'SYN-LOCK', 9, 2026, $2, 'Synthetic Co', 'Lock Lab', 'public_cloud',
+         'AWS', 'VILT', '2026-09-01', '2026-09-30', 3, 1500, 900, $3)`,
+      [tx, CUSTOMER, U.ops],
+    );
+
+    const opsBlocked = await asActor(db, as(U.ops), (q) =>
+      outcome(q.query("update public.transactions set selling_cost = 1700 where id = $1", [tx])),
+    );
+    expect(opsBlocked).toBe("42501");
+
+    const adminBlocked = await asActor(db, as(U.admin), (q) =>
+      outcome(q.query("update public.transactions set input_cost = 950 where id = $1", [tx])),
+    );
+    expect(adminBlocked).toBe("42501");
+
+    const correction = await asActor(db, as(U.admin), async (q) => {
+      const call = await outcome(
+        q.query(
+          `select public.admin_correct_lab_transaction_costs(
+             $1, 1600, 910, 1000, 650, 'Correction after finance reconciliation'
+           )`,
+          [tx],
+        ),
+      );
+      const corrected = await q.query<{
+        selling_cost: string;
+        input_cost: string;
+        public_total_margin_actual: string;
+      }>(
+        "select selling_cost::text, input_cost::text, public_total_margin_actual::text from public.transactions where id = $1",
+        [tx],
+      );
+      const audit = await q.query<{ n: number }>(
+        "select count(*)::int as n from public.lab_transaction_cost_corrections where transaction_id = $1",
+        [tx],
+      );
+      return { call, row: corrected.rows[0], audit: audit.rows[0].n };
+    });
+    expect(correction.call).toBe("ok");
+    expect(correction.row).toEqual({
+      selling_cost: "1600.00",
+      input_cost: "910.00",
+      public_total_margin_actual: "950.00",
+    });
+    expect(correction.audit).toBe(1);
   });
 });
 

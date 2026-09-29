@@ -27,6 +27,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useServerFn } from "@tanstack/react-start";
 import { createCustomerFn, updateCustomerFn, setCustomerActiveFn } from "@/lib/customers.functions";
+import { CustomersExampleView } from "@/components/customers-example-view";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
 
 type SortKey = "customer_name" | "account_manager_name" | "count" | "users" | "revenue" | "profit" | "margin";
 const PAGE_SIZE = 25;
@@ -48,6 +53,15 @@ export const Route = createFileRoute("/_authenticated/customers")({
 });
 
 function CustomersPage() {
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
+  if (isExampleCaptureMode) {
+    return (
+      <AppShell title="Customers">
+        <CustomersExampleView />
+      </AppShell>
+    );
+  }
+
   const { user, hasAnyRole } = useAuth();
   const { can } = usePermissions();
   const searchParams = Route.useSearch();

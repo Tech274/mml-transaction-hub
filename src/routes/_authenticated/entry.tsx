@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/app-shell";
 import { MasterAdrForm } from "@/components/master-adr-form";
-import { BulkImport } from "@/components/bulk-import";
 import { BulkImportHistory } from "@/components/bulk-import-history";
 import { BulkImportAuditLog } from "@/components/bulk-import-audit-log";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,9 +22,6 @@ function EntryPage() {
   // Bulk import + history are limited to Ops/Manager/Admin.
   const canBulk = hasAnyRole(["admin", "ops_lead", "ops_user"]);
   const canHistory = hasAnyRole(["admin", "ops_lead", "leadership"]);
-  // The lenient importer is the Bulk Import tab for every import role.
-  // The old row-by-row importer stays admin-only, under Legacy import.
-  const canLegacy = hasAnyRole(["admin"]);
   return (
     <AppShell title="Master ADR Entry">
       {allowed ? (
@@ -33,13 +29,11 @@ function EntryPage() {
           <TabsList>
             <TabsTrigger value="single">Single Entry</TabsTrigger>
             {canBulk && <TabsTrigger value="bulk">Bulk Import</TabsTrigger>}
-            {canLegacy && <TabsTrigger value="legacy">Legacy import</TabsTrigger>}
             {canHistory && <TabsTrigger value="history">Import History</TabsTrigger>}
             {canHistory && <TabsTrigger value="audit">Audit Log</TabsTrigger>}
           </TabsList>
           <TabsContent value="single"><MasterAdrForm /></TabsContent>
           {canBulk && <TabsContent value="bulk"><StrictImport /></TabsContent>}
-          {canLegacy && <TabsContent value="legacy"><BulkImport /></TabsContent>}
           {canHistory && <TabsContent value="history"><BulkImportHistory /></TabsContent>}
           {canHistory && <TabsContent value="audit"><BulkImportAuditLog /></TabsContent>}
         </Tabs>

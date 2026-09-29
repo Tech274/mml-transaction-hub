@@ -38,6 +38,7 @@ import {
 import { useAuth, type AppRole } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
+import { isLeadershipOnlyRoleSet } from "@/lib/leadership-access";
 
 type NavItem = {
   to: string;
@@ -67,10 +68,10 @@ const nav: NavItem[] = [
     roles: null,
     permission: "feature_reports_access",
   },
-  { to: "/tickets", label: "Support Tickets", icon: LifeBuoy, roles: null },
+  { to: "/tickets", label: "Support Tickets", icon: LifeBuoy, roles: ["admin"] },
   { to: "/agent-integrations", label: "Agent integrations", icon: PlugZap, roles: null },
 
-  { to: "/sync-status", label: "Sync status", icon: DatabaseZap, roles: null },
+  { to: "/sync-status", label: "Sync status", icon: DatabaseZap, roles: ["admin"] },
   { to: "/mcp-audit", label: "MCP audit log", icon: ScrollText, roles: ["admin"] },
   { to: "/admin", label: "Admin Settings", icon: Settings, roles: ["admin"] },
 ];
@@ -100,10 +101,11 @@ const mmlLabNav: NavItem[] = [
 ];
 
 const aiCommandCenterNav: NavItem[] = [
-  { to: "/ai-command-center/agents", label: "Agents", icon: Bot, roles: null },
-  { to: "/ai-command-center/inbox", label: "Inbox", icon: Inbox, roles: null },
-  { to: "/ai-command-center/run-now", label: "Run now", icon: Play, roles: null },
-  { to: "/ai-command-center/audit", label: "Audit", icon: History, roles: null },
+  { to: "/ai-command-center", label: "AI Command Center", icon: Bot, roles: ["admin"] },
+  { to: "/ai-command-center/agents", label: "Agents", icon: Bot, roles: ["admin"] },
+  { to: "/ai-command-center/inbox", label: "Inbox", icon: Inbox, roles: ["admin"] },
+  { to: "/ai-command-center/run-now", label: "Run now", icon: Play, roles: ["admin"] },
+  { to: "/ai-command-center/audit", label: "Audit", icon: History, roles: ["admin"] },
 ];
 
 export function AppSidebar() {
@@ -112,6 +114,20 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { hasAnyRole, user, roles, signOut } = useAuth();
   const { can } = usePermissions();
+  const isLeadershipOnly = isLeadershipOnlyRoleSet(roles);
+  const visibleAiCommandCenterNav = isLeadershipOnly
+    ? []
+    : aiCommandCenterNav.filter((i) => !i.roles || hasAnyRole(i.roles));
+  const visibleMmlLabNav = isLeadershipOnly
+    ? []
+    : mmlLabNav.filter(
+        (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
+      );
+  const visibleWorkspaceNav = nav
+    .filter(
+      (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
+    )
+    .filter((i) => !isLeadershipOnly || i.to === "/dashboard");
 
   return (
     <Sidebar collapsible="icon">
@@ -129,13 +145,12 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>AI Command Center</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {aiCommandCenterNav
-                .filter((i) => !i.roles || hasAnyRole(i.roles))
-                .map((item) => {
+        {visibleAiCommandCenterNav.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>AI Command Center</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleAiCommandCenterNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
@@ -148,18 +163,16 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                   );
                 })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>MML Lab</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mmlLabNav
-                .filter(
-                  (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
-                )
-                .map((item) => {
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {visibleMmlLabNav.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>MML Lab</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleMmlLabNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
@@ -172,18 +185,16 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                   );
                 })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {nav
-                .filter(
-                  (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
-                )
-                .map((item) => {
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {visibleWorkspaceNav.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleWorkspaceNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
@@ -196,9 +207,10 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                   );
                 })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">

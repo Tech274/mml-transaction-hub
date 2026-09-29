@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -25,10 +25,17 @@ import { RefreshCw, LifeBuoy, AlertTriangle, Eye, Loader2, CheckCircle2, X, User
 import { useAuth } from "@/lib/auth-context";
 import {
   getTicketsOverview, syncFreshdeskNow, getAgentDirectory, setMyAgentIdentity,
-  getTicketHistory, resolveTicket, getTicketDescription, type TicketRow,
+  getTicketHistory, resolveTicket, getTicketDescription, type TicketRow, type TicketsOverview,
 } from "@/lib/freshdesk.functions";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
+import { requireRouteRoles } from "@/lib/route-guard";
+import { fmtNumber } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/tickets")({
+  beforeLoad: requireRouteRoles("/tickets"),
   validateSearch: (search: Record<string, unknown>) => ({
     view: search.view === "mine" ? ("mine" as const) : ("all" as const),
     quick: (["all", "open", "pending", "resolved", "closed", "overdue", "escalated"] as const).includes(
@@ -51,7 +58,14 @@ export const Route = createFileRoute("/_authenticated/tickets")({
   }),
 });
 
-const COLORS = ["hsl(var(--primary))", "hsl(var(--chart-2, 173 58% 39%))", "hsl(var(--chart-3, 197 37% 24%))", "hsl(var(--chart-4, 43 74% 66%))", "hsl(var(--chart-5, 27 87% 67%))", "hsl(var(--muted-foreground))"];
+const COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--muted-foreground)",
+];
 
 const OPEN_LIKE = ["Open", "Waiting on Customer", "Waiting on Third Party"];
 const STATUS_OPTIONS = ["Open", "Pending", "Waiting on Customer", "Waiting on Third Party", "Resolved", "Closed"];
@@ -67,6 +81,61 @@ const QUICK_LABEL: Record<Quick, string> = {
   closed: "Closed",
   overdue: "Overdue",
   escalated: "Escalated",
+};
+
+const EXAMPLE_TICKETS: TicketRow[] = [
+  { id: 5142, subject: "Unable to launch DevOps lab VM", status: "Open", priority: "High", type: "Incident", source: "Portal", requester_name: "Priya Menon", requester_email: "priya@cognizant.com", company_name: "Cognizant", agent_name: "Ritu Sharma", group_name: "Cloud Labs", tags: ["vm", "launch"], due_by: "2026-09-29T09:30:00Z", is_escalated: true, ticket_created_at: "2026-09-29T03:40:00Z", ticket_updated_at: "2026-09-29T04:50:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  { id: 5139, subject: "Seat quota mismatch in AI Foundations cohort", status: "Pending", priority: "Medium", type: "Service Request", source: "Email", requester_name: "Arun Das", requester_email: "arun@infosys.com", company_name: "Infosys", agent_name: "Ritu Sharma", group_name: "Cloud Labs", tags: ["quota"], due_by: "2026-09-29T13:00:00Z", is_escalated: false, ticket_created_at: "2026-09-28T15:12:00Z", ticket_updated_at: "2026-09-29T02:20:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  { id: 5131, subject: "Need invoice split by BU for private batch", status: "Waiting on Customer", priority: "Low", type: "Question", source: "Portal", requester_name: "Sanjay Rao", requester_email: "sanjay@tcs.com", company_name: "TCS", agent_name: "Nisha Patel", group_name: "Cloud Labs", tags: ["invoice"], due_by: "2026-09-30T10:00:00Z", is_escalated: false, ticket_created_at: "2026-09-28T08:10:00Z", ticket_updated_at: "2026-09-29T00:45:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  { id: 5128, subject: "Freshdesk webhook retry warnings", status: "Open", priority: "Urgent", type: "Incident", source: "Email", requester_name: "Platform Bot", requester_email: "alerts@mml.local", company_name: "MakeMyLabs", agent_name: "Amit Singh", group_name: "Platform Ops", tags: ["integration", "webhook"], due_by: "2026-09-29T07:00:00Z", is_escalated: true, ticket_created_at: "2026-09-28T04:42:00Z", ticket_updated_at: "2026-09-29T04:10:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  { id: 5124, subject: "Add learners to AKS lab after go-live", status: "Resolved", priority: "Medium", type: "Service Request", source: "Portal", requester_name: "Megha Iyer", requester_email: "megha@wipro.com", company_name: "Wipro", agent_name: "Ritu Sharma", group_name: "Cloud Labs", tags: ["learners"], due_by: "2026-09-28T12:00:00Z", is_escalated: false, ticket_created_at: "2026-09-27T17:20:00Z", ticket_updated_at: "2026-09-28T11:05:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  { id: 5116, subject: "Lab DNS issue in APAC region", status: "Closed", priority: "High", type: "Incident", source: "Email", requester_name: "Rahul Nair", requester_email: "rahul@hcl.com", company_name: "HCL", agent_name: "Nisha Patel", group_name: "Cloud Labs", tags: ["dns", "apac"], due_by: "2026-09-27T06:30:00Z", is_escalated: false, ticket_created_at: "2026-09-26T20:10:00Z", ticket_updated_at: "2026-09-27T06:10:00Z", synced_at: "2026-09-29T05:15:00Z" },
+];
+
+const EXAMPLE_TICKETS_OVERVIEW: TicketsOverview = {
+  tickets: EXAMPLE_TICKETS,
+  total: EXAMPLE_TICKETS.length,
+  counts: { open: 3, pending: 1, resolved: 1, closed: 1, escalated: 2, overdue: 1 },
+  by_status: [
+    { name: "Open", value: 2 },
+    { name: "Pending", value: 1 },
+    { name: "Waiting on Customer", value: 1 },
+    { name: "Resolved", value: 1 },
+    { name: "Closed", value: 1 },
+  ],
+  by_priority: [
+    { name: "Urgent", value: 1 },
+    { name: "High", value: 2 },
+    { name: "Medium", value: 2 },
+    { name: "Low", value: 1 },
+  ],
+  by_agent: [
+    { name: "Ritu Sharma", value: 3 },
+    { name: "Nisha Patel", value: 2 },
+    { name: "Amit Singh", value: 1 },
+  ],
+  by_group: [
+    { name: "Cloud Labs", value: 5 },
+    { name: "Platform Ops", value: 1 },
+  ],
+  by_month: [
+    { month: "2026-06", value: 22 },
+    { month: "2026-07", value: 27 },
+    { month: "2026-08", value: 31 },
+    { month: "2026-09", value: 34 },
+  ],
+  last_synced_at: "2026-09-29T05:15:00Z",
+  connection: { ok: true, message: "Connected to Freshdesk sandbox", domain: "mml-helpdesk.freshdesk.com" },
+  truncated: false,
+};
+
+const EXAMPLE_AGENT_DIRECTORY = {
+  agents: [
+    { id: 1401, name: "Ritu Sharma", email: "ritu.sharma@mml.local" },
+    { id: 1402, name: "Nisha Patel", email: "nisha.patel@mml.local" },
+    { id: 1403, name: "Amit Singh", email: "amit.singh@mml.local" },
+  ],
+  identity: { agent_name: "Ritu Sharma", agent_id: 1401, auto_matched: true },
 };
 
 function isOverdue(t: TicketRow) {
@@ -87,6 +156,7 @@ function matchesQuick(t: TicketRow, quick: Quick) {
 
 function TicketsPage() {
   const qc = useQueryClient();
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const { hasAnyRole } = useAuth();
   const canSync = hasAnyRole(["admin", "ops_lead"]);
   const canAct = hasAnyRole(["admin", "ops_lead", "ops_user"]);
@@ -112,8 +182,16 @@ function TicketsPage() {
     setPage(0);
   }, [search.view, search.quick]);
 
-  const overview = useQuery({ queryKey: ["freshdesk", "overview"], queryFn: () => overviewFn() });
-  const directory = useQuery({ queryKey: ["freshdesk", "agents"], queryFn: () => directoryFn() });
+  const overview = useQuery({
+    queryKey: ["freshdesk", "overview"],
+    queryFn: () => overviewFn(),
+    enabled: !isExampleCaptureMode,
+  });
+  const directory = useQuery({
+    queryKey: ["freshdesk", "agents"],
+    queryFn: () => directoryFn(),
+    enabled: !isExampleCaptureMode,
+  });
 
   const sync = useMutation({
     mutationFn: () => syncFn({ data: {} }),
@@ -125,8 +203,9 @@ function TicketsPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Freshdesk sync failed"),
   });
 
-  const d = overview.data;
-  const myAgent = directory.data?.identity?.agent_name ?? null;
+  const d = isExampleCaptureMode ? EXAMPLE_TICKETS_OVERVIEW : overview.data;
+  const directoryData = isExampleCaptureMode ? EXAMPLE_AGENT_DIRECTORY : directory.data;
+  const myAgent = directoryData?.identity?.agent_name ?? null;
 
   const scoped = useMemo(() => {
     const rows = d?.tickets ?? [];
@@ -175,30 +254,6 @@ function TicketsPage() {
     [scoped],
   );
 
-  const charts = useMemo(() => {
-    const tally = (pick: (r: TicketRow) => string | null | undefined) => {
-      const m = new Map<string, number>();
-      for (const r of scoped) {
-        const k = pick(r) || "Unassigned";
-        m.set(k, (m.get(k) ?? 0) + 1);
-      }
-      return [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-    };
-    const months = new Map<string, number>();
-    for (const r of scoped) {
-      if (!r.ticket_created_at) continue;
-      const dt = new Date(r.ticket_created_at);
-      const key = `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}`;
-      months.set(key, (months.get(key) ?? 0) + 1);
-    }
-    return {
-      by_status: tally((r) => r.status),
-      by_priority: tally((r) => r.priority),
-      by_agent: tally((r) => r.agent_name).slice(0, 10),
-      by_month: [...months.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-12).map(([month, value]) => ({ month, value })),
-    };
-  }, [scoped]);
-
   const pageRows = filtered.slice(page * perPage, page * perPage + perPage);
 
   const pages = Math.max(1, Math.ceil(filtered.length / perPage));
@@ -225,6 +280,14 @@ function TicketsPage() {
   return (
     <AppShell title="Support tickets">
       <div className="space-y-4">
+        <SupportTicketsSummary
+          rows={scoped}
+          counts={counts}
+          canSync={canSync}
+          syncPending={sync.isPending}
+          onSyncNow={() => sync.mutate()}
+        />
+
         <Card>
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
@@ -258,8 +321,8 @@ function TicketsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <AgentIdentityBar
-              agents={directory.data?.agents ?? []}
-              identity={directory.data?.identity ?? null}
+              agents={directoryData?.agents ?? []}
+              identity={directoryData?.identity ?? null}
               view={view}
               onView={(v) => { setView(v); setPage(0); }}
             />
@@ -293,26 +356,10 @@ function TicketsPage() {
                 <AlertDescription>{d.connection.message}</AlertDescription>
               </Alert>
             )}
-            {d && (
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
-                <Stat label="Total tickets" value={counts.total} active={quick === "all"} onClick={() => pick("all")} />
-                <Stat label="Open" value={counts.open} active={quick === "open"} onClick={() => pick("open")} />
-                <Stat label="Pending" value={counts.pending} active={quick === "pending"} onClick={() => pick("pending")} />
-                <Stat label="Resolved" value={counts.resolved} active={quick === "resolved"} onClick={() => pick("resolved")} />
-                <Stat label="Closed" value={counts.closed} active={quick === "closed"} onClick={() => pick("closed")} />
-                <Stat
-                  label="Overdue"
-                  value={counts.overdue}
-                  tone={counts.overdue > 0 ? "warn" : undefined}
-                  active={quick === "overdue"}
-                  onClick={() => pick("overdue")}
-                />
-              </div>
-            )}
             {quick !== "all" && (
               <div className="flex items-center gap-2 text-sm">
                 <Badge variant="secondary" className="gap-1">
-                  {QUICK_LABEL[quick]} only
+                  {QUICK_LABEL[quick]} filter is active
                   <button aria-label="Clear filter" onClick={() => pick("all")}><X className="h-3 w-3" /></button>
                 </Badge>
               </div>
@@ -360,66 +407,6 @@ function TicketsPage() {
               ))}
             </CardContent>
           </Card>
-        )}
-
-        {d && counts.total > 0 && (
-          <div className="grid gap-4 lg:grid-cols-2">
-            <ChartCard title="Tickets by status">
-              <ResponsiveContainer width="100%" height={260}>
-                <PieChart>
-                  <Pie data={charts.by_status} dataKey="value" nameKey="name" outerRadius={90} label>
-                    {charts.by_status.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartCard>
-            <ChartCard title="Tickets by priority">
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart
-                  data={charts.by_priority}
-                  onClick={(e: { activeLabel?: string }) => {
-                    if (e?.activeLabel) { setQuick("all"); setPriority(e.activeLabel); setPage(0); }
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="name" fontSize={12} />
-                  <YAxis fontSize={12} allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} className="cursor-pointer" />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-            <ChartCard title="Top agents by ticket volume">
-              <ResponsiveContainer width="100%" height={260}>
-                <BarChart
-                  data={charts.by_agent}
-                  layout="vertical"
-                  onClick={(e: { activeLabel?: string }) => {
-                    if (e?.activeLabel) { setQuick("all"); setAgent(e.activeLabel); setPage(0); }
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis type="number" fontSize={12} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" width={120} fontSize={12} />
-                  <Tooltip />
-                  <Bar dataKey="value" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} className="cursor-pointer" />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartCard>
-            <ChartCard title="Tickets created per month">
-              <ResponsiveContainer width="100%" height={260}>
-                <LineChart data={charts.by_month}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                  <XAxis dataKey="month" fontSize={12} />
-                  <YAxis fontSize={12} allowDecimals={false} />
-                  <Tooltip />
-                  <Line type="monotone" dataKey="value" stroke="hsl(var(--primary))" strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartCard>
-          </div>
         )}
 
         <Card>
@@ -508,7 +495,7 @@ function TicketsPage() {
         ticket={open}
         onClose={() => setOpen(null)}
         canAct={canAct}
-        agents={directory.data?.agents ?? []}
+        agents={directoryData?.agents ?? []}
       />
     </AppShell>
   );
@@ -787,30 +774,6 @@ function TicketDetailSheet({
   );
 }
 
-function Stat({
-  label, value, tone, active, onClick,
-}: { label: string; value: number; tone?: "warn"; active?: boolean; onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-lg border p-3 text-left transition-colors hover:bg-muted/50 ${active ? "border-primary ring-1 ring-primary" : ""}`}
-    >
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={`text-2xl font-semibold ${tone === "warn" ? "text-destructive" : ""}`}>{value.toLocaleString()}</p>
-    </button>
-  );
-}
-
-function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">{title}</CardTitle></CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  );
-}
-
 function FilterSelect({
   label, value, onChange, options,
 }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
@@ -832,4 +795,344 @@ function Field({ label, value }: { label: string; value: string | null | undefin
       <p className="font-medium">{value || "—"}</p>
     </div>
   );
+}
+
+function SupportTicketsSummary({
+  rows,
+  counts,
+  canSync,
+  syncPending,
+  onSyncNow,
+}: {
+  rows: TicketRow[];
+  counts: {
+    total: number;
+    open: number;
+    pending: number;
+    resolved: number;
+    closed: number;
+    overdue: number;
+    escalated: number;
+  };
+  canSync: boolean;
+  syncPending: boolean;
+  onSyncNow: () => void;
+}) {
+  const now = Date.now();
+  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+  const resolvedLast7 = rows.filter(
+    (row) =>
+      row.ticket_updated_at &&
+      new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo &&
+      row.status === "Resolved",
+  ).length;
+  const closedLast7 = rows.filter(
+    (row) =>
+      row.ticket_updated_at &&
+      new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo &&
+      row.status === "Closed",
+  ).length;
+  const dueResolvedRows = rows.filter(
+    (row) =>
+      row.ticket_updated_at &&
+      row.due_by &&
+      ["Resolved", "Closed"].includes(row.status ?? "") &&
+      new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo,
+  );
+  const resolvedWithinDue = dueResolvedRows.filter(
+    (row) => new Date(row.ticket_updated_at as string).getTime() <= new Date(row.due_by as string).getTime(),
+  ).length;
+  const resolvedWithinDuePct =
+    dueResolvedRows.length > 0 ? Math.round((resolvedWithinDue / dueResolvedRows.length) * 100) : 0;
+
+  const resolutionDurationsHours = rows
+    .filter(
+      (row) =>
+        row.ticket_created_at &&
+        row.ticket_updated_at &&
+        ["Resolved", "Closed"].includes(row.status ?? "") &&
+        new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo,
+    )
+    .map(
+      (row) =>
+        (new Date(row.ticket_updated_at as string).getTime() - new Date(row.ticket_created_at as string).getTime()) /
+        (1000 * 60 * 60),
+    );
+  const avgResolutionHours =
+    resolutionDurationsHours.length > 0
+      ? resolutionDurationsHours.reduce((sum, value) => sum + value, 0) / resolutionDurationsHours.length
+      : 0;
+
+  const dueTodayCount = rows.filter((row) => {
+    if (!row.due_by || ["Resolved", "Closed"].includes(row.status ?? "")) return false;
+    const due = new Date(row.due_by);
+    const current = new Date();
+    return (
+      due.getUTCFullYear() === current.getUTCFullYear() &&
+      due.getUTCMonth() === current.getUTCMonth() &&
+      due.getUTCDate() === current.getUTCDate()
+    );
+  }).length;
+  const dueThisWeekCount = rows.filter((row) => {
+    if (!row.due_by || ["Resolved", "Closed"].includes(row.status ?? "")) return false;
+    const dueTs = new Date(row.due_by).getTime();
+    return dueTs >= now && dueTs <= now + 7 * 24 * 60 * 60 * 1000;
+  }).length;
+
+  const byPriority = tallyBy(rows, (row) => row.priority ?? "Unassigned");
+  const byAgent = tallyBy(rows, (row) => row.agent_name ?? "Unassigned").slice(0, 6);
+  const byCustomer = tallyBy(rows, (row) => row.company_name ?? "Unknown").slice(0, 6);
+
+  const weeklyTrend = buildWeeklyTrend(rows);
+  const recentActivity = [...rows]
+    .sort(
+      (a, b) =>
+        new Date(b.ticket_updated_at ?? b.ticket_created_at ?? 0).getTime() -
+        new Date(a.ticket_updated_at ?? a.ticket_created_at ?? 0).getTime(),
+    )
+    .slice(0, 6);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <div>
+            <CardTitle className="text-base">Support tickets summary</CardTitle>
+            <CardDescription>At-a-glance support health with one-click drill-downs into the list.</CardDescription>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <Link to="/tickets" search={{ quick: "all", view: "all" }}>
+                Open full list
+              </Link>
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+            <SummaryLinkCard label="Open" value={counts.open} quick="open" />
+            <SummaryLinkCard label="Pending" value={counts.pending} quick="pending" />
+            <SummaryLinkCard label="Overdue" value={counts.overdue} quick="overdue" />
+            <SummaryLinkCard label="Escalated" value={counts.escalated} quick="escalated" />
+            <SummaryLinkCard label="Resolved" value={counts.resolved} quick="resolved" />
+            <SummaryLinkCard label="Closed" value={counts.closed} quick="closed" />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard label="Resolved (last 7 days)" value={resolvedLast7.toLocaleString()} />
+            <MetricCard label="Closed (last 7 days)" value={closedLast7.toLocaleString()} />
+            <MetricCard label="Avg resolution time" value={`${avgResolutionHours.toFixed(1)} h`} />
+            <MetricCard
+              label="Resolved within due by"
+              value={`${resolvedWithinDuePct}%`}
+              sublabel={`${resolvedWithinDue.toLocaleString()} of ${dueResolvedRows.length.toLocaleString()}`}
+            />
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="text-sm">Due-by status</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2 sm:grid-cols-3">
+                <MetricCard label="Overdue" value={counts.overdue.toLocaleString()} />
+                <MetricCard label="Due today" value={dueTodayCount.toLocaleString()} />
+                <MetricCard label="Due in next 7 days" value={dueThisWeekCount.toLocaleString()} />
+              </CardContent>
+            </Card>
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="text-sm">Freshdesk ticket sync</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="text-sm text-muted-foreground">
+                  Keep support data current before review captures and triage actions.
+                </div>
+                <div className="flex items-center gap-2">
+                  {canSync && (
+                    <Button size="sm" onClick={onSyncNow} disabled={syncPending}>
+                      {syncPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
+                      Sync now
+                    </Button>
+                  )}
+                  <span className="text-xs text-muted-foreground">
+                    Sync now is available to Super Admin.
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SummaryChartCard title="Tickets by priority">
+          <ResponsiveContainer width="100%" height={240}>
+            <PieChart>
+              <Pie data={byPriority} dataKey="value" nameKey="name" outerRadius={85} innerRadius={54}>
+                {byPriority.map((_, idx) => (
+                  <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+              <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-xs font-semibold">
+                {fmtNumber(rows.length)}
+              </text>
+            </PieChart>
+          </ResponsiveContainer>
+        </SummaryChartCard>
+        <SummaryChartCard title="Opened vs resolved (weekly)">
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={weeklyTrend}>
+              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+              <XAxis dataKey="week" fontSize={11} />
+              <YAxis fontSize={11} allowDecimals={false} domain={[0, "auto"]} />
+              <Tooltip />
+              <Legend />
+              <Line type="linear" dataKey="opened" name="Opened" stroke="var(--chart-1)" strokeWidth={2} />
+              <Line type="linear" dataKey="resolved" name="Resolved/Closed" stroke="var(--chart-3)" strokeWidth={2} />
+            </LineChart>
+          </ResponsiveContainer>
+        </SummaryChartCard>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Recent ticket activity</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {recentActivity.map((ticket) => (
+              <button
+                key={ticket.id}
+                type="button"
+                className="w-full rounded-md border border-border px-3 py-2 text-left hover:bg-muted/30"
+              >
+                <div className="text-sm font-medium">#{ticket.id} · {ticket.subject ?? "—"}</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {ticket.company_name ?? "Unknown"} · {ticket.status ?? "—"} · {ticket.priority ?? "—"}
+                </div>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Tickets by agent</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {byAgent.map((entry) => (
+              <Link
+                key={entry.name}
+                to="/tickets"
+                search={{ quick: "all", view: "all" }}
+                className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+              >
+                <span className="text-sm">{entry.name}</span>
+                <Badge variant="outline">{entry.value.toLocaleString()}</Badge>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Tickets by customer</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {byCustomer.map((entry) => (
+              <Link
+                key={entry.name}
+                to="/tickets"
+                search={{ quick: "all", view: "all" }}
+                className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+              >
+                <span className="text-sm">{entry.name}</span>
+                <Badge variant="outline">{entry.value.toLocaleString()}</Badge>
+              </Link>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function SummaryLinkCard({ label, value, quick }: { label: string; value: number; quick: Quick }) {
+  return (
+    <Link
+      to="/tickets"
+      search={{ quick, view: "all" }}
+      className="rounded-md border border-border px-3 py-2 transition hover:bg-muted/30"
+    >
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-xl font-semibold">{value.toLocaleString()}</div>
+    </Link>
+  );
+}
+
+function MetricCard({ label, value, sublabel }: { label: string; value: string; sublabel?: string }) {
+  return (
+    <div className="rounded-md border border-border p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 text-lg font-semibold">{value}</div>
+      {sublabel && <div className="mt-1 text-xs text-muted-foreground">{sublabel}</div>}
+    </div>
+  );
+}
+
+function SummaryChartCard({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
+}
+
+function tallyBy(rows: TicketRow[], key: (row: TicketRow) => string) {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const value = key(row);
+    map.set(value, (map.get(value) ?? 0) + 1);
+  }
+  return [...map.entries()]
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+}
+
+function buildWeeklyTrend(rows: TicketRow[]) {
+  const now = new Date();
+  const buckets: { week: string; opened: number; resolved: number }[] = [];
+  for (let index = 7; index >= 0; index--) {
+    const start = new Date(now);
+    start.setDate(now.getDate() - index * 7);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    buckets.push({
+      week: `${String(start.getMonth() + 1).padStart(2, "0")}/${String(start.getDate()).padStart(2, "0")}`,
+      opened: 0,
+      resolved: 0,
+    });
+    rows.forEach((row) => {
+      const created = row.ticket_created_at ? new Date(row.ticket_created_at).getTime() : null;
+      const updated = row.ticket_updated_at ? new Date(row.ticket_updated_at).getTime() : null;
+      const startTs = start.getTime();
+      const endTs = end.getTime() + 24 * 60 * 60 * 1000;
+      if (created && created >= startTs && created < endTs) buckets[buckets.length - 1].opened += 1;
+      if (
+        updated &&
+        updated >= startTs &&
+        updated < endTs &&
+        ["Resolved", "Closed"].includes(row.status ?? "")
+      ) {
+        buckets[buckets.length - 1].resolved += 1;
+      }
+    });
+  }
+  return buckets;
 }
