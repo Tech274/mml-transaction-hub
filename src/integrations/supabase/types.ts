@@ -74,6 +74,36 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_cc_agent_workers: {
+        Row: {
+          agent_key: string
+          created_at: string
+          current_load: number
+          id: string
+          is_active: boolean
+          last_assigned_at: string | null
+          worker_name: string
+        }
+        Insert: {
+          agent_key: string
+          created_at?: string
+          current_load?: number
+          id?: string
+          is_active?: boolean
+          last_assigned_at?: string | null
+          worker_name: string
+        }
+        Update: {
+          agent_key?: string
+          created_at?: string
+          current_load?: number
+          id?: string
+          is_active?: boolean
+          last_assigned_at?: string | null
+          worker_name?: string
+        }
+        Relationships: []
+      }
       ai_cc_audit: {
         Row: {
           action: string
@@ -252,6 +282,71 @@ export type Database = {
           status?: string
         }
         Relationships: []
+      }
+      ai_cc_work_items: {
+        Row: {
+          approval_note: string | null
+          approved_at: string | null
+          approved_by: string | null
+          assigned_agent_key: string | null
+          assigned_worker_id: string | null
+          created_at: string
+          created_by: string | null
+          created_by_email: string | null
+          id: string
+          payload: Json
+          requested_agent_key: string | null
+          requires_approval: boolean
+          status: string
+          title: string
+          updated_at: string
+          work_type: string
+        }
+        Insert: {
+          approval_note?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_agent_key?: string | null
+          assigned_worker_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          payload?: Json
+          requested_agent_key?: string | null
+          requires_approval?: boolean
+          status?: string
+          title: string
+          updated_at?: string
+          work_type: string
+        }
+        Update: {
+          approval_note?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_agent_key?: string | null
+          assigned_worker_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          payload?: Json
+          requested_agent_key?: string | null
+          requires_approval?: boolean
+          status?: string
+          title?: string
+          updated_at?: string
+          work_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_cc_work_items_assigned_worker_id_fkey"
+            columns: ["assigned_worker_id"]
+            isOneToOne: false
+            referencedRelation: "ai_cc_agent_workers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bulk_import_audit_events: {
         Row: {
@@ -910,6 +1005,13 @@ export type Database = {
             referencedRelation: "lab_batches"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "lab_batch_cost_runs_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_batch_transaction_totals"
+            referencedColumns: ["lab_batch_id"]
+          },
         ]
       }
       lab_batch_invoices: {
@@ -974,6 +1076,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lab_batches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_batch_invoices_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_batch_transaction_totals"
+            referencedColumns: ["lab_batch_id"]
           },
           {
             foreignKeyName: "lab_batch_invoices_superseded_by_fkey"
@@ -1138,6 +1247,76 @@ export type Database = {
             columns: ["vm_tier_id"]
             isOneToOne: false
             referencedRelation: "vm_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_transaction_cost_corrections: {
+        Row: {
+          corrected_at: string
+          corrected_by: string | null
+          id: string
+          new_actual_consumption: number | null
+          new_credit_allocated: number | null
+          new_input_cost: number | null
+          new_selling_cost: number | null
+          old_actual_consumption: number | null
+          old_credit_allocated: number | null
+          old_input_cost: number | null
+          old_selling_cost: number | null
+          reason: string
+          transaction_id: string
+        }
+        Insert: {
+          corrected_at?: string
+          corrected_by?: string | null
+          id?: string
+          new_actual_consumption?: number | null
+          new_credit_allocated?: number | null
+          new_input_cost?: number | null
+          new_selling_cost?: number | null
+          old_actual_consumption?: number | null
+          old_credit_allocated?: number | null
+          old_input_cost?: number | null
+          old_selling_cost?: number | null
+          reason: string
+          transaction_id: string
+        }
+        Update: {
+          corrected_at?: string
+          corrected_by?: string | null
+          id?: string
+          new_actual_consumption?: number | null
+          new_credit_allocated?: number | null
+          new_input_cost?: number | null
+          new_selling_cost?: number | null
+          old_actual_consumption?: number | null
+          old_credit_allocated?: number | null
+          old_input_cost?: number | null
+          old_selling_cost?: number | null
+          reason?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_transaction_cost_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_transaction_cost_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_transaction_profit_breakdown"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "lab_transaction_cost_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_transaction_costs"
             referencedColumns: ["id"]
           },
         ]
@@ -1550,6 +1729,13 @@ export type Database = {
             foreignKeyName: "transaction_activity_log_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
+            referencedRelation: "v_lab_transaction_profit_breakdown"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_activity_log_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
             referencedRelation: "v_transaction_costs"
             referencedColumns: ["id"]
           },
@@ -1581,6 +1767,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "transactions"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_tags_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_transaction_profit_breakdown"
+            referencedColumns: ["transaction_id"]
           },
           {
             foreignKeyName: "transaction_tags_transaction_id_fkey"
@@ -1623,6 +1816,11 @@ export type Database = {
           line_of_business: string | null
           month: number | null
           potential_id: string | null
+          public_actual_consumption: number | null
+          public_credit_allocated: number | null
+          public_service_margin: number | null
+          public_total_margin_actual: number | null
+          public_unused_credit: number | null
           repository_type: string
           selling_cost: number | null
           selling_price_per_user: number | null
@@ -1667,6 +1865,11 @@ export type Database = {
           line_of_business?: string | null
           month?: number | null
           potential_id?: string | null
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          public_service_margin?: number | null
+          public_total_margin_actual?: number | null
+          public_unused_credit?: number | null
           repository_type: string
           selling_cost?: number | null
           selling_price_per_user?: number | null
@@ -1711,6 +1914,11 @@ export type Database = {
           line_of_business?: string | null
           month?: number | null
           potential_id?: string | null
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          public_service_margin?: number | null
+          public_total_margin_actual?: number | null
+          public_unused_credit?: number | null
           repository_type?: string
           selling_cost?: number | null
           selling_price_per_user?: number | null
@@ -1745,6 +1953,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "lab_batches"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_batch_transaction_totals"
+            referencedColumns: ["lab_batch_id"]
           },
         ]
       }
@@ -1819,6 +2034,75 @@ export type Database = {
       }
     }
     Views: {
+      v_lab_batch_transaction_totals: {
+        Row: {
+          actual_cost_total_derived: number | null
+          auto_line_count_derived: number | null
+          estimated_cost_total_derived: number | null
+          known_line_count_derived: number | null
+          lab_batch_id: string | null
+          line_count_derived: number | null
+          revenue_total_derived: number | null
+        }
+        Relationships: []
+      }
+      v_lab_transaction_profit_breakdown: {
+        Row: {
+          effective_cost: number | null
+          input_cost_locked: number | null
+          lab_batch_id: string | null
+          lab_type: string | null
+          public_actual_consumption: number | null
+          public_credit_allocated: number | null
+          selling_cost: number | null
+          service_margin: number | null
+          total_profit_actual: number | null
+          transaction_id: string | null
+          unused_credit: number | null
+        }
+        Insert: {
+          effective_cost?: never
+          input_cost_locked?: number | null
+          lab_batch_id?: string | null
+          lab_type?: string | null
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          selling_cost?: number | null
+          service_margin?: number | null
+          total_profit_actual?: number | null
+          transaction_id?: string | null
+          unused_credit?: number | null
+        }
+        Update: {
+          effective_cost?: never
+          input_cost_locked?: number | null
+          lab_batch_id?: string | null
+          lab_type?: string | null
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          selling_cost?: number | null
+          service_margin?: number | null
+          total_profit_actual?: number | null
+          transaction_id?: string | null
+          unused_credit?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "lab_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_batch_transaction_totals"
+            referencedColumns: ["lab_batch_id"]
+          },
+        ]
+      }
       v_transaction_costs: {
         Row: {
           cost_effective: number | null
@@ -1851,6 +2135,26 @@ export type Database = {
           p_vcpu: number
         }
         Returns: string
+      }
+      admin_correct_lab_transaction_costs: {
+        Args: {
+          p_input_cost: number
+          p_public_actual_consumption?: number
+          p_public_credit_allocated?: number
+          p_reason?: string
+          p_selling_cost: number
+          p_transaction_id: string
+        }
+        Returns: undefined
+      }
+      claim_ai_cc_worker_slot: {
+        Args: { p_worker_id: string }
+        Returns: {
+          agent_key: string
+          current_load: number
+          id: string
+          last_assigned_at: string
+        }[]
       }
       clean_customer_name: { Args: { p_name: string }; Returns: string }
       clear_bulk_import_artifact_paths: {
@@ -1917,6 +2221,13 @@ export type Database = {
           p_vendor: string
         }
         Returns: Json
+      }
+      release_ai_cc_worker_slot: {
+        Args: { p_worker_id: string }
+        Returns: {
+          current_load: number
+          id: string
+        }[]
       }
       reopen_lab_batch: { Args: { p_batch_id: string }; Returns: Json }
       request_lab_batch_recompute: {
