@@ -1,10 +1,14 @@
 export const SUPERADMIN_CAPTURE_MODE_ENV_VAR = "VITE_SUPERADMIN_CAPTURE_MODE" as const;
 
 /**
- * Screenshot capture gate for Super Admin review runs.
- * Only the exact string "true" enables capture mode.
+ * Screenshot/example-data capture gate for Super Admin review runs.
+ * This mode is development-only and is ignored by production builds.
  */
-export function isSuperadminCaptureModeEnabled(env: Record<string, string | undefined>): boolean {
+export function isSuperadminCaptureModeEnabled(
+  env: Record<string, string | undefined>,
+  isDev = import.meta.env.DEV,
+): boolean {
+  if (!isDev) return false;
   return env[SUPERADMIN_CAPTURE_MODE_ENV_VAR] === "true";
 }
 

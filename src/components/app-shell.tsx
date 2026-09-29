@@ -8,11 +8,18 @@ import {
   getScrum44UiReviewEnvForClient,
   isScrum44UiReviewEnabled,
 } from "@/lib/scrum44-ui-review-flag";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
 
 export function AppShell({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
   const pathname = useRouterState({ select: (router) => router.location.pathname });
   const isUiReviewEnabled = isScrum44UiReviewEnabled(getScrum44UiReviewEnvForClient());
-  const shouldApplyAzureTheme = isUiReviewEnabled && pathname !== "/dashboard";
+  const isCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
+  const KEEP_HOME_SCREEN_UNCHANGED = true;
+  const shouldApplyAzureTheme =
+    isUiReviewEnabled && (!KEEP_HOME_SCREEN_UNCHANGED || pathname !== "/dashboard");
 
   return (
     <SidebarProvider>
@@ -24,7 +31,16 @@ export function AppShell({ title, actions, children }: { title: string; actions?
             <h1 className="text-base font-semibold flex-1 truncate">{title}</h1>
             <div className="flex items-center gap-2">{actions}</div>
           </header>
-          <main className="flex-1 p-4 md:p-6 overflow-x-auto">{children}</main>
+          <main className="flex-1 p-4 md:p-6 overflow-x-auto">
+            <div className="space-y-3">
+              {isCaptureMode && (
+                <div className="inline-flex rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold tracking-wide text-primary">
+                  EXAMPLE DATA
+                </div>
+              )}
+              {children}
+            </div>
+          </main>
         </div>
       </div>
       <Toaster richColors closeButton position="top-right" />

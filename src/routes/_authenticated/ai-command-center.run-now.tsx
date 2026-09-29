@@ -16,6 +16,10 @@ import { Loader2, Play, Bot } from "lucide-react";
 import {
   runAgent, listLabRequests, AGENTS, type AgentKey, type LabRequest,
 } from "@/lib/ai-command-center.functions";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
 
 const AGENT_KEYS: AgentKey[] = ["generalist", "support", "cost_adr"];
 
@@ -33,6 +37,7 @@ const HINT_PLACEHOLDER: Record<AgentKey, string> = {
 };
 
 function RunNowPage() {
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const search = Route.useSearch();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -44,7 +49,9 @@ function RunNowPage() {
   const labs = useQuery({
     queryKey: ["ai-cc", "lab-requests"],
     queryFn: () => labsFn() as Promise<LabRequest[]>,
+    enabled: !isExampleCaptureMode,
   });
+  const labsData = isExampleCaptureMode ? EXAMPLE_LAB_REQUESTS : (labs.data ?? []);
 
   const run = useMutation({
     mutationFn: () => runFn({ data: { agent_key: agent, job_hint: hint.trim() || undefined } }),
@@ -129,14 +136,14 @@ function RunNowPage() {
                     </TableCell>
                   </TableRow>
                 )}
-                {labs.data?.length === 0 && (
+                {labsData.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
                       No lab requests yet. The Cost / ADR agent has nothing to work on until a request is CONFIRMED.
                     </TableCell>
                   </TableRow>
                 )}
-                {(labs.data ?? []).map((r) => (
+                {labsData.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono text-xs">{r.request_code}</TableCell>
                     <TableCell>{r.customer_name}</TableCell>
@@ -157,3 +164,36 @@ function RunNowPage() {
     </AppShell>
   );
 }
+
+const EXAMPLE_LAB_REQUESTS: LabRequest[] = [
+  {
+    id: "req-001",
+    request_code: "LR-2026-091",
+    customer_name: "Cognizant",
+    lab_name: "Kogito BPMN Automation",
+    status: "CONFIRMED",
+    requisition: { total_users: 45, delivery_mode: "virtual", duration_weeks: 3 },
+    confirmed_at: "2026-09-28T14:30:00Z",
+    created_at: "2026-09-27T07:20:00Z",
+  },
+  {
+    id: "req-002",
+    request_code: "LR-2026-092",
+    customer_name: "Infosys",
+    lab_name: "Cloud Security Essentials",
+    status: "DRAFT",
+    requisition: { total_users: 30, delivery_mode: "virtual", duration_weeks: 2 },
+    confirmed_at: null,
+    created_at: "2026-09-28T09:40:00Z",
+  },
+  {
+    id: "req-003",
+    request_code: "LR-2026-093",
+    customer_name: "TCS",
+    lab_name: "AKS Platform Engineering",
+    status: "CONFIRMED",
+    requisition: { total_users: 38, delivery_mode: "hybrid", duration_weeks: 4 },
+    confirmed_at: "2026-09-29T03:10:00Z",
+    created_at: "2026-09-28T22:05:00Z",
+  },
+];

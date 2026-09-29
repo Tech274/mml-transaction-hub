@@ -25,8 +25,12 @@ import { RefreshCw, LifeBuoy, AlertTriangle, Eye, Loader2, CheckCircle2, X, User
 import { useAuth } from "@/lib/auth-context";
 import {
   getTicketsOverview, syncFreshdeskNow, getAgentDirectory, setMyAgentIdentity,
-  getTicketHistory, resolveTicket, getTicketDescription, type TicketRow,
+  getTicketHistory, resolveTicket, getTicketDescription, type TicketRow, type TicketsOverview,
 } from "@/lib/freshdesk.functions";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
 
 export const Route = createFileRoute("/_authenticated/tickets")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -76,6 +80,61 @@ const QUICK_LABEL: Record<Quick, string> = {
   escalated: "Escalated",
 };
 
+const EXAMPLE_TICKETS: TicketRow[] = [
+  { id: 5142, subject: "Unable to launch DevOps lab VM", status: "Open", priority: "High", type: "Incident", source: "Portal", requester_name: "Priya Menon", requester_email: "priya@cognizant.com", company_name: "Cognizant", agent_name: "Ritu Sharma", group_name: "Cloud Labs", tags: ["vm", "launch"], due_by: "2026-09-29T09:30:00Z", is_escalated: true, ticket_created_at: "2026-09-29T03:40:00Z", ticket_updated_at: "2026-09-29T04:50:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  { id: 5139, subject: "Seat quota mismatch in AI Foundations cohort", status: "Pending", priority: "Medium", type: "Service Request", source: "Email", requester_name: "Arun Das", requester_email: "arun@infosys.com", company_name: "Infosys", agent_name: "Ritu Sharma", group_name: "Cloud Labs", tags: ["quota"], due_by: "2026-09-29T13:00:00Z", is_escalated: false, ticket_created_at: "2026-09-28T15:12:00Z", ticket_updated_at: "2026-09-29T02:20:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  { id: 5131, subject: "Need invoice split by BU for private batch", status: "Waiting on Customer", priority: "Low", type: "Question", source: "Portal", requester_name: "Sanjay Rao", requester_email: "sanjay@tcs.com", company_name: "TCS", agent_name: "Nisha Patel", group_name: "Cloud Labs", tags: ["invoice"], due_by: "2026-09-30T10:00:00Z", is_escalated: false, ticket_created_at: "2026-09-28T08:10:00Z", ticket_updated_at: "2026-09-29T00:45:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  { id: 5128, subject: "Freshdesk webhook retry warnings", status: "Open", priority: "Urgent", type: "Incident", source: "Email", requester_name: "Platform Bot", requester_email: "alerts@mml.local", company_name: "MakeMyLabs", agent_name: "Amit Singh", group_name: "Platform Ops", tags: ["integration", "webhook"], due_by: "2026-09-29T07:00:00Z", is_escalated: true, ticket_created_at: "2026-09-28T04:42:00Z", ticket_updated_at: "2026-09-29T04:10:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  { id: 5124, subject: "Add learners to AKS lab after go-live", status: "Resolved", priority: "Medium", type: "Service Request", source: "Portal", requester_name: "Megha Iyer", requester_email: "megha@wipro.com", company_name: "Wipro", agent_name: "Ritu Sharma", group_name: "Cloud Labs", tags: ["learners"], due_by: "2026-09-28T12:00:00Z", is_escalated: false, ticket_created_at: "2026-09-27T17:20:00Z", ticket_updated_at: "2026-09-28T11:05:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  { id: 5116, subject: "Lab DNS issue in APAC region", status: "Closed", priority: "High", type: "Incident", source: "Email", requester_name: "Rahul Nair", requester_email: "rahul@hcl.com", company_name: "HCL", agent_name: "Nisha Patel", group_name: "Cloud Labs", tags: ["dns", "apac"], due_by: "2026-09-27T06:30:00Z", is_escalated: false, ticket_created_at: "2026-09-26T20:10:00Z", ticket_updated_at: "2026-09-27T06:10:00Z", synced_at: "2026-09-29T05:15:00Z" },
+];
+
+const EXAMPLE_TICKETS_OVERVIEW: TicketsOverview = {
+  tickets: EXAMPLE_TICKETS,
+  total: EXAMPLE_TICKETS.length,
+  counts: { open: 3, pending: 1, resolved: 1, closed: 1, escalated: 2, overdue: 1 },
+  by_status: [
+    { name: "Open", value: 2 },
+    { name: "Pending", value: 1 },
+    { name: "Waiting on Customer", value: 1 },
+    { name: "Resolved", value: 1 },
+    { name: "Closed", value: 1 },
+  ],
+  by_priority: [
+    { name: "Urgent", value: 1 },
+    { name: "High", value: 2 },
+    { name: "Medium", value: 2 },
+    { name: "Low", value: 1 },
+  ],
+  by_agent: [
+    { name: "Ritu Sharma", value: 3 },
+    { name: "Nisha Patel", value: 2 },
+    { name: "Amit Singh", value: 1 },
+  ],
+  by_group: [
+    { name: "Cloud Labs", value: 5 },
+    { name: "Platform Ops", value: 1 },
+  ],
+  by_month: [
+    { month: "2026-06", value: 22 },
+    { month: "2026-07", value: 27 },
+    { month: "2026-08", value: 31 },
+    { month: "2026-09", value: 34 },
+  ],
+  last_synced_at: "2026-09-29T05:15:00Z",
+  connection: { ok: true, message: "Connected to Freshdesk sandbox", domain: "mml-helpdesk.freshdesk.com" },
+  truncated: false,
+};
+
+const EXAMPLE_AGENT_DIRECTORY = {
+  agents: [
+    { id: 1401, name: "Ritu Sharma", email: "ritu.sharma@mml.local" },
+    { id: 1402, name: "Nisha Patel", email: "nisha.patel@mml.local" },
+    { id: 1403, name: "Amit Singh", email: "amit.singh@mml.local" },
+  ],
+  identity: { agent_name: "Ritu Sharma", agent_id: 1401, auto_matched: true },
+};
+
 function isOverdue(t: TicketRow) {
   return !!t.due_by && new Date(t.due_by).getTime() < Date.now() && !["Resolved", "Closed"].includes(t.status ?? "");
 }
@@ -94,6 +153,7 @@ function matchesQuick(t: TicketRow, quick: Quick) {
 
 function TicketsPage() {
   const qc = useQueryClient();
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const { hasAnyRole } = useAuth();
   const canSync = hasAnyRole(["admin", "ops_lead"]);
   const canAct = hasAnyRole(["admin", "ops_lead", "ops_user"]);
@@ -119,8 +179,16 @@ function TicketsPage() {
     setPage(0);
   }, [search.view, search.quick]);
 
-  const overview = useQuery({ queryKey: ["freshdesk", "overview"], queryFn: () => overviewFn() });
-  const directory = useQuery({ queryKey: ["freshdesk", "agents"], queryFn: () => directoryFn() });
+  const overview = useQuery({
+    queryKey: ["freshdesk", "overview"],
+    queryFn: () => overviewFn(),
+    enabled: !isExampleCaptureMode,
+  });
+  const directory = useQuery({
+    queryKey: ["freshdesk", "agents"],
+    queryFn: () => directoryFn(),
+    enabled: !isExampleCaptureMode,
+  });
 
   const sync = useMutation({
     mutationFn: () => syncFn({ data: {} }),
@@ -132,8 +200,9 @@ function TicketsPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Freshdesk sync failed"),
   });
 
-  const d = overview.data;
-  const myAgent = directory.data?.identity?.agent_name ?? null;
+  const d = isExampleCaptureMode ? EXAMPLE_TICKETS_OVERVIEW : overview.data;
+  const directoryData = isExampleCaptureMode ? EXAMPLE_AGENT_DIRECTORY : directory.data;
+  const myAgent = directoryData?.identity?.agent_name ?? null;
 
   const scoped = useMemo(() => {
     const rows = d?.tickets ?? [];
@@ -265,8 +334,8 @@ function TicketsPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <AgentIdentityBar
-              agents={directory.data?.agents ?? []}
-              identity={directory.data?.identity ?? null}
+              agents={directoryData?.agents ?? []}
+              identity={directoryData?.identity ?? null}
               view={view}
               onView={(v) => { setView(v); setPage(0); }}
             />
@@ -515,7 +584,7 @@ function TicketsPage() {
         ticket={open}
         onClose={() => setOpen(null)}
         canAct={canAct}
-        agents={directory.data?.agents ?? []}
+        agents={directoryData?.agents ?? []}
       />
     </AppShell>
   );

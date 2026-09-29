@@ -15,6 +15,10 @@ import { usePermissions, setPreviewRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -50,8 +54,24 @@ const COLORS = [
   "#ef4444",
 ];
 
+const EXAMPLE_DASHBOARD_ROWS: ReportRow[] = [
+  { month: 9, year: 2026, repository_type: "public_cloud", cloud_provider: "Azure", line_of_business: "Training", customer_name: "Cognizant", total_users: 42, input_cost: 48200, input_cost_auto: null, input_cost_actual_alloc: 46850, selling_cost: 67600, is_deleted: false },
+  { month: 9, year: 2026, repository_type: "public_cloud", cloud_provider: "AWS", line_of_business: "Delivery", customer_name: "Infosys", total_users: 30, input_cost: 39100, input_cost_auto: null, input_cost_actual_alloc: 38920, selling_cost: 57500, is_deleted: false },
+  { month: 9, year: 2026, repository_type: "public_cloud", cloud_provider: "Azure", line_of_business: "Training", customer_name: "TCS", total_users: 55, input_cost: 73400, input_cost_auto: null, input_cost_actual_alloc: 72130, selling_cost: 96500, is_deleted: false },
+  { month: 9, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Delivery", customer_name: "HCL", total_users: 33, input_cost: 41900, input_cost_auto: null, input_cost_actual_alloc: 40210, selling_cost: 63100, is_deleted: false },
+  { month: 8, year: 2026, repository_type: "private_cloud", cloud_provider: "AWS", line_of_business: "Training", customer_name: "Accenture", total_users: 37, input_cost: 44600, input_cost_auto: null, input_cost_actual_alloc: 44120, selling_cost: 68600, is_deleted: false },
+  { month: 8, year: 2026, repository_type: "public_cloud", cloud_provider: "GCP", line_of_business: "Support", customer_name: "Wipro", total_users: 24, input_cost: 28800, input_cost_auto: null, input_cost_actual_alloc: 28240, selling_cost: 44600, is_deleted: false },
+  { month: 7, year: 2026, repository_type: "public_cloud", cloud_provider: "Azure", line_of_business: "Delivery", customer_name: "Capgemini", total_users: 20, input_cost: 22900, input_cost_auto: null, input_cost_actual_alloc: 21980, selling_cost: 35200, is_deleted: false },
+  { month: 7, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Training", customer_name: "TechM", total_users: 26, input_cost: 31200, input_cost_auto: 30500, input_cost_actual_alloc: null, selling_cost: 47800, is_deleted: false },
+  { month: 6, year: 2026, repository_type: "public_cloud", cloud_provider: "AWS", line_of_business: "Delivery", customer_name: "LTIMindtree", total_users: 46, input_cost: 59200, input_cost_auto: null, input_cost_actual_alloc: 57120, selling_cost: 87400, is_deleted: false },
+  { month: 6, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Support", customer_name: "Persistent", total_users: 29, input_cost: 36100, input_cost_auto: null, input_cost_actual_alloc: 34970, selling_cost: 54800, is_deleted: false },
+  { month: 5, year: 2026, repository_type: "public_cloud", cloud_provider: "GCP", line_of_business: "Training", customer_name: "Mphasis", total_users: 18, input_cost: 21900, input_cost_auto: null, input_cost_actual_alloc: 21000, selling_cost: 33100, is_deleted: false },
+  { month: 5, year: 2026, repository_type: "private_cloud", cloud_provider: "Azure", line_of_business: "Delivery", customer_name: "Hexaware", total_users: 27, input_cost: 33200, input_cost_auto: null, input_cost_actual_alloc: 31800, selling_cost: 50900, is_deleted: false },
+];
+
 function DashboardPage() {
   const { can, orderedKpis, isPreviewing, previewRole } = usePermissions();
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const { data } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
@@ -68,9 +88,10 @@ function DashboardPage() {
         "Dashboard transactions",
       );
     },
+    enabled: !isExampleCaptureMode,
   });
 
-  const rows = (data ?? []) as unknown as ReportRow[];
+  const rows = isExampleCaptureMode ? EXAMPLE_DASHBOARD_ROWS : ((data ?? []) as unknown as ReportRow[]);
   const basis = costBasisCounts(rows);
   const now = new Date();
   const curMonth = now.getMonth() + 1;
@@ -230,7 +251,7 @@ function DashboardPage() {
           {basis.none ? ` · ${COST_BASIS_LABEL.none} ${basis.none}` : ""}.
         </p>
 
-        <MyAgentTicketKpis />
+        {isExampleCaptureMode ? <ExampleMyAgentTicketKpis /> : <MyAgentTicketKpis />}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {can("chart_tx_by_month") && (
@@ -781,6 +802,53 @@ function Stat({
     <Link to="/customers" search={search as never} className="block h-full">
       {inner}
     </Link>
+  );
+}
+
+/** Agent-specific support KPIs, linked straight into the agent's ticket queue. */
+function ExampleMyAgentTicketKpis() {
+  const byMonth = [
+    { month: "Apr 26", total: 18, closed: 16 },
+    { month: "May 26", total: 24, closed: 21 },
+    { month: "Jun 26", total: 29, closed: 26 },
+    { month: "Jul 26", total: 27, closed: 25 },
+    { month: "Aug 26", total: 31, closed: 28 },
+    { month: "Sep 26", total: 22, closed: 19 },
+  ];
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm">My support tickets — Ritu Sharma</CardTitle>
+          <Link
+            to="/tickets"
+            search={{ view: "mine" as const, quick: "all" as const }}
+            className="text-xs text-primary hover:underline whitespace-nowrap"
+          >
+            Open my queue →
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KPI label="Tickets Closed" value="135" to="/tickets" search={{ view: "mine", quick: "closed" }} />
+          <KPI label="Avg Resolution Time" value="6.4 h" to="/tickets" search={{ view: "mine", quick: "resolved" }} />
+          <KPI label="Tickets This Month" value="22" to="/tickets" search={{ view: "mine", quick: "all" }} />
+          <KPI label="In My Queue" value="9" to="/tickets" search={{ view: "mine", quick: "open" }} />
+        </div>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={byMonth}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+            <XAxis dataKey="month" fontSize={12} />
+            <YAxis fontSize={12} />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="total" name="Assigned" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="closed" name="Closed" fill="#22c55e" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
   );
 }
 

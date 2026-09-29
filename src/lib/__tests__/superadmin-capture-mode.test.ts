@@ -8,6 +8,10 @@ describe("Super Admin capture mode feature flag", () => {
     expect(isSuperadminCaptureModeEnabled({ VITE_SUPERADMIN_CAPTURE_MODE: "TRUE" })).toBe(false);
   });
 
+  it("is ignored outside development builds", () => {
+    expect(isSuperadminCaptureModeEnabled({ VITE_SUPERADMIN_CAPTURE_MODE: "true" }, false)).toBe(false);
+  });
+
   it("turns on only for the exact true string", () => {
     expect(isSuperadminCaptureModeEnabled({ VITE_SUPERADMIN_CAPTURE_MODE: "true" })).toBe(true);
   });
