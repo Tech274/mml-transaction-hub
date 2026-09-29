@@ -1049,7 +1049,7 @@ export function DashboardSuperAdminSummary() {
               EXAMPLE DATA
             </span>
           ) : null}
-          <h2 className="mt-1 text-[38px] font-semibold leading-none">Dashboard</h2>
+          <h2 className="mt-1 text-[2.375rem] font-semibold leading-none">Dashboard</h2>
           <p className="mt-1 text-xs" style={{ color: PALETTE.textSecondary }}>
             Viewing as <strong>{viewer.viewerName}</strong> · <strong>{viewer.viewerRole}</strong>
           </p>
@@ -1077,7 +1077,7 @@ export function DashboardSuperAdminSummary() {
           </div>
           <Select value={customerFilter} onValueChange={setCustomerFilter}>
             <SelectTrigger
-              className="h-8 w-[148px] rounded-full border bg-white px-3 text-xs font-medium"
+              className="h-8 w-[9.25rem] rounded-full border bg-white px-3 text-xs font-medium"
               style={{ borderColor: PALETTE.border }}
             >
               <SelectValue />
@@ -1096,7 +1096,7 @@ export function DashboardSuperAdminSummary() {
             onValueChange={(value) => setPeriodFilter(value as DashboardPeriodFilter)}
           >
             <SelectTrigger
-              className="h-8 w-[170px] rounded-full border bg-white px-3 text-xs font-medium"
+              className="h-8 w-[10.625rem] rounded-full border bg-white px-3 text-xs font-medium"
               style={{ borderColor: PALETTE.border }}
             >
               <SelectValue />
@@ -1244,90 +1244,93 @@ export function DashboardSuperAdminSummary() {
               <LegendPill color={PALETTE.gold}>Margin {chartMarginPct.toFixed(1)}%</LegendPill>
             </div>
             {trendRows.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <ComposedChart data={trendRows}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ebeff9" />
-                  <XAxis dataKey="label" fontSize={11} tick={{ fill: PALETTE.textSecondary }} />
-                  <YAxis
-                    yAxisId="money"
-                    fontSize={11}
-                    tick={{ fill: PALETTE.textSecondary }}
-                    tickFormatter={(value) => `${Math.round(value / 1000)}`}
-                    label={{
-                      value: "INR (thousands)",
-                      angle: -90,
-                      position: "insideLeft",
-                      offset: 5,
-                      fill: PALETTE.textSecondary,
-                      fontSize: 11,
-                    }}
-                  />
-                  <YAxis
-                    yAxisId="margin"
-                    orientation="right"
-                    fontSize={11}
-                    tick={{ fill: PALETTE.textSecondary }}
-                    domain={[0, 50]}
-                    tickFormatter={(value) => `${value}%`}
-                    label={{
-                      value: "Margin %",
-                      angle: 90,
-                      position: "insideRight",
-                      offset: 2,
-                      fill: PALETTE.textSecondary,
-                      fontSize: 11,
-                    }}
-                  />
-                  <Tooltip
-                    formatter={(value, key) => {
-                      const numericValue =
-                        typeof value === "number"
-                          ? value
-                          : typeof value === "string"
-                            ? Number(value)
-                            : NaN;
-                      if (!Number.isFinite(numericValue)) return "—";
-                      if (String(key).toLowerCase().includes("margin"))
-                        return `${numericValue.toFixed(1)}%`;
-                      return fmtCurrency(numericValue);
-                    }}
-                  />
-                  <Bar
-                    yAxisId="money"
-                    dataKey="revenue"
-                    name="Revenue"
-                    fill={PALETTE.azure}
-                    radius={[5, 5, 0, 0]}
-                    barSize={18}
-                  />
-                  <Bar
-                    yAxisId="money"
-                    dataKey="inputCost"
-                    name="Input cost"
-                    fill={PALETTE.azureSoft}
-                    radius={[5, 5, 0, 0]}
-                    barSize={18}
-                  />
-                  <Line
-                    yAxisId="margin"
-                    type="linear"
-                    dataKey="marginPct"
-                    name="Margin %"
-                    stroke={PALETTE.gold}
-                    strokeWidth={2}
-                    dot={{ r: 3 }}
-                    connectNulls={false}
-                  >
-                    <LabelList
-                      dataKey="marginPct"
-                      position="top"
-                      formatter={(value: number | null) =>
-                        value === null || value === 0 ? "" : `${value.toFixed(1)}%`
-                      }
+              <div className="h-[15.625rem] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={trendRows}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ebeff9" />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: PALETTE.textSecondary, fontSize: "0.6875rem" }}
                     />
-                  </Line>
-                </ComposedChart>
-              </ResponsiveContainer>
+                    <YAxis
+                      yAxisId="money"
+                      tick={{ fill: PALETTE.textSecondary, fontSize: "0.6875rem" }}
+                      tickFormatter={(value) => `${Math.round(value / 1000)}`}
+                      label={{
+                        value: "INR (thousands)",
+                        angle: -90,
+                        position: "insideLeft",
+                        offset: 5,
+                        fill: PALETTE.textSecondary,
+                        fontSize: "0.6875rem",
+                      }}
+                    />
+                    <YAxis
+                      yAxisId="margin"
+                      orientation="right"
+                      tick={{ fill: PALETTE.textSecondary, fontSize: "0.6875rem" }}
+                      domain={[0, 50]}
+                      tickFormatter={(value) => `${value}%`}
+                      label={{
+                        value: "Margin %",
+                        angle: 90,
+                        position: "insideRight",
+                        offset: 2,
+                        fill: PALETTE.textSecondary,
+                        fontSize: "0.6875rem",
+                      }}
+                    />
+                    <Tooltip
+                      formatter={(value, key) => {
+                        const numericValue =
+                          typeof value === "number"
+                            ? value
+                            : typeof value === "string"
+                              ? Number(value)
+                              : NaN;
+                        if (!Number.isFinite(numericValue)) return "—";
+                        if (String(key).toLowerCase().includes("margin"))
+                          return `${numericValue.toFixed(1)}%`;
+                        return fmtCurrency(numericValue);
+                      }}
+                    />
+                    <Bar
+                      yAxisId="money"
+                      dataKey="revenue"
+                      name="Revenue"
+                      fill={PALETTE.azure}
+                      radius={[5, 5, 0, 0]}
+                      barSize={18}
+                    />
+                    <Bar
+                      yAxisId="money"
+                      dataKey="inputCost"
+                      name="Input cost"
+                      fill={PALETTE.azureSoft}
+                      radius={[5, 5, 0, 0]}
+                      barSize={18}
+                    />
+                    <Line
+                      yAxisId="margin"
+                      type="linear"
+                      dataKey="marginPct"
+                      name="Margin %"
+                      stroke={PALETTE.gold}
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      connectNulls={false}
+                    >
+                      <LabelList
+                        dataKey="marginPct"
+                        position="top"
+                        formatter={(value: number | null) =>
+                          value === null || value === 0 ? "" : `${value.toFixed(1)}%`
+                        }
+                      />
+                    </Line>
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
               <EmptyPanel />
             )}
@@ -1347,50 +1350,42 @@ export function DashboardSuperAdminSummary() {
             </div>
           </CardHeader>
           <CardContent className="px-3 pb-3 pt-2">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_220px]">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_13.75rem]">
               <div>
                 {lobTotal > 0 ? (
-                  <ResponsiveContainer width="100%" height={235}>
-                    <PieChart>
-                      <Pie
-                        data={lobRows}
-                        dataKey="value"
-                        nameKey="name"
-                        innerRadius={62}
-                        outerRadius={88}
-                        stroke="#fff"
-                        strokeWidth={2}
-                      >
-                        <Cell fill={PALETTE.azure} />
-                        <Cell fill={PALETTE.teal} />
-                        <Cell fill={PALETTE.purple} />
-                      </Pie>
-                      <text
-                        x="50%"
-                        y="48%"
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        className="fill-foreground text-3xl font-bold"
-                      >
-                        {fmtNumber(lobTotal)}
-                      </text>
-                      <text
-                        x="50%"
-                        y="58%"
-                        textAnchor="middle"
-                        dominantBaseline="middle"
-                        fill={PALETTE.textMuted}
-                        fontSize={11}
-                      >
-                        Total lines
-                      </text>
-                    </PieChart>
-                  </ResponsiveContainer>
+                  <div className="h-[14.6875rem] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={lobRows}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius="18%"
+                          outerRadius="82%"
+                          stroke="#fff"
+                          strokeWidth={2}
+                        >
+                          <Cell fill={PALETTE.azure} />
+                          <Cell fill={PALETTE.teal} />
+                          <Cell fill={PALETTE.purple} />
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
                 ) : (
                   <EmptyPanel compact />
                 )}
               </div>
               <div className="space-y-2">
+                <div
+                  className="rounded-lg border bg-[#f8faff] px-2 py-1.5"
+                  style={{ borderColor: PALETTE.border }}
+                >
+                  <div className="text-[0.6875rem]" style={{ color: PALETTE.textMuted }}>
+                    Total lines
+                  </div>
+                  <div className="text-lg font-bold">{fmtNumber(lobTotal)}</div>
+                </div>
                 {lobRows.map((lob, idx) => {
                   const pct = lobTotal > 0 ? (lob.value / lobTotal) * 100 : 0;
                   const color =
@@ -1486,11 +1481,11 @@ export function DashboardSuperAdminSummary() {
                   {userEntries.map((entry) => (
                     <div
                       key={entry.role}
-                      className={`grid grid-cols-[22px_1fr] items-center gap-2 rounded-lg border px-2 py-1 ${entry.parked ? "opacity-60" : ""}`}
+                      className={`grid grid-cols-[1.375rem_1fr] items-center gap-2 rounded-lg border px-2 py-1 ${entry.parked ? "opacity-60" : ""}`}
                       style={{ borderColor: PALETTE.border }}
                     >
                       <div
-                        className="grid h-[22px] w-[22px] place-items-center rounded-full text-[9px] font-bold"
+                        className="grid h-[1.375rem] w-[1.375rem] place-items-center rounded-full text-[0.5625rem] font-bold"
                         style={{ color: PALETTE.azure, background: "#edf3ff" }}
                       >
                         {initials(entry.name)}
@@ -1539,7 +1534,7 @@ export function DashboardSuperAdminSummary() {
                   {ticketsByAgent.slice(0, 3).map((agent) => (
                     <div
                       key={agent.name}
-                      className="grid grid-cols-[82px_1fr_16px] items-center gap-2 text-[11px]"
+                      className="grid grid-cols-[5.125rem_1fr_1rem] items-center gap-2 text-[11px]"
                     >
                       <span style={{ color: PALETTE.textSecondary }}>{agent.name}</span>
                       <div className="h-1.5 rounded-full bg-[#ebeff9]">
@@ -1729,7 +1724,7 @@ function DashboardKpiCard({
           {tag}
         </span>
       </div>
-      <div className="mt-1 text-[42px] font-bold leading-none">{value}</div>
+      <div className="mt-1 text-[2.625rem] font-bold leading-none">{value}</div>
       <div className="mt-2 flex items-center justify-between gap-2">
         {delta ? (
           <span
@@ -1744,7 +1739,7 @@ function DashboardKpiCard({
         ) : (
           <span />
         )}
-        <svg viewBox="0 0 66 20" className="h-5 w-[68px]" aria-label="Trend">
+        <svg viewBox="0 0 66 20" className="h-5 w-[4.25rem]" aria-label="Trend">
           <polyline
             fill="none"
             stroke={sparkColor}
@@ -1815,9 +1810,9 @@ function TopCustomerCard({
                       {metricFormatter(row[metricKey])}
                     </div>
                   </div>
-                  <div className="mt-1 h-[5px] rounded-full bg-[#ebeff9]">
+                  <div className="mt-1 h-[0.3125rem] rounded-full bg-[#ebeff9]">
                     <div
-                      className="h-[5px] rounded-full"
+                      className="h-[0.3125rem] rounded-full"
                       style={{ width: `${share}%`, background: barColor }}
                     />
                   </div>
@@ -1884,7 +1879,7 @@ function LegendPill({ color, children }: { color: string; children: React.ReactN
 function EmptyPanel({ compact = false }: { compact?: boolean }) {
   return (
     <div
-      className={`grid place-items-center rounded-lg border border-dashed text-sm ${compact ? "min-h-[96px]" : "min-h-[220px]"}`}
+      className={`grid place-items-center rounded-lg border border-dashed text-sm ${compact ? "min-h-[6rem]" : "min-h-[13.75rem]"}`}
       style={{ borderColor: PALETTE.border, color: PALETTE.textMuted }}
     >
       No data yet
