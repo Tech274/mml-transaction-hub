@@ -39,9 +39,30 @@ function createSupabaseClient() {
       ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
       ...(!SUPABASE_PUBLISHABLE_KEY ? ['SUPABASE_PUBLISHABLE_KEY'] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
+    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}.`;
+    // DEV safety: render screens (auth/capture mode) even when backend env is not wired.
+    // Production still fails closed unless explicit values are provided at build/runtime.
+    if (import.meta.env.DEV) {
+      console.warn(
+        `[Supabase] ${message} Using local placeholder values in DEV; network calls may fail until env is set.`,
+      );
+      return createClient<Database>(
+        "http://127.0.0.1:54321",
+        "sb_publishable_dev_placeholder",
+        {
+          global: {
+            fetch: createSupabaseFetch("sb_publishable_dev_placeholder"),
+          },
+          auth: {
+            storage: brokeredPreviewStorage(),
+            persistSession: true,
+            autoRefreshToken: true,
+          },
+        },
+      );
+    }
     console.error(`[Supabase] ${message}`);
-    throw new Error(message);
+    throw new Error(`${message} Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.`);
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {

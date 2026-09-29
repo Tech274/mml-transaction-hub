@@ -149,7 +149,7 @@ export function TransactionsTable({
     },
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: [
       "transactions",
       repoFilter,
@@ -237,6 +237,7 @@ export function TransactionsTable({
       };
     },
   });
+  const queryError = error instanceof Error ? error : null;
 
   const rows = data?.rows ?? [];
   const allRows = (data as { allRows?: typeof rows } | undefined)?.allRows ?? rows;
@@ -246,6 +247,7 @@ export function TransactionsTable({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const searchTokens = useMemo(() => tokenize(filters.search), [filters.search]);
   const isFuzzy = searchTokens.length > 0;
+  const tableColSpan = 13 + (showProviderFilter ? 1 : 0) + (isFuzzy ? 1 : 0);
   const compactControlClass = compactFilters ? "h-8 text-xs" : "";
 
   const publicCloudInsights = useMemo(() => {
@@ -635,14 +637,21 @@ export function TransactionsTable({
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={14} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={tableColSpan} className="text-center text-muted-foreground py-10">
                     Loading…
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && queryError && (
+                <TableRow>
+                  <TableCell colSpan={tableColSpan} className="text-center text-destructive py-10">
+                    Could not load transactions: {queryError.message}
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={14} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={tableColSpan} className="text-center text-muted-foreground py-10">
                     No transactions match the current filters.
                   </TableCell>
                 </TableRow>
