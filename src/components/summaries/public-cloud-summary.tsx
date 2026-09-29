@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
+  BarChart,
   CartesianGrid,
   Legend,
   Pie,
@@ -87,6 +88,13 @@ export function PublicCloudSummary() {
       const now = new Date();
       const nowTs = now.getTime();
       const nextWeekTs = nowTs + 7 * 24 * 60 * 60 * 1000;
+      const currentYear = now.getFullYear();
+      const availableYears = rows
+        .map((row) => row.year)
+        .filter((value): value is number => typeof value === "number");
+      const chartYear = availableYears.includes(currentYear)
+        ? currentYear
+        : (availableYears.sort((a, b) => b - a)[0] ?? currentYear);
       const revenue = rows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
       const inputCost = rows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
       const profit = revenue - inputCost;
@@ -106,7 +114,7 @@ export function PublicCloudSummary() {
 
       const byMonth = Array.from({ length: 12 }, (_, idx) => {
         const month = idx + 1;
-        const monthRows = rows.filter((row) => row.month === month && row.year === now.getFullYear());
+        const monthRows = rows.filter((row) => row.month === month && row.year === chartYear);
         const monthRevenue = monthRows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
         const monthCost = monthRows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
         return { month: MONTH_NAMES[idx].slice(0, 3), revenue: monthRevenue, cost: monthCost };
@@ -153,6 +161,7 @@ export function PublicCloudSummary() {
         runningNow,
         endingSoon,
         creditUsed,
+        chartYear,
         byMonth,
         providerRevenue: [...providerRevenueMap.entries()].map(([name, value]) => ({ name, value })),
         providerCredit: [...providerCreditMap.entries()].map(([name, value]) => ({
@@ -188,6 +197,11 @@ export function PublicCloudSummary() {
       </Alert>
     );
   }
+  const hasMonthlyCostData = data.byMonth.some((row) => row.revenue > 0 || row.cost > 0);
+  const hasProviderRevenue = data.providerRevenue.length > 0;
+  const hasLobSplit = data.lobSplit.length > 0;
+  const hasStatusSplit = data.statusSplit.length > 0;
+  const hasProviderCredit = data.providerCredit.length > 0;
 
   return (
     <div className="space-y-4">
@@ -204,62 +218,94 @@ export function PublicCloudSummary() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Cost overview by month">
-          <ResponsiveContainer width="100%" height={250}>
-            <ComposedChart data={data.byMonth}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-              <XAxis dataKey="month" fontSize={12} />
-              <YAxis fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
-              <Tooltip formatter={(value: number) => fmtCurrency(value)} />
-              <Legend />
-              <Bar dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-              <Line dataKey="cost" name="Input cost" stroke="var(--chart-3)" strokeWidth={2} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          {hasMonthlyCostData ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <ComposedChart data={data.byMonth}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                <XAxis dataKey="month" fontSize={12} />
+                <YAxis fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
+                <Tooltip formatter={(value: number) => fmtCurrency(value)} />
+                <Legend />
+                <Bar dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+                <Line dataKey="cost" name="Input cost" stroke="var(--chart-3)" strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
 
         <ChartCard title="Revenue by cloud provider">
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChartSafe data={data.providerRevenue} dataKey="value" xDataKey="name" />
-          </ResponsiveContainer>
+          {hasProviderRevenue ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={data.providerRevenue}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                <XAxis dataKey="name" fontSize={12} />
+                <YAxis fontSize={12} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Line of business split">
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie data={data.lobSplit} dataKey="value" nameKey="name" outerRadius={85} label>
-                {data.lobSplit.map((_, idx) => (
-                  <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          {hasLobSplit ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie data={data.lobSplit} dataKey="value" nameKey="name" outerRadius={85} label>
+                  {data.lobSplit.map((_, idx) => (
+                    <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
         <ChartCard title="Lab status">
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChartSafe data={data.statusSplit} dataKey="value" xDataKey="name" />
-          </ResponsiveContainer>
+          {hasStatusSplit ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={data.statusSplit}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                <XAxis dataKey="name" fontSize={12} />
+                <YAxis fontSize={12} allowDecimals={false} />
+                <Tooltip />
+                <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Credit utilisation by provider">
-          <ResponsiveContainer width="100%" height={250}>
-            <ComposedChart data={data.providerCredit}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-              <XAxis dataKey="name" fontSize={12} />
-              <YAxis yAxisId="money" fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
-              <YAxis yAxisId="pct" orientation="right" fontSize={12} tickFormatter={(value) => `${value}%`} />
-              <Tooltip formatter={(value: number, key) => (String(key).includes("Pct") ? `${value}%` : fmtCurrency(value))} />
-              <Legend />
-              <Bar yAxisId="money" dataKey="allocated" name="Allocated credit" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
-              <Bar yAxisId="money" dataKey="used" name="Used credit" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-              <Line yAxisId="pct" dataKey="utilizationPct" name="Utilization %" stroke="var(--chart-4)" strokeWidth={2} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          {hasProviderCredit ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <ComposedChart data={data.providerCredit}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                <XAxis dataKey="name" fontSize={12} />
+                <YAxis yAxisId="money" fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
+                <YAxis yAxisId="pct" orientation="right" fontSize={12} tickFormatter={(value) => `${value}%`} />
+                <Tooltip formatter={(value: number, key) => (String(key).includes("Pct") ? `${value}%` : fmtCurrency(value))} />
+                <Legend />
+                <Bar yAxisId="money" dataKey="allocated" name="Allocated credit" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                <Bar yAxisId="money" dataKey="used" name="Used credit" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+                <Line yAxisId="pct" dataKey="utilizationPct" name="Utilization %" stroke="var(--chart-4)" strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
         <Card>
           <CardHeader>
@@ -283,7 +329,7 @@ export function PublicCloudSummary() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Recent lab transactions</CardTitle>
+          <CardTitle className="text-sm">Recent lab transactions ({data.chartYear})</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {data.recent.map((row) => (
@@ -305,6 +351,14 @@ export function PublicCloudSummary() {
           ))}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function NoDataYet() {
+  return (
+    <div className="grid min-h-[250px] w-full place-items-center rounded-md border border-dashed border-border text-sm text-muted-foreground">
+      No data yet
     </div>
   );
 }
@@ -331,22 +385,3 @@ function ChartCard({ title, children }: { title: string; children: ReactNode }) 
   );
 }
 
-function BarChartSafe({
-  data,
-  dataKey,
-  xDataKey,
-}: {
-  data: Array<Record<string, string | number>>;
-  dataKey: string;
-  xDataKey: string;
-}) {
-  return (
-    <ComposedChart data={data}>
-      <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-      <XAxis dataKey={xDataKey} fontSize={12} />
-      <YAxis fontSize={12} allowDecimals={false} />
-      <Tooltip />
-      <Bar dataKey={dataKey} fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-    </ComposedChart>
-  );
-}

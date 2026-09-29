@@ -175,6 +175,9 @@ export function AgentsSummary() {
       </Alert>
     );
   }
+  const hasWorkloadData = data.byAgent.some((row) => row.proposals > 0 || row.pending > 0);
+  const hasRunsPerDayData = data.runsPerDay.length > 0;
+  const hasRecentRuns = data.recentRuns.length > 0;
 
   return (
     <div className="space-y-4">
@@ -214,31 +217,39 @@ export function AgentsSummary() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Workload by agent">
-          <ResponsiveContainer width="100%" height={260}>
-            <ComposedChart data={data.byAgent}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-              <XAxis dataKey="name" fontSize={11} />
-              <YAxis fontSize={12} allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="pending" name="Awaiting review" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="proposals" name="Proposals" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          {hasWorkloadData ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={data.byAgent}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                <XAxis dataKey="name" fontSize={11} />
+                <YAxis fontSize={12} allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="pending" name="Awaiting review" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="proposals" name="Proposals" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
         <ChartCard title="Runs per day by agent">
-          <ResponsiveContainer width="100%" height={260}>
-            <ComposedChart data={data.runsPerDay}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-              <XAxis dataKey="day" fontSize={11} />
-              <YAxis fontSize={12} allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="generalist" name="Generalist" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="support" name="Support desk" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="cost_adr" name="Cost / ADR" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          {hasRunsPerDayData ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={data.runsPerDay}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                <XAxis dataKey="day" fontSize={11} />
+                <YAxis fontSize={12} allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="generalist" name="Generalist" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="support" name="Support desk" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="cost_adr" name="Cost / ADR" fill="var(--chart-3)" radius={[4, 4, 0, 0]} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
       </div>
 
@@ -287,26 +298,42 @@ export function AgentsSummary() {
           <CardTitle className="text-sm">Recent agent runs</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          {data.recentRuns.map((run) => (
-            <Link
-              key={run.id}
-              to="/ai-command-center/audit"
-              search={{ agent: run.agent_key as "generalist" | "support" | "cost_adr" }}
-              className="block rounded-md border border-border px-3 py-2 hover:bg-muted/30"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-medium">{run.id}</div>
-                <Badge variant={run.status === "done" ? "default" : run.status === "error" ? "destructive" : "secondary"}>
-                  {run.status}
-                </Badge>
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {run.agent_key} · {new Date(run.created_at).toLocaleString()}
-              </div>
-            </Link>
-          ))}
+          {hasRecentRuns ? (
+            data.recentRuns.map((run) => (
+              <Link
+                key={run.id}
+                to="/ai-command-center/audit"
+                search={{ agent: run.agent_key as "generalist" | "support" | "cost_adr" }}
+                className="block rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-sm font-medium">{run.id}</div>
+                  <Badge variant={run.status === "done" ? "default" : run.status === "error" ? "destructive" : "secondary"}>
+                    {run.status}
+                  </Badge>
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {run.agent_key} · {new Date(run.created_at).toLocaleString()}
+                </div>
+              </Link>
+            ))
+          ) : (
+            <NoDataYet compact />
+          )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function NoDataYet({ compact = false }: { compact?: boolean }) {
+  return (
+    <div
+      className={`grid w-full place-items-center rounded-md border border-dashed border-border text-sm text-muted-foreground ${
+        compact ? "min-h-[96px]" : "min-h-[260px]"
+      }`}
+    >
+      No data yet
     </div>
   );
 }

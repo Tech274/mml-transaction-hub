@@ -108,7 +108,13 @@ export function PrivateCloudSummary() {
               "Private cloud summary transactions",
             );
       const now = new Date();
-      const year = now.getFullYear();
+      const nowYear = now.getFullYear();
+      const availableYears = tx
+        .map((row) => row.year)
+        .filter((value): value is number => typeof value === "number");
+      const year = availableYears.includes(nowYear)
+        ? nowYear
+        : (availableYears.sort((a, b) => b - a)[0] ?? nowYear);
       const revenue = batches.reduce((sum, row) => addNullable(sum, row.revenue_total), 0);
       const actualCost = batches.reduce((sum, row) => addNullable(sum, row.actual_cost_total), 0);
       const estimatedCost = batches.reduce((sum, row) => addNullable(sum, row.estimated_cost_total), 0);
@@ -172,6 +178,7 @@ export function PrivateCloudSummary() {
       return {
         batches,
         tx,
+        year,
         revenue,
         actualCost,
         estimatedCost,
@@ -203,6 +210,10 @@ export function PrivateCloudSummary() {
       </Alert>
     );
   }
+  const hasMonthlyData = data.byMonth.some((row) => row.revenue > 0 || row.cost > 0 || row.marginPct > 0);
+  const hasStatusSplit = data.statusSplit.length > 0;
+  const hasReconciliation = data.reconciliation.length > 0;
+  const hasTopCustomers = data.topCustomers.length > 0;
 
   return (
     <div className="space-y-4">
@@ -219,62 +230,74 @@ export function PrivateCloudSummary() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="Revenue and margin by month">
-          <ResponsiveContainer width="100%" height={250}>
-            <ComposedChart data={data.byMonth}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-              <XAxis dataKey="month" fontSize={12} />
-              <YAxis yAxisId="money" fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
-              <YAxis yAxisId="margin" orientation="right" fontSize={12} tickFormatter={(value) => `${value}%`} />
-              <Tooltip formatter={(value: number, name) => (String(name).includes("%") ? `${value}%` : fmtCurrency(value))} />
-              <Legend />
-              <Bar yAxisId="money" dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-              <Line yAxisId="money" dataKey="cost" name="Cost" stroke="var(--chart-2)" strokeWidth={2} />
-              <Line yAxisId="margin" dataKey="marginPct" name="Margin %" stroke="var(--chart-3)" strokeWidth={2} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          {hasMonthlyData ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <ComposedChart data={data.byMonth}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                <XAxis dataKey="month" fontSize={12} />
+                <YAxis yAxisId="money" fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
+                <YAxis yAxisId="margin" orientation="right" fontSize={12} tickFormatter={(value) => `${value}%`} />
+                <Tooltip formatter={(value: number, name) => (String(name).includes("%") ? `${value}%` : fmtCurrency(value))} />
+                <Legend />
+                <Bar yAxisId="money" dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+                <Line yAxisId="money" dataKey="cost" name="Cost" stroke="var(--chart-2)" strokeWidth={2} />
+                <Line yAxisId="margin" dataKey="marginPct" name="Margin %" stroke="var(--chart-3)" strokeWidth={2} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
 
         <ChartCard title="Batch status">
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie data={data.statusSplit} dataKey="value" nameKey="name" outerRadius={85} label>
-                {data.statusSplit.map((_, idx) => (
-                  <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          {hasStatusSplit ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie data={data.statusSplit} dataKey="value" nameKey="name" outerRadius={85} label>
+                  {data.statusSplit.map((_, idx) => (
+                    <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm">Reconciled costs (actual vs estimate)</CardTitle>
+            <CardTitle className="text-sm">Reconciled costs (actual vs estimate) · {data.year}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {data.reconciliation.map((batch) => (
-              <div key={batch.id} className="rounded-md border border-border px-3 py-2">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-medium">
-                    {batch.batch_code} {batch.name ? `· ${batch.name}` : ""}
+            {hasReconciliation ? (
+              data.reconciliation.map((batch) => (
+                <div key={batch.id} className="rounded-md border border-border px-3 py-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-medium">
+                      {batch.batch_code} {batch.name ? `· ${batch.name}` : ""}
+                    </div>
+                    {batch.reconciled ? (
+                      <Badge variant="default" className="gap-1">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Reconciled ✓
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">Review needed</Badge>
+                    )}
                   </div>
-                  {batch.reconciled ? (
-                    <Badge variant="default" className="gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Reconciled ✓
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary">Review needed</Badge>
-                  )}
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Σ line actual costs = {fmtCurrency(batch.lineActual)} · batch actual cost ={" "}
+                    {fmtCurrency(batch.batchActual)} · estimate = {fmtCurrency(batch.batchEstimate)}
+                  </div>
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Σ line actual costs = {fmtCurrency(batch.lineActual)} · batch actual cost ={" "}
-                  {fmtCurrency(batch.batchActual)} · estimate = {fmtCurrency(batch.batchEstimate)}
-                </div>
-              </div>
-            ))}
+              ))
+            ) : (
+              <NoDataYet compact />
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -282,17 +305,21 @@ export function PrivateCloudSummary() {
             <CardTitle className="text-sm">Top customers by revenue</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {data.topCustomers.map((customer) => (
-              <Link
-                key={customer.name}
-                to="/customers"
-                search={{ q: customer.name, status: "all" }}
-                className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/30"
-              >
-                <span className="text-sm font-medium">{customer.name}</span>
-                <Badge variant="outline">{fmtCurrency(customer.value)}</Badge>
-              </Link>
-            ))}
+            {hasTopCustomers ? (
+              data.topCustomers.map((customer) => (
+                <Link
+                  key={customer.name}
+                  to="/customers"
+                  search={{ q: customer.name, status: "all" }}
+                  className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+                >
+                  <span className="text-sm font-medium">{customer.name}</span>
+                  <Badge variant="outline">{fmtCurrency(customer.value)}</Badge>
+                </Link>
+              ))
+            ) : (
+              <NoDataYet compact />
+            )}
           </CardContent>
         </Card>
       </div>
@@ -320,6 +347,18 @@ export function PrivateCloudSummary() {
           ))}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function NoDataYet({ compact = false }: { compact?: boolean }) {
+  return (
+    <div
+      className={`grid w-full place-items-center rounded-md border border-dashed border-border text-sm text-muted-foreground ${
+        compact ? "min-h-[96px]" : "min-h-[250px]"
+      }`}
+    >
+      No data yet
     </div>
   );
 }

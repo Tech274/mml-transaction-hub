@@ -38,6 +38,7 @@ import {
 import { useAuth, type AppRole } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
+import { isLeadershipOnlyRoleSet } from "@/lib/leadership-access";
 
 type NavItem = {
   to: string;
@@ -113,7 +114,20 @@ export function AppSidebar() {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { hasAnyRole, user, roles, signOut } = useAuth();
   const { can } = usePermissions();
-  const visibleAiCommandCenterNav = aiCommandCenterNav.filter((i) => !i.roles || hasAnyRole(i.roles));
+  const isLeadershipOnly = isLeadershipOnlyRoleSet(roles);
+  const visibleAiCommandCenterNav = isLeadershipOnly
+    ? []
+    : aiCommandCenterNav.filter((i) => !i.roles || hasAnyRole(i.roles));
+  const visibleMmlLabNav = isLeadershipOnly
+    ? []
+    : mmlLabNav.filter(
+        (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
+      );
+  const visibleWorkspaceNav = nav
+    .filter(
+      (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
+    )
+    .filter((i) => !isLeadershipOnly || i.to === "/dashboard");
 
   return (
     <Sidebar collapsible="icon">
@@ -153,15 +167,12 @@ export function AppSidebar() {
             </SidebarGroupContent>
           </SidebarGroup>
         )}
-        <SidebarGroup>
-          <SidebarGroupLabel>MML Lab</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mmlLabNav
-                .filter(
-                  (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
-                )
-                .map((item) => {
+        {visibleMmlLabNav.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>MML Lab</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleMmlLabNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
@@ -174,18 +185,16 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                   );
                 })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {nav
-                .filter(
-                  (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
-                )
-                .map((item) => {
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {visibleWorkspaceNav.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Workspace</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleWorkspaceNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
@@ -198,9 +207,10 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                   );
                 })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">

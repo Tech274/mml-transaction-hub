@@ -171,6 +171,11 @@ export function AiCommandCenterSummary() {
       </Alert>
     );
   }
+  const hasPending = data.pending.length > 0;
+  const hasAlerts = data.alerts.length > 0;
+  const hasWorkByType = data.workByType.length > 0;
+  const hasReviewOutcomes = data.reviewOutcomes.some((row) => row.value > 0);
+  const hasLiveWork = data.liveWork.length > 0;
 
   return (
     <div className="space-y-4">
@@ -189,20 +194,24 @@ export function AiCommandCenterSummary() {
             <CardTitle className="text-sm">Review queue</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {data.pending.slice(0, 8).map((item) => (
-              <Link
-                key={item.id}
-                to="/ai-command-center/inbox"
-                search={{ agent: toAgentKey(item.agent_key) }}
-                className="block rounded-md border border-border px-3 py-2 hover:bg-muted/30"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm font-medium">{item.title}</div>
-                  <Badge variant="outline">{item.agent_key}</Badge>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">{item.summary ?? item.item_type}</div>
-              </Link>
-            ))}
+            {hasPending ? (
+              data.pending.slice(0, 8).map((item) => (
+                <Link
+                  key={item.id}
+                  to="/ai-command-center/inbox"
+                  search={{ agent: toAgentKey(item.agent_key) }}
+                  className="block rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-sm font-medium">{item.title}</div>
+                    <Badge variant="outline">{item.agent_key}</Badge>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">{item.summary ?? item.item_type}</div>
+                </Link>
+              ))
+            ) : (
+              <NoDataYet compact />
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -210,7 +219,7 @@ export function AiCommandCenterSummary() {
             <CardTitle className="text-sm">Alerts</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {data.alerts.length === 0 && (
+            {!hasAlerts && (
               <div className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
                 No active alerts.
               </div>
@@ -229,29 +238,37 @@ export function AiCommandCenterSummary() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <ChartCard title="AI work volume by type">
-          <ResponsiveContainer width="100%" height={260}>
-            <ComposedChart data={data.workByType}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-              <XAxis dataKey="name" fontSize={11} />
-              <YAxis fontSize={12} allowDecimals={false} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="value" name="Items" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-            </ComposedChart>
-          </ResponsiveContainer>
+          {hasWorkByType ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <ComposedChart data={data.workByType}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                <XAxis dataKey="name" fontSize={11} />
+                <YAxis fontSize={12} allowDecimals={false} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="value" name="Items" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+              </ComposedChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
         <ChartCard title="Review outcomes">
-          <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie data={data.reviewOutcomes} dataKey="value" nameKey="name" outerRadius={85} label>
-                {data.reviewOutcomes.map((_, idx) => (
-                  <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
+          {hasReviewOutcomes ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={data.reviewOutcomes} dataKey="value" nameKey="name" outerRadius={85} label>
+                  {data.reviewOutcomes.map((_, idx) => (
+                    <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <NoDataYet />
+          )}
         </ChartCard>
       </div>
 
@@ -280,7 +297,7 @@ export function AiCommandCenterSummary() {
             <CardTitle className="text-sm">Live AI work</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {data.liveWork.length === 0 && (
+            {!hasLiveWork && (
               <div className="rounded-md border border-border px-3 py-2 text-sm text-muted-foreground">
                 No agents are running right now.
               </div>
@@ -307,6 +324,18 @@ export function AiCommandCenterSummary() {
           <Badge variant="destructive">{data.governance.leadershipAccess}</Badge>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function NoDataYet({ compact = false }: { compact?: boolean }) {
+  return (
+    <div
+      className={`grid w-full place-items-center rounded-md border border-dashed border-border text-sm text-muted-foreground ${
+        compact ? "min-h-[96px]" : "min-h-[260px]"
+      }`}
+    >
+      No data yet
     </div>
   );
 }

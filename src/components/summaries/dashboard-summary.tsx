@@ -21,6 +21,8 @@ import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
 import { addNullable } from "@/lib/nullable-sum";
 import { readAllRows } from "@/lib/read-all";
 import { getSyncOverview } from "@/lib/sync.functions";
+import { useAuth } from "@/lib/auth-context";
+import { isLeadershipOnlyRoleSet } from "@/lib/leadership-access";
 import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
@@ -58,14 +60,17 @@ function lineCost(row: Pick<TxRow, "input_cost_actual_alloc" | "input_cost" | "i
 
 export function DashboardSummary() {
   const syncOverviewFn = useServerFn(getSyncOverview);
+  const { roles } = useAuth();
+  const isLeadershipOnly = isLeadershipOnlyRoleSet(roles);
   const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["dashboard-summary-v2"],
     queryFn: async () => {
       const now = new Date();
-      const year = now.getFullYear();
+      const nowYear = now.getFullYear();
       if (isExampleCaptureMode) {
         const txRows = EXAMPLE_ROWS;
+        const year = Math.max(...txRows.map((row) => row.year ?? 0), nowYear);
         const byMonth = Array.from({ length: 12 }, (_, idx) => {
           const month = idx + 1;
           const rows = txRows.filter((row) => row.year === year && row.month === month);
@@ -83,6 +88,11 @@ export function DashboardSummary() {
         const cost = txRows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
         const profit = revenue - cost;
         const marginPct = revenue > 0 ? (profit / revenue) * 100 : 0;
+        const lobMap = new Map<string, number>();
+        for (const row of txRows) {
+          const key = row.line_of_business ?? "Unknown";
+          lobMap.set(key, (lobMap.get(key) ?? 0) + 1);
+        }
         return {
           year,
           byMonth,
@@ -99,6 +109,7 @@ export function DashboardSummary() {
             { name: "HCL", revenue: 63100, profit: 22890, users: 33 },
             { name: "Infosys", revenue: 57500, profit: 18580, users: 30 },
           ],
+          lobSplit: [...lobMap.entries()].map(([name, value]) => ({ name, value })),
           keyAlerts: ["9 support tickets are open.", "3 AI proposals are awaiting review."],
           syncOverview: {
             freshdesk: { health: { state: "ok", message: "Freshdesk sync healthy" } },
@@ -128,6 +139,12 @@ export function DashboardSummary() {
           syncOverviewFn(),
           supabase.from("ai_cc_inbox").select("id", { head: true, count: "exact" }).eq("status", "pending"),
         ]);
+      const availableYears = txRows
+        .map((row) => row.year)
+        .filter((value): value is number => typeof value === "number");
+      const year = availableYears.includes(nowYear)
+        ? nowYear
+        : (availableYears.sort((a, b) => b - a)[0] ?? nowYear);
 
       const byMonth = Array.from({ length: 12 }, (_, idx) => {
         const month = idx + 1;
@@ -177,6 +194,11 @@ export function DashboardSummary() {
         keyAlerts.push(`${fmtNumber(pendingProposals.count ?? 0)} AI proposals are awaiting review.`);
       }
       if (keyAlerts.length === 0) keyAlerts.push("No active alerts right now.");
+      const lobMap = new Map<string, number>();
+      for (const row of txRows) {
+        const key = row.line_of_business ?? "Unknown";
+        lobMap.set(key, (lobMap.get(key) ?? 0) + 1);
+      }
 
       return {
         year,
@@ -188,6 +210,7 @@ export function DashboardSummary() {
         openTickets: openTicketsCount,
         activeResources,
         topCustomers,
+        lobSplit: [...lobMap.entries()].map(([name, value]) => ({ name, value })),
         keyAlerts,
         syncOverview,
       };
@@ -215,6 +238,20 @@ export function DashboardSummary() {
   const syncHealthy =
     data.syncOverview.freshdesk.health.state === "ok" &&
     data.syncOverview.last_success?.status === "success";
+  const hasRevenueSnapshot = data.byMonth.some(
+    (row) => row.revenue > 0 || row.cost > 0 || row.marginPct > 0,
+  );
+  const hasTopCustomers = data.topCustomers.length > 0;
+  const hasLobData = data.lobSplit.length > 0;
+  const visibleModules = isLeadershipOnly
+    ? []
+    : [
+        { title: "Support tickets", to: "/tickets" },
+        { title: "Public cloud", to: "/public-cloud" },
+        { title: "Private cloud", to: "/private-cloud" },
+        { title: "Agents", to: "/ai-command-center/agents" },
+        { title: "AI Command Center", to: "/ai-command-center" },
+      ];
 
   return (
     <div className="space-y-4">
@@ -237,24 +274,28 @@ export function DashboardSummary() {
             <CardTitle className="text-sm">Revenue snapshot (FYTD)</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <ComposedChart data={data.byMonth}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                <XAxis dataKey="month" fontSize={12} />
-                <YAxis yAxisId="money" fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
-                <YAxis yAxisId="margin" orientation="right" fontSize={12} tickFormatter={(value) => `${value}%`} />
-                <Tooltip
-                  formatter={(value: number, name: string) => {
-                    if (name === "Margin %") return [`${value.toFixed(1)}%`, name];
-                    return [fmtCurrency(value), name];
-                  }}
-                />
-                <Legend />
-                <Bar yAxisId="money" dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-                <Bar yAxisId="money" dataKey="cost" name="Input cost" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
-                <Line yAxisId="margin" type="monotone" dataKey="marginPct" name="Margin %" stroke="var(--chart-3)" strokeWidth={2} />
-              </ComposedChart>
-            </ResponsiveContainer>
+            {hasRevenueSnapshot ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={data.byMonth}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                  <XAxis dataKey="month" fontSize={12} />
+                  <YAxis yAxisId="money" fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
+                  <YAxis yAxisId="margin" orientation="right" fontSize={12} tickFormatter={(value) => `${value}%`} />
+                  <Tooltip
+                    formatter={(value: number, name: string) => {
+                      if (name === "Margin %") return [`${value.toFixed(1)}%`, name];
+                      return [fmtCurrency(value), name];
+                    }}
+                  />
+                  <Legend />
+                  <Bar yAxisId="money" dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="money" dataKey="cost" name="Input cost" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                  <Line yAxisId="margin" type="monotone" dataKey="marginPct" name="Margin %" stroke="var(--chart-3)" strokeWidth={2} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <NoDataYet />
+            )}
           </CardContent>
         </Card>
 
@@ -272,18 +313,66 @@ export function DashboardSummary() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Modules</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          <ModuleLink title="Support tickets" to="/tickets" />
-          <ModuleLink title="Public cloud" to="/public-cloud" />
-          <ModuleLink title="Private cloud" to="/private-cloud" />
-          <ModuleLink title="Agents" to="/ai-command-center/agents" />
-          <ModuleLink title="AI Command Center" to="/ai-command-center" />
-        </CardContent>
-      </Card>
+      {visibleModules.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Modules</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {visibleModules.map((module) => (
+              <ModuleLink key={module.to} title={module.title} to={module.to} />
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Top customers by value</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {hasTopCustomers ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={data.topCustomers}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                  <XAxis dataKey="name" fontSize={11} />
+                  <YAxis yAxisId="money" fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
+                  <YAxis yAxisId="users" orientation="right" fontSize={12} allowDecimals={false} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar yAxisId="money" dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+                  <Line yAxisId="money" dataKey="profit" name="Profit" stroke="var(--chart-3)" strokeWidth={2} />
+                  <Line yAxisId="users" dataKey="users" name="Users" stroke="var(--chart-4)" strokeWidth={2} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <NoDataYet />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Line of business distribution</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {hasLobData ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={data.lobSplit}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                  <XAxis dataKey="name" fontSize={11} />
+                  <YAxis fontSize={12} allowDecimals={false} />
+                  <Tooltip />
+                  <Bar dataKey="value" name="Lines" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            ) : (
+              <NoDataYet />
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
@@ -313,25 +402,41 @@ export function DashboardSummary() {
             <CardTitle className="text-sm">Top customers</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {data.topCustomers.map((customer) => (
-              <Link
-                key={customer.name}
-                to="/customers"
-                search={{ q: customer.name, status: "all" }}
-                className="block rounded-md border border-border px-3 py-2 hover:bg-muted/30"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-medium text-sm">{customer.name}</div>
-                  <Badge variant="outline">{fmtNumber(customer.users)} users</Badge>
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Revenue {fmtCurrency(customer.revenue)} · Profit {fmtCurrency(customer.profit)}
-                </div>
-              </Link>
-            ))}
+            {hasTopCustomers ? (
+              data.topCustomers.map((customer) => (
+                <Link
+                  key={customer.name}
+                  to="/customers"
+                  search={{ q: customer.name, status: "all" }}
+                  className="block rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-medium text-sm">{customer.name}</div>
+                    <Badge variant="outline">{fmtNumber(customer.users)} users</Badge>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    Revenue {fmtCurrency(customer.revenue)} · Profit {fmtCurrency(customer.profit)}
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <NoDataYet compact />
+            )}
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function NoDataYet({ compact = false }: { compact?: boolean }) {
+  return (
+    <div
+      className={`grid w-full place-items-center rounded-md border border-dashed border-border text-sm text-muted-foreground ${
+        compact ? "min-h-[96px]" : "min-h-[250px]"
+      }`}
+    >
+      No data yet
     </div>
   );
 }

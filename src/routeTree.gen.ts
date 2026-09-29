@@ -31,6 +31,7 @@ import { Route as AuthenticatedTicketsRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authenticated/transactions'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as AuthenticatedAiCommandCenterIndexRouteImport } from './routes/_authenticated/ai-command-center.index'
 import { Route as AuthenticatedAiCommandCenterAgentsRouteImport } from './routes/_authenticated/ai-command-center.agents'
 import { Route as AuthenticatedAiCommandCenterAuditRouteImport } from './routes/_authenticated/ai-command-center.audit'
 import { Route as AuthenticatedAiCommandCenterInboxRouteImport } from './routes/_authenticated/ai-command-center.inbox'
@@ -160,6 +161,12 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AuthenticatedAiCommandCenterIndexRoute =
+  AuthenticatedAiCommandCenterIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAiCommandCenterRoute,
+  } as any)
 const AuthenticatedAiCommandCenterAgentsRoute =
   AuthenticatedAiCommandCenterAgentsRouteImport.update({
     id: '/agents',
@@ -256,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/mml-lab/cost-catalog': typeof AuthenticatedMmlLabCostCatalogRoute
   '/mml-lab/lab-catalog': typeof AuthenticatedMmlLabLabCatalogRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
+  '/ai-command-center/': typeof AuthenticatedAiCommandCenterIndexRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
   '/api/public/hooks/freshdesk-sync': typeof ApiPublicHooksFreshdeskSyncRoute
   '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
@@ -269,7 +277,6 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/agent-integrations': typeof AuthenticatedAgentIntegrationsRoute
-  '/ai-command-center': typeof AuthenticatedAiCommandCenterRouteWithChildren
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/entry': typeof AuthenticatedEntryRoute
@@ -290,6 +297,7 @@ export interface FileRoutesByTo {
   '/mml-lab/cost-catalog': typeof AuthenticatedMmlLabCostCatalogRoute
   '/mml-lab/lab-catalog': typeof AuthenticatedMmlLabLabCatalogRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
+  '/ai-command-center': typeof AuthenticatedAiCommandCenterIndexRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
   '/api/public/hooks/freshdesk-sync': typeof ApiPublicHooksFreshdeskSyncRoute
   '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
@@ -326,6 +334,7 @@ export interface FileRoutesById {
   '/_authenticated/mml-lab/cost-catalog': typeof AuthenticatedMmlLabCostCatalogRoute
   '/_authenticated/mml-lab/lab-catalog': typeof AuthenticatedMmlLabLabCatalogRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
+  '/_authenticated/ai-command-center/': typeof AuthenticatedAiCommandCenterIndexRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
   '/api/public/hooks/freshdesk-sync': typeof ApiPublicHooksFreshdeskSyncRoute
   '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
@@ -362,6 +371,7 @@ export interface FileRouteTypes {
     | '/mml-lab/cost-catalog'
     | '/mml-lab/lab-catalog'
     | '/api/public/bulk-template-version'
+    | '/ai-command-center/'
     | '/api/public/hooks/bulk-import-cleanup'
     | '/api/public/hooks/freshdesk-sync'
     | '/api/public/hooks/mcp-sync'
@@ -375,7 +385,6 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/admin'
     | '/agent-integrations'
-    | '/ai-command-center'
     | '/customers'
     | '/dashboard'
     | '/entry'
@@ -396,6 +405,7 @@ export interface FileRouteTypes {
     | '/mml-lab/cost-catalog'
     | '/mml-lab/lab-catalog'
     | '/api/public/bulk-template-version'
+    | '/ai-command-center'
     | '/api/public/hooks/bulk-import-cleanup'
     | '/api/public/hooks/freshdesk-sync'
     | '/api/public/hooks/mcp-sync'
@@ -431,6 +441,7 @@ export interface FileRouteTypes {
     | '/_authenticated/mml-lab/cost-catalog'
     | '/_authenticated/mml-lab/lab-catalog'
     | '/api/public/bulk-template-version'
+    | '/_authenticated/ai-command-center/'
     | '/api/public/hooks/bulk-import-cleanup'
     | '/api/public/hooks/freshdesk-sync'
     | '/api/public/hooks/mcp-sync'
@@ -608,6 +619,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/ai-command-center/': {
+      id: '/_authenticated/ai-command-center/'
+      path: '/'
+      fullPath: '/ai-command-center/'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterIndexRouteImport
+      parentRoute: typeof AuthenticatedAiCommandCenterRoute
+    }
     '/_authenticated/ai-command-center/agents': {
       id: '/_authenticated/ai-command-center/agents'
       path: '/agents'
@@ -693,6 +711,7 @@ interface AuthenticatedAiCommandCenterRouteChildren {
   AuthenticatedAiCommandCenterAuditRoute: typeof AuthenticatedAiCommandCenterAuditRoute
   AuthenticatedAiCommandCenterInboxRoute: typeof AuthenticatedAiCommandCenterInboxRoute
   AuthenticatedAiCommandCenterRunNowRoute: typeof AuthenticatedAiCommandCenterRunNowRoute
+  AuthenticatedAiCommandCenterIndexRoute: typeof AuthenticatedAiCommandCenterIndexRoute
 }
 
 const AuthenticatedAiCommandCenterRouteChildren: AuthenticatedAiCommandCenterRouteChildren =
@@ -705,6 +724,8 @@ const AuthenticatedAiCommandCenterRouteChildren: AuthenticatedAiCommandCenterRou
       AuthenticatedAiCommandCenterInboxRoute,
     AuthenticatedAiCommandCenterRunNowRoute:
       AuthenticatedAiCommandCenterRunNowRoute,
+    AuthenticatedAiCommandCenterIndexRoute:
+      AuthenticatedAiCommandCenterIndexRoute,
   }
 
 const AuthenticatedAiCommandCenterRouteWithChildren =
