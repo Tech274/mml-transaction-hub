@@ -159,6 +159,43 @@ export function effectiveCost(row: {
   return { amount: null, basis: "none" };
 }
 
+/**
+ * Public cloud margin model:
+ * - service margin is what we keep after reserving user credit
+ * - unused credit margin is reserved credit the user did not consume
+ * - total profit is selling minus actual consumption
+ */
+export function publicCloudMarginBreakdown(
+  sellingCost: number | null | undefined,
+  creditAllocated: number | null | undefined,
+  actualConsumption: number | null | undefined,
+): {
+  serviceMargin: number | null;
+  unusedCredit: number | null;
+  unusedCreditMargin: number | null;
+  totalProfitActual: number | null;
+} {
+  if (sellingCost == null) {
+    return {
+      serviceMargin: null,
+      unusedCredit: null,
+      unusedCreditMargin: null,
+      totalProfitActual: null,
+    };
+  }
+  const serviceMargin = creditAllocated == null ? null : round2(sellingCost - creditAllocated);
+  const unusedCredit =
+    creditAllocated == null || actualConsumption == null
+      ? null
+      : round2(Math.max(creditAllocated - actualConsumption, 0));
+  return {
+    serviceMargin,
+    unusedCredit,
+    unusedCreditMargin: unusedCredit,
+    totalProfitActual: actualConsumption == null ? null : round2(sellingCost - actualConsumption),
+  };
+}
+
 export const COST_BASIS_LABEL: Record<CostBasis, string> = {
   actual: "Actual (invoice)",
   entered: "Entered estimate",

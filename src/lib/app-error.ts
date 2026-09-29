@@ -89,6 +89,21 @@ export function logError(err: unknown, where: string, extra?: Record<string, unk
   return ref;
 }
 
+/** Structured server-side audit line for admin-sensitive actions. Never throws. */
+export function logAudit(where: string, event: Record<string, unknown>): void {
+  try {
+    logger(
+      JSON.stringify({
+        level: "audit",
+        where,
+        ...event,
+      }),
+    );
+  } catch {
+    // logging must never throw
+  }
+}
+
 /**
  * Use in server code instead of `throw new Error(error.message)`:
  *   if (error) throw dbError(error, "customers.update");

@@ -6,7 +6,7 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("@/integrations/supabase/client", () => ({ supabase: {} }));
 vi.mock("@/lib/auth-context", () => ({ useAuth: () => ({}) }));
 
-const src = import.meta.glob(["/src/lib/admin.functions.ts", "/src/components/bulk-import.tsx"], {
+const src = import.meta.glob(["/src/lib/admin.functions.ts", "/src/components/bulk-import.tsx", "/src/routes/_authenticated/entry.tsx"], {
   query: "?raw",
   import: "default",
   eager: true,
@@ -30,9 +30,11 @@ describe("3A: every admin server function checks admin on the server first", () 
       expect(admin === -1 || guard < admin).toBe(true);
     },
   );
-  it("self-protection rules exist (cannot delete yourself; last Super Admin protected)", () => {
-    expect(code).toContain("You cannot delete your own account.");
-    expect(code).toMatch(/assertNotLastAdmin\(supabaseAdmin, data\.userId, false, "delete"\)/);
+  it("self-protection rules exist (cannot disable yourself; last Super Admin protected)", () => {
+    expect(code).toContain("You cannot disable your own account.");
+    expect(code).toMatch(/assertNotLastAdmin\(supabaseAdmin, data\.userId, false, "disable"/);
+    expect(code).toMatch(/applyActive\(supabaseAdmin, data\.userId, false, context\.userId\)/);
+    expect(code).not.toContain("auth.admin.deleteUser");
   });
 });
 
@@ -59,5 +61,15 @@ describe("3B: legacy bulk import is insert-only", () => {
     expect(code).not.toMatch(/Save preset/);
     expect(code).not.toMatch(/setDupStrategy/);
     expect(code).not.toMatch(/duplicate choices/);
+  });
+});
+
+describe("3B: strict import is the only UI import path", () => {
+  const code = src["/src/routes/_authenticated/entry.tsx"];
+  it("keeps StrictImport and removes the Legacy import tab", () => {
+    expect(code).toContain("<StrictImport />");
+    expect(code).not.toContain("Legacy import");
+    expect(code).not.toContain("<BulkImport />");
+    expect(code).not.toContain("value=\"legacy\"");
   });
 });

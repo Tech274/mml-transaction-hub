@@ -14,6 +14,10 @@ import { useAuth } from "@/lib/auth-context";
 import { requireRouteRoles } from "@/lib/route-guard";
 import { listAllMcpAudit, type McpAuditRow } from "@/lib/mcp-audit.functions";
 import { format } from "date-fns";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
 
 export const Route = createFileRoute("/_authenticated/mcp-audit")({
   beforeLoad: requireRouteRoles("/mcp-audit"),
@@ -38,6 +42,7 @@ function McpAuditPage() {
 }
 
 function AuditView() {
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const listFn = useServerFn(listAllMcpAudit);
   const [tool, setTool] = useState<string>("all");
   const [outcome, setOutcome] = useState<string>("all");
@@ -55,7 +60,15 @@ function AuditView() {
           client_id: clientId.trim() || undefined,
         },
       }),
+    enabled: !isExampleCaptureMode,
   });
+  const rows: McpAuditRow[] = isExampleCaptureMode
+    ? [
+        { id: "1", user_id: "u1", user_email: "admin.demo@mml.local", client_id: "mcp-client-01", tool_name: "list_transactions", arguments: { month: 9, year: 2026 }, success: true, error_code: null, error_message: null, duration_ms: 182, created_at: "2026-09-29T05:35:00Z" },
+        { id: "2", user_id: "u1", user_email: "admin.demo@mml.local", client_id: "mcp-client-02", tool_name: "reports_summary", arguments: { range: "current_month" }, success: true, error_code: null, error_message: null, duration_ms: 141, created_at: "2026-09-29T05:33:00Z" },
+        { id: "3", user_id: "u2", user_email: "opslead.demo@mml.local", client_id: "mcp-client-03", tool_name: "list_customers", arguments: { status: "active" }, success: false, error_code: "rate_limited", error_message: "Too many requests", duration_ms: 220, created_at: "2026-09-29T05:32:00Z" },
+      ]
+    : (q.data ?? []);
 
   return (
     <div className="space-y-4">
@@ -106,7 +119,7 @@ function AuditView() {
               {(q.error as Error).message}
               <div className="mt-2"><Button size="sm" variant="outline" onClick={() => q.refetch()}>Retry</Button></div>
             </div>
-          ) : (q.data ?? []).length === 0 ? (
+          ) : rows.length === 0 ? (
             <div className="text-sm text-muted-foreground py-6 text-center">No matching activity.</div>
           ) : (
             <div className="overflow-x-auto">
@@ -123,7 +136,7 @@ function AuditView() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(q.data as McpAuditRow[]).map((r) => (
+                  {rows.map((r) => (
                     <tr key={r.id} className="border-b">
                       <td className="py-2 pr-3 whitespace-nowrap">{format(new Date(r.created_at), "yyyy-MM-dd HH:mm:ss")}</td>
                       <td className="py-2 pr-3">{r.user_email ?? r.user_id}</td>

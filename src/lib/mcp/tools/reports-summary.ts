@@ -52,6 +52,8 @@ export default defineTool({
     }
     const { addNullable } = await import("../../nullable-sum");
     const { effectiveCost } = await import("../../cost-calculator");
+    const { loadFinanceVisibilityForUser } = await import("../../finance-visibility");
+    const visibility = await loadFinanceVisibilityForUser(ctx.getUserId() ?? "");
     const revenue = rows.reduce((a, r) => addNullable(a, r.selling_cost), 0);
     const cost = rows.reduce((a, r) => addNullable(a, effectiveCost(r).amount), 0);
     const users = rows.reduce((a, r) => addNullable(a, r.total_users), 0);
@@ -63,10 +65,11 @@ export default defineTool({
       line_of_business: line_of_business ?? null,
       transactions: rows.length,
       users,
-      revenue,
-      input_cost: cost,
-      profit,
-      margin_pct: Math.round(margin_pct * 100) / 100,
+      revenue: visibility.canViewFinanceTotals ? revenue : null,
+      input_cost: visibility.canViewFinanceTotals ? cost : null,
+      profit: visibility.canViewFinanceTotals ? profit : null,
+      margin_pct: visibility.canViewFinanceTotals ? Math.round(margin_pct * 100) / 100 : null,
+      finance_totals_visible: visibility.canViewFinanceTotals,
     };
     return {
       content: [{ type: "text", text: JSON.stringify(summary, null, 2) }],

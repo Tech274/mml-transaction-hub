@@ -18,7 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { TransactionDetailDrawer } from "./transaction-detail-drawer";
 import { fmtCurrency, fmtDate, fmtDateTime, fmtNumber, MONTH_NAMES, YEARS } from "@/lib/format";
 import { effectiveCost } from "@/lib/cost-calculator";
@@ -77,6 +77,9 @@ export function TransactionsTable({
   repoFilter = "all",
   showProviderFilter = true,
   initialFilters,
+  pageSize = 25,
+  compactFilters = false,
+  showPublicCloudInsights = false,
 }: {
   repoFilter?: RepoFilter;
   showProviderFilter?: boolean;
@@ -88,6 +91,9 @@ export function TransactionsTable({
     lob?: string;
     systemConfig?: string;
   };
+  pageSize?: number;
+  compactFilters?: boolean;
+  showPublicCloudInsights?: boolean;
 }) {
   const [filters, setFilters] = useState<Filters>({
     ...initial,
@@ -103,7 +109,6 @@ export function TransactionsTable({
   const [openId, setOpenId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [completeness, setCompleteness] = useState<CompletenessFilter>("all");
-  const pageSize = 25;
   const { user, isAdmin } = useAuth();
   const [hybridOnly, setHybridOnly] = useState(false);
   const { data: hybridIds = [] } = useQuery({
@@ -144,7 +149,7 @@ export function TransactionsTable({
     },
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: [
       "transactions",
       repoFilter,
@@ -232,6 +237,7 @@ export function TransactionsTable({
       };
     },
   });
+  const queryError = error instanceof Error ? error : null;
 
   const rows = data?.rows ?? [];
   const allRows = (data as { allRows?: typeof rows } | undefined)?.allRows ?? rows;
@@ -241,6 +247,60 @@ export function TransactionsTable({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const searchTokens = useMemo(() => tokenize(filters.search), [filters.search]);
   const isFuzzy = searchTokens.length > 0;
+  const tableColSpan = 13 + (showProviderFilter ? 1 : 0) + (isFuzzy ? 1 : 0);
+  const compactControlClass = compactFilters ? "h-8 text-xs" : "";
+
+  const publicCloudInsights = useMemo(() => {
+    const toOptionalNumber = (value: unknown): number | null => {
+      if (typeof value === "number" && Number.isFinite(value)) return value;
+      if (typeof value === "string" && value.trim() !== "") {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+      return null;
+    };
+
+    return rows.reduce(
+      (acc, row) => {
+        const map = row as Record<string, unknown>;
+        const creditAllocated = toOptionalNumber(map.public_credit_allocated);
+        const actualConsumption = toOptionalNumber(map.public_actual_consumption);
+        const unusedCredit =
+          toOptionalNumber(map.public_unused_credit) ??
+          (creditAllocated != null && actualConsumption != null
+            ? Math.max(creditAllocated - actualConsumption, 0)
+            : null);
+        const serviceMargin =
+          toOptionalNumber(map.public_service_margin) ??
+          (row.selling_cost != null && creditAllocated != null
+            ? Number(row.selling_cost) - creditAllocated
+            : null);
+        const totalMarginActual =
+          toOptionalNumber(map.public_total_margin_actual) ??
+          (row.selling_cost != null && actualConsumption != null
+            ? Number(row.selling_cost) - actualConsumption
+            : null);
+
+        if (creditAllocated != null || actualConsumption != null) {
+          acc.linesWithPublicUsage += 1;
+        }
+        acc.creditAllocated = addNullable(acc.creditAllocated, creditAllocated);
+        acc.actualConsumption = addNullable(acc.actualConsumption, actualConsumption);
+        acc.unusedCredit = addNullable(acc.unusedCredit, unusedCredit);
+        acc.serviceMargin = addNullable(acc.serviceMargin, serviceMargin);
+        acc.totalActualMargin = addNullable(acc.totalActualMargin, totalMarginActual);
+        return acc;
+      },
+      {
+        linesWithPublicUsage: 0,
+        creditAllocated: 0,
+        actualConsumption: 0,
+        unusedCredit: 0,
+        serviceMargin: 0,
+        totalActualMargin: 0,
+      },
+    );
+  }, [rows]);
 
   const summary = useMemo(
     () => ({
@@ -323,6 +383,7 @@ export function TransactionsTable({
             <Button
               type="button"
               variant={hybridOnly ? "default" : "outline"}
+              size="sm"
               data-testid="hybrid-only"
               onClick={() => {
                 setHybridOnly((v) => !v);
@@ -339,7 +400,7 @@ export function TransactionsTable({
               setPage(0);
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger className={compactControlClass}>
               <SelectValue placeholder="Month" />
             </SelectTrigger>
             <SelectContent>
@@ -358,7 +419,7 @@ export function TransactionsTable({
               setPage(0);
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger className={compactControlClass}>
               <SelectValue placeholder="Year" />
             </SelectTrigger>
             <SelectContent>
@@ -377,7 +438,7 @@ export function TransactionsTable({
               setPage(0);
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger className={compactControlClass}>
               <SelectValue placeholder="Customer" />
             </SelectTrigger>
             <SelectContent>
@@ -396,7 +457,7 @@ export function TransactionsTable({
               setPage(0);
             }}
           >
-            <SelectTrigger>
+            <SelectTrigger className={compactControlClass}>
               <SelectValue placeholder="Line of Business" />
             </SelectTrigger>
             <SelectContent>
@@ -416,7 +477,7 @@ export function TransactionsTable({
                 setPage(0);
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className={compactControlClass}>
                 <SelectValue placeholder="Provider" />
               </SelectTrigger>
               <SelectContent>
@@ -437,7 +498,7 @@ export function TransactionsTable({
                 setPage(0);
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className={compactControlClass}>
                 <SelectValue placeholder="System Config" />
               </SelectTrigger>
               <SelectContent>
@@ -453,6 +514,7 @@ export function TransactionsTable({
           <div className="flex gap-2">
             <Input
               type="date"
+              className={compactControlClass}
               value={filters.startFrom}
               onChange={(e) => {
                 setFilters({ ...filters, startFrom: e.target.value });
@@ -461,6 +523,7 @@ export function TransactionsTable({
             />
             <Input
               type="date"
+              className={compactControlClass}
               value={filters.startTo}
               onChange={(e) => {
                 setFilters({ ...filters, startTo: e.target.value });
@@ -574,14 +637,21 @@ export function TransactionsTable({
             <TableBody>
               {isLoading && (
                 <TableRow>
-                  <TableCell colSpan={14} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={tableColSpan} className="text-center text-muted-foreground py-10">
                     Loading…
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && queryError && (
+                <TableRow>
+                  <TableCell colSpan={tableColSpan} className="text-center text-destructive py-10">
+                    Could not load transactions: {queryError.message}
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={14} className="text-center text-muted-foreground py-10">
+                  <TableCell colSpan={tableColSpan} className="text-center text-muted-foreground py-10">
                     No transactions match the current filters.
                   </TableCell>
                 </TableRow>
@@ -680,6 +750,51 @@ export function TransactionsTable({
         open={!!openId}
         onOpenChange={(b) => !b && setOpenId(null)}
       />
+
+      {showPublicCloudInsights && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold">KPI insights (current page)</h3>
+              <p className="text-xs text-muted-foreground">
+                Public cloud margin = service margin + unused credit.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <KpiTile label="Transactions shown" value={fmtNumber(rows.length)} />
+              <KpiTile label="Credit allocated" value={fmtCurrency(publicCloudInsights.creditAllocated)} />
+              <KpiTile
+                label="Actual consumption"
+                value={fmtCurrency(publicCloudInsights.actualConsumption)}
+              />
+              <KpiTile label="Unused credit" value={fmtCurrency(publicCloudInsights.unusedCredit)} />
+              <KpiTile
+                label="Actual margin"
+                value={fmtCurrency(publicCloudInsights.totalActualMargin)}
+                muted={`Service margin ${fmtCurrency(publicCloudInsights.serviceMargin)} · ${fmtNumber(publicCloudInsights.linesWithPublicUsage)} usage-tagged`}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
+function KpiTile({
+  label,
+  value,
+  muted,
+}: {
+  label: string;
+  value: string;
+  muted?: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-3">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mt-1 text-lg font-semibold">{value}</div>
+      {muted && <div className="mt-1 text-[11px] text-muted-foreground">{muted}</div>}
     </div>
   );
 }

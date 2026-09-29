@@ -6,6 +6,35 @@
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import type { PluginOption } from "vite";
+
+function devDashboardMockRoutesPlugin(): PluginOption {
+  const htmlPath = resolve(__dirname, "src/dev-mocks/coupler-dashboard-mocks.html");
+  return {
+    name: "dev-dashboard-mock-routes",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        const requestPath = (req.url ?? "").split("?")[0] ?? "";
+        if (!requestPath.startsWith("/dev-mocks")) {
+          next();
+          return;
+        }
+        try {
+          const html = await readFile(htmlPath, "utf8");
+          const transformed = await server.transformIndexHtml(req.url ?? "/dev-mocks", html);
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "text/html; charset=utf-8");
+          res.end(transformed);
+        } catch (error) {
+          next(error as Error);
+        }
+      });
+    },
+  };
+}
 
 export default defineConfig({
   tanstackStart: {
@@ -14,6 +43,6 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
-    plugins: [mcpPlugin()],
+    plugins: [mcpPlugin(), devDashboardMockRoutesPlugin()],
   },
 });

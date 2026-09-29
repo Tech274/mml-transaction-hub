@@ -24,10 +24,12 @@ import { Route as AuthenticatedMcpAuditRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedEntryRouteImport } from './routes/_authenticated/entry'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
+import { Route as AuthenticatedAiCommandCenterRouteImport } from './routes/_authenticated/ai-command-center'
 import { Route as AuthenticatedAgentIntegrationsRouteImport } from './routes/_authenticated/agent-integrations'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
+import { Route as AuthenticatedAiCommandCenterIndexRouteImport } from './routes/_authenticated/ai-command-center.index'
 import { Route as ApiPublicBulkTemplateVersionRouteImport } from './routes/api/public/bulk-template-version'
 import { Route as AuthenticatedMmlLabLabCatalogRouteImport } from './routes/_authenticated/mml-lab.lab-catalog'
 import { Route as AuthenticatedMmlLabCostCatalogRouteImport } from './routes/_authenticated/mml-lab.cost-catalog'
@@ -119,6 +121,12 @@ const AuthenticatedCustomersRoute = AuthenticatedCustomersRouteImport.update({
   path: '/customers',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAiCommandCenterRoute =
+  AuthenticatedAiCommandCenterRouteImport.update({
+    id: '/ai-command-center',
+    path: '/ai-command-center',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAgentIntegrationsRoute =
   AuthenticatedAgentIntegrationsRouteImport.update({
     id: '/agent-integrations',
@@ -141,6 +149,12 @@ const Char91DotmcpChar93ListToolsRoute =
     id: '/.mcp/list-tools',
     path: '/.mcp/list-tools',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const AuthenticatedAiCommandCenterIndexRoute =
+  AuthenticatedAiCommandCenterIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedAiCommandCenterRoute,
   } as any)
 const ApiPublicBulkTemplateVersionRoute =
   ApiPublicBulkTemplateVersionRouteImport.update({
@@ -168,27 +182,27 @@ const AuthenticatedMmlLabBatchesRoute =
   } as any)
 const AuthenticatedAiCommandCenterRunNowRoute =
   AuthenticatedAiCommandCenterRunNowRouteImport.update({
-    id: '/ai-command-center/run-now',
-    path: '/ai-command-center/run-now',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/run-now',
+    path: '/run-now',
+    getParentRoute: () => AuthenticatedAiCommandCenterRoute,
   } as any)
 const AuthenticatedAiCommandCenterInboxRoute =
   AuthenticatedAiCommandCenterInboxRouteImport.update({
-    id: '/ai-command-center/inbox',
-    path: '/ai-command-center/inbox',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/inbox',
+    path: '/inbox',
+    getParentRoute: () => AuthenticatedAiCommandCenterRoute,
   } as any)
 const AuthenticatedAiCommandCenterAuditRoute =
   AuthenticatedAiCommandCenterAuditRouteImport.update({
-    id: '/ai-command-center/audit',
-    path: '/ai-command-center/audit',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/audit',
+    path: '/audit',
+    getParentRoute: () => AuthenticatedAiCommandCenterRoute,
   } as any)
 const AuthenticatedAiCommandCenterAgentsRoute =
   AuthenticatedAiCommandCenterAgentsRouteImport.update({
-    id: '/ai-command-center/agents',
-    path: '/ai-command-center/agents',
-    getParentRoute: () => AuthenticatedRouteRoute,
+    id: '/agents',
+    path: '/agents',
+    getParentRoute: () => AuthenticatedAiCommandCenterRoute,
   } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
@@ -228,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/agent-integrations': typeof AuthenticatedAgentIntegrationsRoute
+  '/ai-command-center': typeof AuthenticatedAiCommandCenterRouteWithChildren
   '/customers': typeof AuthenticatedCustomersRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/entry': typeof AuthenticatedEntryRoute
@@ -248,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/mml-lab/cost-catalog': typeof AuthenticatedMmlLabCostCatalogRoute
   '/mml-lab/lab-catalog': typeof AuthenticatedMmlLabLabCatalogRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
+  '/ai-command-center/': typeof AuthenticatedAiCommandCenterIndexRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
   '/api/public/hooks/freshdesk-sync': typeof ApiPublicHooksFreshdeskSyncRoute
   '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
@@ -281,6 +297,7 @@ export interface FileRoutesByTo {
   '/mml-lab/cost-catalog': typeof AuthenticatedMmlLabCostCatalogRoute
   '/mml-lab/lab-catalog': typeof AuthenticatedMmlLabLabCatalogRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
+  '/ai-command-center': typeof AuthenticatedAiCommandCenterIndexRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
   '/api/public/hooks/freshdesk-sync': typeof ApiPublicHooksFreshdeskSyncRoute
   '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
@@ -296,6 +313,7 @@ export interface FileRoutesById {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/agent-integrations': typeof AuthenticatedAgentIntegrationsRoute
+  '/_authenticated/ai-command-center': typeof AuthenticatedAiCommandCenterRouteWithChildren
   '/_authenticated/customers': typeof AuthenticatedCustomersRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/entry': typeof AuthenticatedEntryRoute
@@ -316,6 +334,7 @@ export interface FileRoutesById {
   '/_authenticated/mml-lab/cost-catalog': typeof AuthenticatedMmlLabCostCatalogRoute
   '/_authenticated/mml-lab/lab-catalog': typeof AuthenticatedMmlLabLabCatalogRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
+  '/_authenticated/ai-command-center/': typeof AuthenticatedAiCommandCenterIndexRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
   '/api/public/hooks/freshdesk-sync': typeof ApiPublicHooksFreshdeskSyncRoute
   '/api/public/hooks/mcp-sync': typeof ApiPublicHooksMcpSyncRoute
@@ -331,6 +350,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/admin'
     | '/agent-integrations'
+    | '/ai-command-center'
     | '/customers'
     | '/dashboard'
     | '/entry'
@@ -351,6 +371,7 @@ export interface FileRouteTypes {
     | '/mml-lab/cost-catalog'
     | '/mml-lab/lab-catalog'
     | '/api/public/bulk-template-version'
+    | '/ai-command-center/'
     | '/api/public/hooks/bulk-import-cleanup'
     | '/api/public/hooks/freshdesk-sync'
     | '/api/public/hooks/mcp-sync'
@@ -384,6 +405,7 @@ export interface FileRouteTypes {
     | '/mml-lab/cost-catalog'
     | '/mml-lab/lab-catalog'
     | '/api/public/bulk-template-version'
+    | '/ai-command-center'
     | '/api/public/hooks/bulk-import-cleanup'
     | '/api/public/hooks/freshdesk-sync'
     | '/api/public/hooks/mcp-sync'
@@ -398,6 +420,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/_authenticated/admin'
     | '/_authenticated/agent-integrations'
+    | '/_authenticated/ai-command-center'
     | '/_authenticated/customers'
     | '/_authenticated/dashboard'
     | '/_authenticated/entry'
@@ -418,6 +441,7 @@ export interface FileRouteTypes {
     | '/_authenticated/mml-lab/cost-catalog'
     | '/_authenticated/mml-lab/lab-catalog'
     | '/api/public/bulk-template-version'
+    | '/_authenticated/ai-command-center/'
     | '/api/public/hooks/bulk-import-cleanup'
     | '/api/public/hooks/freshdesk-sync'
     | '/api/public/hooks/mcp-sync'
@@ -546,6 +570,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCustomersRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ai-command-center': {
+      id: '/_authenticated/ai-command-center'
+      path: '/ai-command-center'
+      fullPath: '/ai-command-center'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/agent-integrations': {
       id: '/_authenticated/agent-integrations'
       path: '/agent-integrations'
@@ -573,6 +604,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/.mcp/list-tools'
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/ai-command-center/': {
+      id: '/_authenticated/ai-command-center/'
+      path: '/'
+      fullPath: '/ai-command-center/'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterIndexRouteImport
+      parentRoute: typeof AuthenticatedAiCommandCenterRoute
     }
     '/api/public/bulk-template-version': {
       id: '/api/public/bulk-template-version'
@@ -604,31 +642,31 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/ai-command-center/run-now': {
       id: '/_authenticated/ai-command-center/run-now'
-      path: '/ai-command-center/run-now'
+      path: '/run-now'
       fullPath: '/ai-command-center/run-now'
       preLoaderRoute: typeof AuthenticatedAiCommandCenterRunNowRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedAiCommandCenterRoute
     }
     '/_authenticated/ai-command-center/inbox': {
       id: '/_authenticated/ai-command-center/inbox'
-      path: '/ai-command-center/inbox'
+      path: '/inbox'
       fullPath: '/ai-command-center/inbox'
       preLoaderRoute: typeof AuthenticatedAiCommandCenterInboxRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedAiCommandCenterRoute
     }
     '/_authenticated/ai-command-center/audit': {
       id: '/_authenticated/ai-command-center/audit'
-      path: '/ai-command-center/audit'
+      path: '/audit'
       fullPath: '/ai-command-center/audit'
       preLoaderRoute: typeof AuthenticatedAiCommandCenterAuditRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedAiCommandCenterRoute
     }
     '/_authenticated/ai-command-center/agents': {
       id: '/_authenticated/ai-command-center/agents'
-      path: '/ai-command-center/agents'
+      path: '/agents'
       fullPath: '/ai-command-center/agents'
       preLoaderRoute: typeof AuthenticatedAiCommandCenterAgentsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+      parentRoute: typeof AuthenticatedAiCommandCenterRoute
     }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
@@ -668,9 +706,37 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedAiCommandCenterRouteChildren {
+  AuthenticatedAiCommandCenterAgentsRoute: typeof AuthenticatedAiCommandCenterAgentsRoute
+  AuthenticatedAiCommandCenterAuditRoute: typeof AuthenticatedAiCommandCenterAuditRoute
+  AuthenticatedAiCommandCenterInboxRoute: typeof AuthenticatedAiCommandCenterInboxRoute
+  AuthenticatedAiCommandCenterRunNowRoute: typeof AuthenticatedAiCommandCenterRunNowRoute
+  AuthenticatedAiCommandCenterIndexRoute: typeof AuthenticatedAiCommandCenterIndexRoute
+}
+
+const AuthenticatedAiCommandCenterRouteChildren: AuthenticatedAiCommandCenterRouteChildren =
+  {
+    AuthenticatedAiCommandCenterAgentsRoute:
+      AuthenticatedAiCommandCenterAgentsRoute,
+    AuthenticatedAiCommandCenterAuditRoute:
+      AuthenticatedAiCommandCenterAuditRoute,
+    AuthenticatedAiCommandCenterInboxRoute:
+      AuthenticatedAiCommandCenterInboxRoute,
+    AuthenticatedAiCommandCenterRunNowRoute:
+      AuthenticatedAiCommandCenterRunNowRoute,
+    AuthenticatedAiCommandCenterIndexRoute:
+      AuthenticatedAiCommandCenterIndexRoute,
+  }
+
+const AuthenticatedAiCommandCenterRouteWithChildren =
+  AuthenticatedAiCommandCenterRoute._addFileChildren(
+    AuthenticatedAiCommandCenterRouteChildren,
+  )
+
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAgentIntegrationsRoute: typeof AuthenticatedAgentIntegrationsRoute
+  AuthenticatedAiCommandCenterRoute: typeof AuthenticatedAiCommandCenterRouteWithChildren
   AuthenticatedCustomersRoute: typeof AuthenticatedCustomersRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEntryRoute: typeof AuthenticatedEntryRoute
@@ -681,10 +747,6 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSyncStatusRoute: typeof AuthenticatedSyncStatusRoute
   AuthenticatedTicketsRoute: typeof AuthenticatedTicketsRoute
   AuthenticatedTransactionsRoute: typeof AuthenticatedTransactionsRoute
-  AuthenticatedAiCommandCenterAgentsRoute: typeof AuthenticatedAiCommandCenterAgentsRoute
-  AuthenticatedAiCommandCenterAuditRoute: typeof AuthenticatedAiCommandCenterAuditRoute
-  AuthenticatedAiCommandCenterInboxRoute: typeof AuthenticatedAiCommandCenterInboxRoute
-  AuthenticatedAiCommandCenterRunNowRoute: typeof AuthenticatedAiCommandCenterRunNowRoute
   AuthenticatedMmlLabBatchesRoute: typeof AuthenticatedMmlLabBatchesRoute
   AuthenticatedMmlLabCostCatalogRoute: typeof AuthenticatedMmlLabCostCatalogRoute
   AuthenticatedMmlLabLabCatalogRoute: typeof AuthenticatedMmlLabLabCatalogRoute
@@ -693,6 +755,8 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAgentIntegrationsRoute: AuthenticatedAgentIntegrationsRoute,
+  AuthenticatedAiCommandCenterRoute:
+    AuthenticatedAiCommandCenterRouteWithChildren,
   AuthenticatedCustomersRoute: AuthenticatedCustomersRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEntryRoute: AuthenticatedEntryRoute,
@@ -703,14 +767,6 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSyncStatusRoute: AuthenticatedSyncStatusRoute,
   AuthenticatedTicketsRoute: AuthenticatedTicketsRoute,
   AuthenticatedTransactionsRoute: AuthenticatedTransactionsRoute,
-  AuthenticatedAiCommandCenterAgentsRoute:
-    AuthenticatedAiCommandCenterAgentsRoute,
-  AuthenticatedAiCommandCenterAuditRoute:
-    AuthenticatedAiCommandCenterAuditRoute,
-  AuthenticatedAiCommandCenterInboxRoute:
-    AuthenticatedAiCommandCenterInboxRoute,
-  AuthenticatedAiCommandCenterRunNowRoute:
-    AuthenticatedAiCommandCenterRunNowRoute,
   AuthenticatedMmlLabBatchesRoute: AuthenticatedMmlLabBatchesRoute,
   AuthenticatedMmlLabCostCatalogRoute: AuthenticatedMmlLabCostCatalogRoute,
   AuthenticatedMmlLabLabCatalogRoute: AuthenticatedMmlLabLabCatalogRoute,
