@@ -1,6 +1,6 @@
-import { createFileRoute, useNavigate, useSearch } from "@tanstack/react-router";
+import { createFileRoute, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { getSupabaseConfigError, supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +17,6 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const navigate = useNavigate();
   const { next } = useSearch({ from: "/auth" });
   // Only follow same-origin relative paths — never a scheme/host.
   const safeNext = next && next.startsWith("/") && !next.startsWith("//") ? next : "";
@@ -25,15 +24,21 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const configError = getSupabaseConfigError();
 
   useEffect(() => {
+    if (configError) return;
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) window.location.href = redirectTo();
     });
-  }, [navigate, safeNext]);
+  }, [safeNext, configError]);
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
+    if (configError) {
+      toast.error(`${configError} Configure Supabase and refresh this page.`);
+      return;
+    }
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
@@ -57,6 +62,12 @@ function AuthPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {configError && (
+            <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+              {configError} Configure the runtime values and refresh. The sign-in form is shown for
+              configuration checks only.
+            </div>
+          )}
           <form onSubmit={signIn} className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="email">Work email</Label>
@@ -66,7 +77,7 @@ function AuthPage() {
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || !!configError}>
               {loading ? "Signing in…" : "Sign in"}
             </Button>
             <p className="text-xs text-muted-foreground text-center">

@@ -27,21 +27,60 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
   };
 }
 
+function readSupabaseRuntimeConfig() {
+  return {
+    url: import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "",
+    publishableKey:
+      import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+      process.env.SUPABASE_PUBLISHABLE_KEY ||
+      "",
+  };
+}
+
+export function getSupabaseConfigError(): string | null {
+  const { url, publishableKey } = readSupabaseRuntimeConfig();
+  const missing = [
+    ...(url ? [] : ['SUPABASE_URL']),
+    ...(publishableKey ? [] : ['SUPABASE_PUBLISHABLE_KEY']),
+  ];
+  if (missing.length === 0) return null;
+  return `Missing Supabase environment variable(s): ${missing.join(', ')}.`;
+}
+
 
 function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  const {
+    url: SUPABASE_URL,
+    publishableKey: SUPABASE_PUBLISHABLE_KEY,
+  } = readSupabaseRuntimeConfig();
 
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-    const missing = [
-      ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
-      ...(!SUPABASE_PUBLISHABLE_KEY ? ['SUPABASE_PUBLISHABLE_KEY'] : []),
-    ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
-    console.error(`[Supabase] ${message}`);
-    throw new Error(message);
+  const configError = getSupabaseConfigError();
+  if (configError) {
+    // DEV safety: render screens (auth/capture mode) even when backend env is not wired.
+    // Production still fails closed unless explicit values are provided at build/runtime.
+    if (import.meta.env.DEV) {
+      console.warn(
+        `[Supabase] ${configError} Using local placeholder values in DEV; network calls may fail until env is set.`,
+      );
+      return createClient<Database>(
+        "http://127.0.0.1:54321",
+        "sb_publishable_dev_placeholder",
+        {
+          global: {
+            fetch: createSupabaseFetch("sb_publishable_dev_placeholder"),
+          },
+          auth: {
+            storage: brokeredPreviewStorage(),
+            persistSession: true,
+            autoRefreshToken: true,
+          },
+        },
+      );
+    }
+    console.error(`[Supabase] ${configError}`);
+    throw new Error(
+      `${configError} Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.`,
+    );
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {

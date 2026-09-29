@@ -74,12 +74,506 @@ export type Database = {
         }
         Relationships: []
       }
+      ai_agent_eval_runs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          pass_rate: number
+          results: Json
+          safety_pass: boolean
+          version_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          pass_rate: number
+          results: Json
+          safety_pass: boolean
+          version_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          pass_rate?: number
+          results?: Json
+          safety_pass?: boolean
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_eval_runs_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_evals: {
+        Row: {
+          agent_id: string
+          created_at: string
+          created_by: string | null
+          expectations: Json
+          id: string
+          input: Json
+          is_safety: boolean
+          name: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          created_by?: string | null
+          expectations?: Json
+          id?: string
+          input: Json
+          is_safety?: boolean
+          name: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          created_by?: string | null
+          expectations?: Json
+          id?: string
+          input?: Json
+          is_safety?: boolean
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_evals_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_run_steps: {
+        Row: {
+          cost_usd_est: number
+          created_at: string
+          duration_ms: number
+          error: string | null
+          id: string
+          input_redacted: Json
+          kind: string
+          name: string
+          output_redacted: Json
+          run_id: string
+          seq: number
+          status: string
+          tokens_in: number
+          tokens_out: number
+        }
+        Insert: {
+          cost_usd_est?: number
+          created_at?: string
+          duration_ms?: number
+          error?: string | null
+          id?: string
+          input_redacted?: Json
+          kind: string
+          name: string
+          output_redacted?: Json
+          run_id: string
+          seq: number
+          status: string
+          tokens_in?: number
+          tokens_out?: number
+        }
+        Update: {
+          cost_usd_est?: number
+          created_at?: string
+          duration_ms?: number
+          error?: string | null
+          id?: string
+          input_redacted?: Json
+          kind?: string
+          name?: string
+          output_redacted?: Json
+          run_id?: string
+          seq?: number
+          status?: string
+          tokens_in?: number
+          tokens_out?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_run_steps_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_runs: {
+        Row: {
+          agent_id: string
+          cost_usd_est: number
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          input: Json
+          invoked_by: string | null
+          model_id: string | null
+          run_as: string
+          started_at: string
+          status: string
+          tokens_in: number
+          tokens_out: number
+          trigger_kind: string
+          trigger_ref: Json
+          version_id: string
+          view_roles: Database["public"]["Enums"]["app_role"][]
+        }
+        Insert: {
+          agent_id: string
+          cost_usd_est?: number
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          input?: Json
+          invoked_by?: string | null
+          model_id?: string | null
+          run_as?: string
+          started_at?: string
+          status: string
+          tokens_in?: number
+          tokens_out?: number
+          trigger_kind: string
+          trigger_ref?: Json
+          version_id: string
+          view_roles: Database["public"]["Enums"]["app_role"][]
+        }
+        Update: {
+          agent_id?: string
+          cost_usd_est?: number
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          input?: Json
+          invoked_by?: string | null
+          model_id?: string | null
+          run_as?: string
+          started_at?: string
+          status?: string
+          tokens_in?: number
+          tokens_out?: number
+          trigger_kind?: string
+          trigger_ref?: Json
+          version_id?: string
+          view_roles?: Database["public"]["Enums"]["app_role"][]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_runs_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_runs_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_tools: {
+        Row: {
+          params: Json
+          tool_key: string
+          version_id: string
+        }
+        Insert: {
+          params?: Json
+          tool_key: string
+          version_id: string
+        }
+        Update: {
+          params?: Json
+          tool_key?: string
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_tools_tool_key_fkey"
+            columns: ["tool_key"]
+            isOneToOne: false
+            referencedRelation: "ai_tool_catalog"
+            referencedColumns: ["tool_key"]
+          },
+          {
+            foreignKeyName: "ai_agent_tools_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_versions: {
+        Row: {
+          agent_id: string
+          approve_roles: Database["public"]["Enums"]["app_role"][]
+          change_note: string | null
+          created_at: string
+          created_by: string | null
+          eval_status: string
+          id: string
+          instructions: string
+          limits: Json
+          max_output_tokens: number
+          model_id: string | null
+          model_provider: string
+          output_types: string[]
+          premium_approved: boolean
+          purpose: string
+          run_roles: Database["public"]["Enums"]["app_role"][]
+          temperature: number
+          triggers: Json
+          version: number
+          view_roles: Database["public"]["Enums"]["app_role"][]
+        }
+        Insert: {
+          agent_id: string
+          approve_roles?: Database["public"]["Enums"]["app_role"][]
+          change_note?: string | null
+          created_at?: string
+          created_by?: string | null
+          eval_status?: string
+          id?: string
+          instructions?: string
+          limits?: Json
+          max_output_tokens?: number
+          model_id?: string | null
+          model_provider?: string
+          output_types?: string[]
+          premium_approved?: boolean
+          purpose?: string
+          run_roles?: Database["public"]["Enums"]["app_role"][]
+          temperature?: number
+          triggers?: Json
+          version: number
+          view_roles?: Database["public"]["Enums"]["app_role"][]
+        }
+        Update: {
+          agent_id?: string
+          approve_roles?: Database["public"]["Enums"]["app_role"][]
+          change_note?: string | null
+          created_at?: string
+          created_by?: string | null
+          eval_status?: string
+          id?: string
+          instructions?: string
+          limits?: Json
+          max_output_tokens?: number
+          model_id?: string | null
+          model_provider?: string
+          output_types?: string[]
+          premium_approved?: boolean
+          purpose?: string
+          run_roles?: Database["public"]["Enums"]["app_role"][]
+          temperature?: number
+          triggers?: Json
+          version?: number
+          view_roles?: Database["public"]["Enums"]["app_role"][]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_versions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agents: {
+        Row: {
+          created_at: string
+          current_version_id: string | null
+          engine: string
+          id: string
+          is_system: boolean
+          key: string
+          name: string
+          owner_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_version_id?: string | null
+          engine: string
+          id?: string
+          is_system?: boolean
+          key: string
+          name: string
+          owner_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_version_id?: string | null
+          engine?: string
+          id?: string
+          is_system?: boolean
+          key?: string
+          name?: string
+          owner_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agents_current_version_fkey"
+            columns: ["current_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_model_prices: {
+        Row: {
+          input_per_mtok_usd: number
+          model_id: string
+          output_per_mtok_usd: number
+          provider: string
+          source_url: string | null
+          valid_from: string
+        }
+        Insert: {
+          input_per_mtok_usd: number
+          model_id: string
+          output_per_mtok_usd: number
+          provider: string
+          source_url?: string | null
+          valid_from: string
+        }
+        Update: {
+          input_per_mtok_usd?: number
+          model_id?: string
+          output_per_mtok_usd?: number
+          provider?: string
+          source_url?: string | null
+          valid_from?: string
+        }
+        Relationships: []
+      }
+      ai_settings: {
+        Row: {
+          agents_enabled: boolean
+          id: number
+          monthly_cap_usd: number
+          per_agent_month_cap_usd: number
+          per_run_cap_usd: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          agents_enabled?: boolean
+          id: number
+          monthly_cap_usd?: number
+          per_agent_month_cap_usd?: number
+          per_run_cap_usd?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          agents_enabled?: boolean
+          id?: number
+          monthly_cap_usd?: number
+          per_agent_month_cap_usd?: number
+          per_run_cap_usd?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      ai_tool_catalog: {
+        Row: {
+          description: string
+          enabled: boolean
+          phase: number
+          reads_untrusted: boolean
+          required_roles: Database["public"]["Enums"]["app_role"][]
+          returns_money: boolean
+          title: string
+          tool_key: string
+        }
+        Insert: {
+          description: string
+          enabled?: boolean
+          phase: number
+          reads_untrusted?: boolean
+          required_roles: Database["public"]["Enums"]["app_role"][]
+          returns_money?: boolean
+          title: string
+          tool_key: string
+        }
+        Update: {
+          description?: string
+          enabled?: boolean
+          phase?: number
+          reads_untrusted?: boolean
+          required_roles?: Database["public"]["Enums"]["app_role"][]
+          returns_money?: boolean
+          title?: string
+          tool_key?: string
+        }
+        Relationships: []
+      }
+      ai_cc_agent_workers: {
+        Row: {
+          agent_key: string
+          created_at: string
+          current_load: number
+          id: string
+          is_active: boolean
+          last_assigned_at: string | null
+          worker_name: string
+        }
+        Insert: {
+          agent_key: string
+          created_at?: string
+          current_load?: number
+          id?: string
+          is_active?: boolean
+          last_assigned_at?: string | null
+          worker_name: string
+        }
+        Update: {
+          agent_key?: string
+          created_at?: string
+          current_load?: number
+          id?: string
+          is_active?: boolean
+          last_assigned_at?: string | null
+          worker_name?: string
+        }
+        Relationships: []
+      }
       ai_cc_audit: {
         Row: {
           action: string
           actor_email: string | null
           actor_id: string | null
           agent_key: string | null
+          agent_version_id: string | null
           created_at: string
           detail: Json
           id: string
@@ -91,6 +585,7 @@ export type Database = {
           actor_email?: string | null
           actor_id?: string | null
           agent_key?: string | null
+          agent_version_id?: string | null
           created_at?: string
           detail?: Json
           id?: string
@@ -102,6 +597,7 @@ export type Database = {
           actor_email?: string | null
           actor_id?: string | null
           agent_key?: string | null
+          agent_version_id?: string | null
           created_at?: string
           detail?: Json
           id?: string
@@ -128,6 +624,11 @@ export type Database = {
       ai_cc_inbox: {
         Row: {
           agent_key: string
+          agent_run_id: string | null
+          agent_version_id: string | null
+          ai_generated: boolean
+          approve_roles: Database["public"]["Enums"]["app_role"][] | null
+          contains_money: boolean
           created_at: string
           decided_at: string | null
           decided_by: string | null
@@ -135,14 +636,21 @@ export type Database = {
           decision_note: string | null
           id: string
           item_type: string
+          model_id: string | null
           payload: Json
           run_id: string | null
           status: string
           summary: string | null
           title: string
+          view_roles: Database["public"]["Enums"]["app_role"][] | null
         }
         Insert: {
           agent_key: string
+          agent_run_id?: string | null
+          agent_version_id?: string | null
+          ai_generated?: boolean
+          approve_roles?: Database["public"]["Enums"]["app_role"][] | null
+          contains_money?: boolean
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -150,14 +658,21 @@ export type Database = {
           decision_note?: string | null
           id?: string
           item_type: string
+          model_id?: string | null
           payload?: Json
           run_id?: string | null
           status?: string
           summary?: string | null
           title: string
+          view_roles?: Database["public"]["Enums"]["app_role"][] | null
         }
         Update: {
           agent_key?: string
+          agent_run_id?: string | null
+          agent_version_id?: string | null
+          ai_generated?: boolean
+          approve_roles?: Database["public"]["Enums"]["app_role"][] | null
+          contains_money?: boolean
           created_at?: string
           decided_at?: string | null
           decided_by?: string | null
@@ -165,13 +680,29 @@ export type Database = {
           decision_note?: string | null
           id?: string
           item_type?: string
+          model_id?: string | null
           payload?: Json
           run_id?: string | null
           status?: string
           summary?: string | null
           title?: string
+          view_roles?: Database["public"]["Enums"]["app_role"][] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_cc_inbox_agent_run_id_fkey"
+            columns: ["agent_run_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_cc_inbox_agent_version_id_fkey"
+            columns: ["agent_version_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_versions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ai_cc_inbox_run_id_fkey"
             columns: ["run_id"]
@@ -252,6 +783,71 @@ export type Database = {
           status?: string
         }
         Relationships: []
+      }
+      ai_cc_work_items: {
+        Row: {
+          approval_note: string | null
+          approved_at: string | null
+          approved_by: string | null
+          assigned_agent_key: string | null
+          assigned_worker_id: string | null
+          created_at: string
+          created_by: string | null
+          created_by_email: string | null
+          id: string
+          payload: Json
+          requested_agent_key: string | null
+          requires_approval: boolean
+          status: string
+          title: string
+          updated_at: string
+          work_type: string
+        }
+        Insert: {
+          approval_note?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_agent_key?: string | null
+          assigned_worker_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          payload?: Json
+          requested_agent_key?: string | null
+          requires_approval?: boolean
+          status?: string
+          title: string
+          updated_at?: string
+          work_type: string
+        }
+        Update: {
+          approval_note?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_agent_key?: string | null
+          assigned_worker_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          payload?: Json
+          requested_agent_key?: string | null
+          requires_approval?: boolean
+          status?: string
+          title?: string
+          updated_at?: string
+          work_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_cc_work_items_assigned_worker_id_fkey"
+            columns: ["assigned_worker_id"]
+            isOneToOne: false
+            referencedRelation: "ai_cc_agent_workers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       bulk_import_audit_events: {
         Row: {
@@ -1219,6 +1815,11 @@ export type Database = {
           license_name: string | null
           license_price_per_user: number | null
           license_seats_used: number | null
+          public_actual_consumption: number | null
+          public_credit_allocated: number | null
+          public_service_margin: number | null
+          public_total_margin_actual: number | null
+          public_unused_credit: number | null
           selling_price_per_user: number | null
           vm_hours_consumed: number | null
           vm_price_per_user: number | null
@@ -1248,11 +1849,13 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           input_cost?: number | null
+          input_cost_actual_alloc?: number | null
           api_key_price_per_user?: number | null
           api_key_service?: string | null
           api_unit_label?: string | null
           api_units_consumed?: number | null
           input_cost_auto?: number | null
+          input_cost_auto_run_id?: string | null
           input_cost_pct?: number | null
           input_cost_per_user?: number | null
           is_complete?: boolean | null
@@ -1262,6 +1865,8 @@ export type Database = {
           license_name?: string | null
           license_price_per_user?: number | null
           license_seats_used?: number | null
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
           selling_price_per_user?: number | null
           vm_hours_consumed?: number | null
           vm_price_per_user?: number | null
@@ -1335,6 +1940,13 @@ export type Database = {
             columns: ["import_batch_id"]
             isOneToOne: false
             referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "lab_batches"
             referencedColumns: ["id"]
           },
         ]
@@ -1440,6 +2052,62 @@ export type Database = {
         Update: { status?: string }
         Relationships: []
       }
+      lab_transaction_cost_corrections: {
+        Row: {
+          corrected_at: string
+          corrected_by: string | null
+          id: string
+          new_actual_consumption: number | null
+          new_credit_allocated: number | null
+          new_input_cost: number | null
+          new_selling_cost: number | null
+          old_actual_consumption: number | null
+          old_credit_allocated: number | null
+          old_input_cost: number | null
+          old_selling_cost: number | null
+          reason: string
+          transaction_id: string
+        }
+        Insert: {
+          corrected_at?: string
+          corrected_by?: string | null
+          id?: string
+          new_actual_consumption?: number | null
+          new_credit_allocated?: number | null
+          new_input_cost?: number | null
+          new_selling_cost?: number | null
+          old_actual_consumption?: number | null
+          old_credit_allocated?: number | null
+          old_input_cost?: number | null
+          old_selling_cost?: number | null
+          reason: string
+          transaction_id: string
+        }
+        Update: {
+          corrected_at?: string
+          corrected_by?: string | null
+          id?: string
+          new_actual_consumption?: number | null
+          new_credit_allocated?: number | null
+          new_input_cost?: number | null
+          new_selling_cost?: number | null
+          old_actual_consumption?: number | null
+          old_credit_allocated?: number | null
+          old_input_cost?: number | null
+          old_selling_cost?: number | null
+          reason?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_transaction_cost_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transaction_tags: {
         Row: { transaction_id: string; tag: string; created_by: string | null; created_at: string }
         Insert: { transaction_id: string; tag: string; created_by?: string | null }
@@ -1469,9 +2137,151 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      ai_usage_monthly: {
+        Row: {
+          agent_key: string
+          budget_blocked: number
+          cost_usd_est: number
+          errors: number
+          model_id: string
+          month: string
+          runs: number
+          tokens_in: number
+          tokens_out: number
+        }
+        Insert: {
+          agent_key?: string
+          budget_blocked?: number
+          cost_usd_est?: number
+          errors?: number
+          model_id?: string
+          month?: string
+          runs?: number
+          tokens_in?: number
+          tokens_out?: number
+        }
+        Update: {
+          agent_key?: string
+          budget_blocked?: number
+          cost_usd_est?: number
+          errors?: number
+          model_id?: string
+          month?: string
+          runs?: number
+          tokens_in?: number
+          tokens_out?: number
+        }
+        Relationships: []
+      }
+      v_lab_batch_transaction_totals: {
+        Row: {
+          actual_cost_total_derived: number | null
+          auto_line_count_derived: number
+          estimated_cost_total_derived: number
+          known_line_count_derived: number
+          lab_batch_id: string
+          line_count_derived: number
+          revenue_total_derived: number
+        }
+        Insert: {
+          actual_cost_total_derived?: number | null
+          auto_line_count_derived?: number
+          estimated_cost_total_derived?: number
+          known_line_count_derived?: number
+          lab_batch_id?: string
+          line_count_derived?: number
+          revenue_total_derived?: number
+        }
+        Update: {
+          actual_cost_total_derived?: number | null
+          auto_line_count_derived?: number
+          estimated_cost_total_derived?: number
+          known_line_count_derived?: number
+          lab_batch_id?: string
+          line_count_derived?: number
+          revenue_total_derived?: number
+        }
+        Relationships: []
+      }
+      v_lab_transaction_profit_breakdown: {
+        Row: {
+          effective_cost: number | null
+          input_cost_locked: number | null
+          lab_batch_id: string | null
+          lab_type: string
+          public_actual_consumption: number | null
+          public_credit_allocated: number | null
+          selling_cost: number | null
+          service_margin: number | null
+          total_profit_actual: number | null
+          transaction_id: string
+          unused_credit: number | null
+        }
+        Insert: {
+          effective_cost?: number | null
+          input_cost_locked?: number | null
+          lab_batch_id?: string | null
+          lab_type?: string
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          selling_cost?: number | null
+          service_margin?: number | null
+          total_profit_actual?: number | null
+          transaction_id?: string
+          unused_credit?: number | null
+        }
+        Update: {
+          effective_cost?: number | null
+          input_cost_locked?: number | null
+          lab_batch_id?: string | null
+          lab_type?: string
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          selling_cost?: number | null
+          service_margin?: number | null
+          total_profit_actual?: number | null
+          transaction_id?: string
+          unused_credit?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      ai_agents_for_me: {
+        Args: never
+        Returns: {
+          engine: string
+          id: string
+          key: string
+          name: string
+          purpose: string
+          status: string
+        }[]
+      }
+      ai_reject_mutation: {
+        Args: never
+        Returns: unknown
+      }
+      admin_correct_lab_transaction_costs: {
+        Args: {
+          p_input_cost: number
+          p_public_actual_consumption?: number | null
+          p_public_credit_allocated?: number | null
+          p_reason?: string | null
+          p_selling_cost: number
+          p_transaction_id: string
+        }
+        Returns: undefined
+      }
+      claim_ai_cc_worker_slot: {
+        Args: { p_worker_id: string }
+        Returns: {
+          agent_key: string
+          current_load: number
+          id: string
+          last_assigned_at: string | null
+        }[]
+      }
       clean_customer_name: { Args: { p_name: string }; Returns: string }
       clear_bulk_import_artifact_paths: {
         Args: { _run_ids: string[] }
@@ -1529,6 +2339,13 @@ export type Database = {
       request_lab_batch_recompute: { Args: { p_batch_id: string }; Returns: Json }
       record_lab_batch_invoice: { Args: { p_batch_id: string; p_vendor: string; p_invoice_ref: string; p_invoice_date: string; p_currency: string; p_amount: number; p_fx: number | null; p_source: string; p_note: string | null }; Returns: Json }
       recompute_lab_batch_costs: { Args: { p_batch_id: string; p_trigger: string }; Returns: Json }
+      release_ai_cc_worker_slot: {
+        Args: { p_worker_id: string }
+        Returns: {
+          current_load: number
+          id: string
+        }[]
+      }
     }
     Enums: {
       app_role:

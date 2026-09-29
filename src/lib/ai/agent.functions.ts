@@ -339,6 +339,29 @@ export const updateCostSettings = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const getAiUiAvailability = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const db = await adminDb();
+    const providers = providerFlags();
+    const hasAnyProviderConfigured =
+      providers.openai || providers.anthropic || providers.gemini || providers.openai_compat;
+    const { data, error } = await db
+      .from("ai_agents")
+      .select("key,status")
+      .in("key", ["ticket_triage", "dashboard_qa"]);
+    if (error) throw dbError(error, "ai-agents.ui-availability");
+    const statuses = new Map(
+      ((data ?? []) as { key: string; status: string }[]).map((row) => [row.key, row.status]),
+    );
+
+    return {
+      hasAnyProviderConfigured,
+      ticketTriageEnabled: hasAnyProviderConfigured && statuses.get("ticket_triage") === "active",
+      dashboardQaEnabled: hasAnyProviderConfigured && statuses.get("dashboard_qa") === "active",
+    };
+  });
+
 export const getKillSwitchBanner = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

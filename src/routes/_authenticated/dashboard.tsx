@@ -16,6 +16,16 @@ import { usePermissions, setPreviewRole } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
+import { CAPTURE_PERSONAS, getCaptureRole, type CaptureRole } from "@/lib/capture-persona";
+import {
+  getScrum44UiReviewEnvForClient,
+  isScrum44UiReviewEnabled,
+} from "@/lib/scrum44-ui-review-flag";
+import { DashboardSuperAdminSummary } from "@/components/summaries/dashboard-super-admin-summary";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -43,16 +53,197 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 const COLORS = [
-  "hsl(var(--primary))",
-  "hsl(var(--accent-foreground))",
-  "#0ea5e9",
-  "#22c55e",
-  "#f59e0b",
-  "#ef4444",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--muted-foreground)",
+];
+
+const EXAMPLE_DASHBOARD_ROWS: ReportRow[] = [
+  {
+    month: 9,
+    year: 2026,
+    repository_type: "public_cloud",
+    cloud_provider: "Azure",
+    line_of_business: "Training",
+    customer_name: "Cognizant",
+    lab_name: "DevOps Pro",
+    total_users: 42,
+    input_cost: 48200,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 46850,
+    selling_cost: 67600,
+  },
+  {
+    month: 9,
+    year: 2026,
+    repository_type: "public_cloud",
+    cloud_provider: "AWS",
+    line_of_business: "Delivery",
+    customer_name: "Infosys",
+    lab_name: "Data Engineering",
+    total_users: 30,
+    input_cost: 39100,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 38920,
+    selling_cost: 57500,
+  },
+  {
+    month: 9,
+    year: 2026,
+    repository_type: "public_cloud",
+    cloud_provider: "Azure",
+    line_of_business: "Training",
+    customer_name: "TCS",
+    lab_name: "AI Foundations",
+    total_users: 55,
+    input_cost: 73400,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 72130,
+    selling_cost: 96500,
+  },
+  {
+    month: 9,
+    year: 2026,
+    repository_type: "private_cloud",
+    cloud_provider: "Azure",
+    line_of_business: "Delivery",
+    customer_name: "HCL",
+    lab_name: "Cloud Security",
+    total_users: 33,
+    input_cost: 41900,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 40210,
+    selling_cost: 63100,
+  },
+  {
+    month: 8,
+    year: 2026,
+    repository_type: "private_cloud",
+    cloud_provider: "AWS",
+    line_of_business: "Training",
+    customer_name: "Accenture",
+    lab_name: "Platform SRE",
+    total_users: 37,
+    input_cost: 44600,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 44120,
+    selling_cost: 68600,
+  },
+  {
+    month: 8,
+    year: 2026,
+    repository_type: "public_cloud",
+    cloud_provider: "GCP",
+    line_of_business: "Support",
+    customer_name: "Wipro",
+    lab_name: "Kubernetes Ops",
+    total_users: 24,
+    input_cost: 28800,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 28240,
+    selling_cost: 44600,
+  },
+  {
+    month: 7,
+    year: 2026,
+    repository_type: "public_cloud",
+    cloud_provider: "Azure",
+    line_of_business: "Delivery",
+    customer_name: "Capgemini",
+    lab_name: "API Engineering",
+    total_users: 20,
+    input_cost: 22900,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 21980,
+    selling_cost: 35200,
+  },
+  {
+    month: 7,
+    year: 2026,
+    repository_type: "private_cloud",
+    cloud_provider: "Azure",
+    line_of_business: "Training",
+    customer_name: "TechM",
+    lab_name: "Observability",
+    total_users: 26,
+    input_cost: 31200,
+    input_cost_auto: 30500,
+    input_cost_actual_alloc: null,
+    selling_cost: 47800,
+  },
+  {
+    month: 6,
+    year: 2026,
+    repository_type: "public_cloud",
+    cloud_provider: "AWS",
+    line_of_business: "Delivery",
+    customer_name: "LTIMindtree",
+    lab_name: "Prompt Engineering",
+    total_users: 46,
+    input_cost: 59200,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 57120,
+    selling_cost: 87400,
+  },
+  {
+    month: 6,
+    year: 2026,
+    repository_type: "private_cloud",
+    cloud_provider: "Azure",
+    line_of_business: "Support",
+    customer_name: "Persistent",
+    lab_name: "FinOps",
+    total_users: 29,
+    input_cost: 36100,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 34970,
+    selling_cost: 54800,
+  },
+  {
+    month: 5,
+    year: 2026,
+    repository_type: "public_cloud",
+    cloud_provider: "GCP",
+    line_of_business: "Training",
+    customer_name: "Mphasis",
+    lab_name: "SRE Basics",
+    total_users: 18,
+    input_cost: 21900,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 21000,
+    selling_cost: 33100,
+  },
+  {
+    month: 5,
+    year: 2026,
+    repository_type: "private_cloud",
+    cloud_provider: "Azure",
+    line_of_business: "Delivery",
+    customer_name: "Hexaware",
+    lab_name: "Data Platform",
+    total_users: 27,
+    input_cost: 33200,
+    input_cost_auto: null,
+    input_cost_actual_alloc: 31800,
+    selling_cost: 50900,
+  },
 ];
 
 function DashboardPage() {
   const { can, orderedKpis, isPreviewing, previewRole } = usePermissions();
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(
+    getSuperadminCaptureModeEnvForClient(),
+  );
+  const uiRefreshEnabled = isScrum44UiReviewEnabled(getScrum44UiReviewEnvForClient());
+  const captureRole = isExampleCaptureMode
+    ? (getCaptureRole(
+        getSuperadminCaptureModeEnvForClient(),
+        typeof window !== "undefined" ? window.location.search : "",
+      ) as CaptureRole)
+    : null;
   const { data } = useQuery({
     queryKey: ["dashboard"],
     queryFn: async () => {
@@ -69,9 +260,12 @@ function DashboardPage() {
         "Dashboard transactions",
       );
     },
+    enabled: !isExampleCaptureMode,
   });
 
-  const rows = (data ?? []) as unknown as ReportRow[];
+  const rows = isExampleCaptureMode
+    ? EXAMPLE_DASHBOARD_ROWS
+    : ((data ?? []) as unknown as ReportRow[]);
   const basis = costBasisCounts(rows);
   const now = new Date();
   const curMonth = now.getMonth() + 1;
@@ -93,6 +287,13 @@ function DashboardPage() {
   const curUsers = curRows.reduce((s, r) => addNullable(s, r.total_users), 0);
 
   const navigate = useNavigate();
+  if (uiRefreshEnabled) {
+    return (
+      <AppShell title="Dashboard">
+        <DashboardSuperAdminSummary />
+      </AppShell>
+    );
+  }
   const reportsTo = can("feature_reports_access") ? "/reports" : "/transactions";
   const curMonthSearch = { month: curMonth, year: curYear };
   const goMonth = (name?: string) => {
@@ -105,6 +306,8 @@ function DashboardPage() {
   const goCustomer = (name?: string) => {
     if (name) navigate({ to: "/customers", search: { q: String(name), status: "all" as const } });
   };
+  const toLabel = (value: unknown): string | undefined =>
+    typeof value === "string" || typeof value === "number" ? String(value) : undefined;
 
   const byMonth = Array.from({ length: 12 }, (_, i) => {
     const monthRows = rows.filter((r) => r.month === i + 1 && r.year === curYear);
@@ -130,7 +333,10 @@ function DashboardPage() {
   }));
 
   const lobMap = new Map<string, number>();
-  for (const r of rows) { const k = r.line_of_business ?? "Unknown"; lobMap.set(k, (lobMap.get(k) ?? 0) + 1); }
+  for (const r of rows) {
+    const k = r.line_of_business ?? "Unknown";
+    lobMap.set(k, (lobMap.get(k) ?? 0) + 1);
+  }
   const lobSplit = Array.from(lobMap.entries()).map(([name, value]) => ({ name, value }));
 
   const custRev = new Map<string, { revenue: number; cost: number; users: number }>();
@@ -232,7 +438,11 @@ function DashboardPage() {
         </p>
 
         <DashboardAskBox />
-        <MyAgentTicketKpis />
+        {isExampleCaptureMode ? (
+          <ExampleMyAgentTicketKpis role={captureRole ?? "admin"} />
+        ) : (
+          <MyAgentTicketKpis />
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {can("chart_tx_by_month") && (
@@ -242,14 +452,19 @@ function DashboardPage() {
               search={{ year: curYear }}
             >
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={byMonth} onClick={(s: any) => goMonth(s?.activeLabel)}>
+                <BarChart
+                  data={byMonth}
+                  onClick={(state: { activeLabel?: unknown }) =>
+                    goMonth(toLabel(state.activeLabel))
+                  }
+                >
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="month" fontSize={12} />
                   <YAxis fontSize={12} />
                   <Tooltip />
                   <Bar
                     dataKey="transactions"
-                    fill="hsl(var(--primary))"
+                    fill="var(--chart-1)"
                     radius={[4, 4, 0, 0]}
                     className="cursor-pointer"
                   />
@@ -266,7 +481,9 @@ function DashboardPage() {
               <ResponsiveContainer width="100%" height={240}>
                 <LineChart
                   data={byMonth}
-                  onClick={(s: any) => goMonth(s?.activeLabel)}
+                  onClick={(state: { activeLabel?: unknown }) =>
+                    goMonth(toLabel(state.activeLabel))
+                  }
                   className="cursor-pointer"
                 >
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
@@ -277,7 +494,7 @@ function DashboardPage() {
                     type="monotone"
                     dataKey="revenue"
                     name="Revenue"
-                    stroke="hsl(var(--primary))"
+                    stroke="var(--chart-1)"
                     strokeWidth={2}
                   />
                   <Line
@@ -310,9 +527,12 @@ function DashboardPage() {
                     outerRadius={80}
                     label
                     className="cursor-pointer"
-                    onClick={(e: any) =>
+                    onClick={(entry: { name?: unknown }) =>
                       navigate({
-                        to: e?.name === "Private Cloud" ? "/private-cloud" : "/public-cloud",
+                        to:
+                          toLabel(entry.name) === "Private Cloud"
+                            ? "/private-cloud"
+                            : "/public-cloud",
                         search: {},
                       })
                     }
@@ -331,10 +551,10 @@ function DashboardPage() {
               <ResponsiveContainer width="100%" height={240}>
                 <BarChart
                   data={providerSplit}
-                  onClick={(s: any) =>
-                    s?.activeLabel &&
-                    navigate({ to: "/transactions", search: { provider: String(s.activeLabel) } })
-                  }
+                  onClick={(state: { activeLabel?: unknown }) => {
+                    const provider = toLabel(state.activeLabel);
+                    if (provider) navigate({ to: "/transactions", search: { provider } });
+                  }}
                 >
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis dataKey="name" fontSize={12} />
@@ -342,7 +562,7 @@ function DashboardPage() {
                   <Tooltip />
                   <Bar
                     dataKey="value"
-                    fill="hsl(var(--primary))"
+                    fill="var(--chart-1)"
                     radius={[4, 4, 0, 0]}
                     className="cursor-pointer"
                   />
@@ -360,7 +580,9 @@ function DashboardPage() {
                 <BarChart
                   data={topRev}
                   layout="vertical"
-                  onClick={(s: any) => goCustomer(s?.activeLabel)}
+                  onClick={(state: { activeLabel?: unknown }) =>
+                    goCustomer(toLabel(state.activeLabel))
+                  }
                 >
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis
@@ -372,7 +594,7 @@ function DashboardPage() {
                   <Tooltip formatter={(v: number) => fmtCurrency(v)} />
                   <Bar
                     dataKey="revenue"
-                    fill="hsl(var(--primary))"
+                    fill="var(--chart-1)"
                     radius={[0, 4, 4, 0]}
                     className="cursor-pointer"
                   />
@@ -390,7 +612,9 @@ function DashboardPage() {
                 <BarChart
                   data={topUsers}
                   layout="vertical"
-                  onClick={(s: any) => goCustomer(s?.activeLabel)}
+                  onClick={(state: { activeLabel?: unknown }) =>
+                    goCustomer(toLabel(state.activeLabel))
+                  }
                 >
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis type="number" fontSize={11} />
@@ -398,7 +622,7 @@ function DashboardPage() {
                   <Tooltip />
                   <Bar
                     dataKey="users"
-                    fill="hsl(var(--primary))"
+                    fill="var(--chart-1)"
                     radius={[0, 4, 4, 0]}
                     className="cursor-pointer"
                   />
@@ -416,7 +640,9 @@ function DashboardPage() {
                 <BarChart
                   data={topProfit}
                   layout="vertical"
-                  onClick={(s: any) => goCustomer(s?.activeLabel)}
+                  onClick={(state: { activeLabel?: unknown }) =>
+                    goCustomer(toLabel(state.activeLabel))
+                  }
                 >
                   <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                   <XAxis
@@ -447,9 +673,10 @@ function DashboardPage() {
                     outerRadius={80}
                     label
                     className="cursor-pointer"
-                    onClick={(e: any) =>
-                      e?.name && navigate({ to: "/transactions", search: { lob: String(e.name) } })
-                    }
+                    onClick={(entry: { name?: unknown }) => {
+                      const lob = toLabel(entry.name);
+                      if (lob) navigate({ to: "/transactions", search: { lob } });
+                    }}
                   >
                     {lobSplit.map((_, i) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
@@ -742,12 +969,7 @@ function CustomersByAccountManager() {
                 <XAxis dataKey="label" fontSize={11} />
                 <YAxis fontSize={11} allowDecimals={false} />
                 <Tooltip />
-                <Line
-                  type="monotone"
-                  dataKey="count"
-                  stroke="hsl(var(--primary))"
-                  strokeWidth={2}
-                />
+                <Line type="monotone" dataKey="count" stroke="var(--chart-1)" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -783,6 +1005,130 @@ function Stat({
     <Link to="/customers" search={search as never} className="block h-full">
       {inner}
     </Link>
+  );
+}
+
+/** Agent-specific support KPIs, linked straight into the agent's ticket queue. */
+function ExampleMyAgentTicketKpis({ role }: { role: CaptureRole }) {
+  const queueOwnerProfiles: Partial<
+    Record<
+      CaptureRole,
+      {
+        closed: number;
+        avg: string;
+        thisMonth: number;
+        queue: number;
+        byMonth: { month: string; total: number; closed: number }[];
+      }
+    >
+  > = {
+    ops_user: {
+      closed: 135,
+      avg: "6.4 h",
+      thisMonth: 22,
+      queue: 9,
+      byMonth: [
+        { month: "Apr 26", total: 18, closed: 16 },
+        { month: "May 26", total: 24, closed: 21 },
+        { month: "Jun 26", total: 29, closed: 26 },
+        { month: "Jul 26", total: 27, closed: 25 },
+        { month: "Aug 26", total: 31, closed: 28 },
+        { month: "Sep 26", total: 22, closed: 19 },
+      ],
+    },
+    ops_lead: {
+      closed: 102,
+      avg: "7.1 h",
+      thisMonth: 17,
+      queue: 6,
+      byMonth: [
+        { month: "Apr 26", total: 15, closed: 13 },
+        { month: "May 26", total: 20, closed: 18 },
+        { month: "Jun 26", total: 24, closed: 21 },
+        { month: "Jul 26", total: 23, closed: 20 },
+        { month: "Aug 26", total: 26, closed: 23 },
+        { month: "Sep 26", total: 17, closed: 14 },
+      ],
+    },
+  };
+  const profile = queueOwnerProfiles[role];
+  if (!profile) {
+    return (
+      <Card>
+        <CardContent className="pt-6 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-sm font-medium">See your own ticket numbers here</div>
+            <p className="text-xs text-muted-foreground">
+              Pick your helpdesk name on the Support tickets page to track tickets closed, average
+              resolution time and tickets per month.
+            </p>
+          </div>
+          <Link
+            to="/tickets"
+            search={{ view: "mine" as const, quick: "all" as const }}
+            className="text-xs text-primary hover:underline"
+          >
+            Go to my tickets →
+          </Link>
+        </CardContent>
+      </Card>
+    );
+  }
+  const persona = CAPTURE_PERSONAS[role];
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-sm">My support tickets — {persona.personName}</CardTitle>
+          <Link
+            to="/tickets"
+            search={{ view: "mine" as const, quick: "all" as const }}
+            className="text-xs text-primary hover:underline whitespace-nowrap"
+          >
+            Open my queue →
+          </Link>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KPI
+            label="Tickets Closed"
+            value={fmtNumber(profile.closed)}
+            to="/tickets"
+            search={{ view: "mine", quick: "closed" }}
+          />
+          <KPI
+            label="Avg Resolution Time"
+            value={profile.avg}
+            to="/tickets"
+            search={{ view: "mine", quick: "resolved" }}
+          />
+          <KPI
+            label="Tickets This Month"
+            value={fmtNumber(profile.thisMonth)}
+            to="/tickets"
+            search={{ view: "mine", quick: "all" }}
+          />
+          <KPI
+            label="In My Queue"
+            value={fmtNumber(profile.queue)}
+            to="/tickets"
+            search={{ view: "mine", quick: "open" }}
+          />
+        </div>
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={profile.byMonth}>
+            <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+            <XAxis dataKey="month" fontSize={12} />
+            <YAxis fontSize={12} />
+            <Tooltip />
+            <Legend />
+            <Bar dataKey="total" name="Assigned" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="closed" name="Closed" fill="#22c55e" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -877,12 +1223,7 @@ function MyAgentTicketKpis() {
               <YAxis fontSize={12} />
               <Tooltip />
               <Legend />
-              <Bar
-                dataKey="total"
-                name="Assigned"
-                fill="hsl(var(--primary))"
-                radius={[4, 4, 0, 0]}
-              />
+              <Bar dataKey="total" name="Assigned" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
               <Bar dataKey="closed" name="Closed" fill="#22c55e" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

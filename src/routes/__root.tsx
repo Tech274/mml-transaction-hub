@@ -35,7 +35,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
@@ -79,17 +79,37 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "MakeMyLabs" },
-      { name: "description", content: "MakeMyLabs Transaction Hub is an enterprise platform for tracking transactions, labs, and cloud usage." },
+      {
+        name: "description",
+        content:
+          "MakeMyLabs Transaction Hub is an enterprise platform for tracking transactions, labs, and cloud usage.",
+      },
       { name: "author", content: "MakeMyLabs" },
       { property: "og:title", content: "MakeMyLabs" },
-      { property: "og:description", content: "MakeMyLabs Transaction Hub is an enterprise platform for tracking transactions, labs, and cloud usage." },
+      {
+        property: "og:description",
+        content:
+          "MakeMyLabs Transaction Hub is an enterprise platform for tracking transactions, labs, and cloud usage.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "MakeMyLabs" },
-      { name: "twitter:description", content: "MakeMyLabs Transaction Hub is an enterprise platform for tracking transactions, labs, and cloud usage." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1625c7df-01ef-4f5d-ac0c-099092a59381/id-preview-50f69a92--cf3e24da-03ad-433c-be90-bd7ad878f932.lovable.app-1782298634441.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1625c7df-01ef-4f5d-ac0c-099092a59381/id-preview-50f69a92--cf3e24da-03ad-433c-be90-bd7ad878f932.lovable.app-1782298634441.png" },
+      {
+        name: "twitter:description",
+        content:
+          "MakeMyLabs Transaction Hub is an enterprise platform for tracking transactions, labs, and cloud usage.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1625c7df-01ef-4f5d-ac0c-099092a59381/id-preview-50f69a92--cf3e24da-03ad-433c-be90-bd7ad878f932.lovable.app-1782298634441.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/1625c7df-01ef-4f5d-ac0c-099092a59381/id-preview-50f69a92--cf3e24da-03ad-433c-be90-bd7ad878f932.lovable.app-1782298634441.png",
+      },
     ],
     links: [
       {

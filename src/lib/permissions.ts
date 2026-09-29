@@ -2,6 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth, type AppRole } from "@/lib/auth-context";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
+import { getCaptureRole } from "@/lib/capture-persona";
 
 export type PermKind = "kpi" | "feature";
 
@@ -95,7 +100,7 @@ export const PERMISSIONS: PermDef[] = [
     label: "Create and edit users (email, name, roles, status)",
     group: "Admin",
   },
-  { key: "feature_user_delete", kind: "feature", label: "Delete users", group: "Admin" },
+  { key: "feature_user_delete", kind: "feature", label: "Disable users", group: "Admin" },
   {
     key: "feature_user_reset_password",
     kind: "feature",
@@ -183,6 +188,13 @@ export function usePreviewRole(): AppRole | null {
 
 export function usePermissions() {
   const { roles, isAdmin, loading: authLoading } = useAuth();
+  const isCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
+  const captureRole = isCaptureMode
+    ? (getCaptureRole(
+        getSuperadminCaptureModeEnvForClient(),
+        typeof window !== "undefined" ? window.location.search : "",
+      ) as AppRole)
+    : null;
   const preview = usePreviewRole();
   const { data, isLoading } = useQuery({
     queryKey: ["role-permissions-all"],
@@ -194,11 +206,18 @@ export function usePermissions() {
       return data ?? [];
     },
     staleTime: 60_000,
+    enabled: !isCaptureMode,
   });
 
   // Effective roles: when admin is previewing, ignore their own admin override.
-  const effectiveRoles: AppRole[] = isAdmin && preview ? [preview] : roles;
-  const treatAsAdmin = isAdmin && !preview;
+  const effectiveRoles: AppRole[] = isCaptureMode
+    ? [captureRole ?? "admin"]
+    : isAdmin && preview
+      ? [preview]
+      : roles;
+  const treatAsAdmin = isCaptureMode
+    ? (captureRole ?? "admin") === "admin"
+    : isAdmin && !preview;
 
   const enabled = new Set<string>();
   const order = new Map<string, number>();
@@ -206,6 +225,68 @@ export function usePermissions() {
     for (const p of PERMISSIONS) enabled.add(p.key);
     if (data)
       for (const row of data) if (row.role === "admin") order.set(row.key, row.sort_order ?? 0);
+  } else if (isCaptureMode) {
+    const capturePermissions: Record<AppRole, string[]> = {
+      admin: PERMISSIONS.map((p) => p.key),
+      leadership: [
+        "kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud", "kpi_total_users",
+        "kpi_total_revenue", "kpi_total_input_cost", "kpi_total_profit", "kpi_margin",
+        "kpi_avg_cost", "kpi_current_month_revenue", "kpi_current_month_profit", "kpi_current_month_users",
+        "chart_tx_by_month", "chart_revenue_by_month", "chart_pub_priv", "chart_provider",
+        "chart_top_revenue", "chart_top_users", "chart_top_profit", "chart_lob",
+        "feature_reports_access", "feature_excel_export", "feature_lab_catalog_view",
+        "feature_cost_catalog_view", "feature_lab_batches_manage",
+      ],
+      finance: [
+        "kpi_total_revenue", "kpi_total_input_cost", "kpi_total_profit", "kpi_margin",
+        "kpi_avg_cost", "kpi_current_month_revenue", "kpi_current_month_profit",
+        "chart_revenue_by_month", "chart_top_revenue", "chart_top_profit",
+        "feature_reports_access", "feature_excel_export",
+        "feature_lab_catalog_view", "feature_cost_catalog_view", "feature_lab_batches_manage",
+      ],
+      ops_lead: [
+        "kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud",
+        "kpi_total_users", "kpi_current_month_users", "kpi_avg_cost",
+        "chart_tx_by_month", "chart_pub_priv", "chart_provider", "chart_lob",
+        "feature_master_adr_entry", "feature_customer_edit", "feature_excel_export",
+        "feature_reports_access", "feature_lab_catalog_view", "feature_cost_catalog_view",
+        "feature_lab_batches_manage",
+      ],
+      ops_user: [
+        "kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud",
+        "kpi_total_users", "kpi_current_month_users",
+        "chart_tx_by_month", "feature_master_adr_entry",
+        "feature_lab_catalog_view", "feature_cost_catalog_view", "feature_lab_batches_manage",
+      ],
+      viewer: [
+        "kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud",
+        "feature_lab_catalog_view", "feature_lab_batches_manage",
+      ],
+    };
+    const captureKpiOrder: Record<AppRole, string[]> = {
+      admin: PERMISSIONS.filter((p) => p.kind === "kpi").map((p) => p.key),
+      leadership: [
+        "kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud", "kpi_total_users",
+        "kpi_total_revenue", "kpi_total_input_cost", "kpi_total_profit", "kpi_margin",
+        "kpi_avg_cost", "kpi_current_month_revenue", "kpi_current_month_profit", "kpi_current_month_users",
+      ],
+      finance: [
+        "kpi_total_revenue", "kpi_total_input_cost", "kpi_total_profit", "kpi_margin",
+        "kpi_avg_cost", "kpi_current_month_revenue", "kpi_current_month_profit",
+      ],
+      ops_lead: [
+        "kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud",
+        "kpi_total_users", "kpi_current_month_users", "kpi_avg_cost",
+      ],
+      ops_user: [
+        "kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud",
+        "kpi_total_users", "kpi_current_month_users",
+      ],
+      viewer: ["kpi_total_transactions", "kpi_public_cloud", "kpi_private_cloud"],
+    };
+    const role = captureRole ?? "admin";
+    for (const key of capturePermissions[role] ?? []) enabled.add(key);
+    for (const [idx, key] of (captureKpiOrder[role] ?? []).entries()) order.set(key, idx);
   } else if (data) {
     for (const row of data) {
       if (effectiveRoles.includes(row.role as AppRole)) {
@@ -224,7 +305,7 @@ export function usePermissions() {
     .map((x) => x.key);
 
   return {
-    loading: authLoading || isLoading,
+    loading: authLoading || (!isCaptureMode && isLoading),
     can: (key: string) => enabled.has(key),
     enabledKeys: enabled,
     orderedKpis,

@@ -39,6 +39,10 @@ import {
 import { useAuth, type AppRole } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { isLeadershipOnlyRoleSet } from "@/lib/leadership-access";
 
 type NavItem = {
   to: string;
@@ -68,10 +72,10 @@ const nav: NavItem[] = [
     roles: null,
     permission: "feature_reports_access",
   },
-  { to: "/tickets", label: "Support Tickets", icon: LifeBuoy, roles: null },
+  { to: "/tickets", label: "Support Tickets", icon: LifeBuoy, roles: ["admin"] },
   { to: "/agent-integrations", label: "Agent integrations", icon: PlugZap, roles: null },
 
-  { to: "/sync-status", label: "Sync status", icon: DatabaseZap, roles: null },
+  { to: "/sync-status", label: "Sync status", icon: DatabaseZap, roles: ["admin"] },
   { to: "/mcp-audit", label: "MCP audit log", icon: ScrollText, roles: ["admin"] },
   { to: "/admin", label: "Admin Settings", icon: Settings, roles: ["admin"] },
 ];
@@ -101,28 +105,42 @@ const mmlLabNav: NavItem[] = [
 ];
 
 const aiCommandCenterNav: NavItem[] = [
-  { to: "/ai-command-center/agents", label: "Agents", icon: Bot, roles: null },
-  { to: "/ai-command-center/inbox", label: "Inbox", icon: Inbox, roles: null },
-  { to: "/ai-command-center/run-now", label: "Run now", icon: Play, roles: null },
-  { to: "/ai-command-center/audit", label: "Audit", icon: History, roles: null },
+  { to: "/ai-command-center", label: "AI Command Center", icon: Bot, roles: ["admin"] },
+  { to: "/ai-command-center/agents", label: "Agents", icon: Bot, roles: ["admin"] },
+  { to: "/ai-command-center/inbox", label: "Inbox", icon: Inbox, roles: ["admin"] },
+  { to: "/ai-command-center/run-now", label: "Run now", icon: Play, roles: ["admin"] },
+  { to: "/ai-command-center/audit", label: "Audit", icon: History, roles: ["admin"] },
   { to: "/ai-command-center/usage", label: "Usage", icon: Gauge, roles: ["admin"] },
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, hoverExpanded, setOpen } = useSidebar();
   const collapsed = state === "collapsed";
+  const showLabels = state === "expanded" || hoverExpanded;
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const { hasAnyRole, user, roles, signOut } = useAuth();
   const { can } = usePermissions();
+  const isLeadershipOnly = isLeadershipOnlyRoleSet(roles);
+  const visibleAiCommandCenterNav = isLeadershipOnly
+    ? []
+    : aiCommandCenterNav.filter((i) => !i.roles || hasAnyRole(i.roles));
+  const visibleMmlLabNav = isLeadershipOnly
+    ? []
+    : mmlLabNav.filter(
+        (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
+      );
+  const visibleWorkspaceNav = nav
+    .filter((i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)))
+    .filter((i) => !isLeadershipOnly || i.to === "/dashboard");
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" hoverExpandOnRail>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-3">
           <div className="h-8 w-8 rounded-md bg-sidebar-primary text-sidebar-primary-foreground grid place-items-center font-bold">
             M
           </div>
-          {!collapsed && (
+          {showLabels && (
             <div className="leading-tight">
               <div className="text-sm font-semibold">MakeMyLabs</div>
               <div className="text-xs text-sidebar-foreground/60">Transaction Platform</div>
@@ -131,80 +149,110 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>AI Command Center</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {aiCommandCenterNav
-                .filter((i) => !i.roles || hasAnyRole(i.roles))
-                .map((item) => {
+        {visibleAiCommandCenterNav.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="group-data-[hover-expanded=true]:mt-0 group-data-[hover-expanded=true]:opacity-100">
+              AI Command Center
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleAiCommandCenterNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={active}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        className="group-data-[hover-expanded=true]:!h-8 group-data-[hover-expanded=true]:!w-full group-data-[hover-expanded=true]:!p-2"
+                      >
                         <Link to={item.to}>
                           <item.icon className="h-4 w-4" />
-                          {!collapsed && <span>{item.label}</span>}
+                          {showLabels && <span>{item.label}</span>}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
                 })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>MML Lab</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {mmlLabNav
-                .filter(
-                  (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
-                )
-                .map((item) => {
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {visibleMmlLabNav.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="group-data-[hover-expanded=true]:mt-0 group-data-[hover-expanded=true]:opacity-100">
+              MML Lab
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleMmlLabNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={active}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        className="group-data-[hover-expanded=true]:!h-8 group-data-[hover-expanded=true]:!w-full group-data-[hover-expanded=true]:!p-2"
+                      >
                         <Link to={item.to}>
                           <item.icon className="h-4 w-4" />
-                          {!collapsed && <span>{item.label}</span>}
+                          {showLabels && <span>{item.label}</span>}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
                 })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>Workspace</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {nav
-                .filter(
-                  (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
-                )
-                .map((item) => {
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        {visibleWorkspaceNav.length > 0 && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="group-data-[hover-expanded=true]:mt-0 group-data-[hover-expanded=true]:opacity-100">
+              Workspace
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {visibleWorkspaceNav.map((item) => {
                   const active = pathname === item.to || pathname.startsWith(item.to + "/");
                   return (
                     <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton asChild isActive={active}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={active}
+                        className="group-data-[hover-expanded=true]:!h-8 group-data-[hover-expanded=true]:!w-full group-data-[hover-expanded=true]:!p-2"
+                      >
                         <Link to={item.to}>
                           <item.icon className="h-4 w-4" />
-                          {!collapsed && <span>{item.label}</span>}
+                          {showLabels && <span>{item.label}</span>}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
                 })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
-        {!collapsed && user && (
+        <div
+          className={cn("flex items-center gap-2 px-2 py-1", !showLabels && "justify-center")}
+          data-testid="collapse-menu-toggle-row"
+        >
+          <Switch
+            id="collapse-menu-toggle"
+            aria-label="Collapse menu"
+            checked={collapsed}
+            onCheckedChange={(checked) => setOpen(!checked)}
+          />
+          {showLabels && (
+            <Label htmlFor="collapse-menu-toggle" className="text-xs text-sidebar-foreground/70">
+              Collapse menu
+            </Label>
+          )}
+        </div>
+        {showLabels && user && (
           <div className="px-2 py-2 text-xs">
             <div className="font-medium truncate">{user.email}</div>
             <div className="text-sidebar-foreground/60 capitalize">
@@ -219,7 +267,7 @@ export function AppSidebar() {
           onClick={signOut}
         >
           <LogOut className="h-4 w-4" />
-          {!collapsed && <span className="ml-2">Sign out</span>}
+          {showLabels && <span className="ml-2">Sign out</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>

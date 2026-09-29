@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { runModelAgent } from "@/lib/ai/agent.functions";
+import { getAiUiAvailability, runModelAgent } from "@/lib/ai/agent.functions";
 import { useAuth } from "@/lib/auth-context";
 
 export function DashboardAskBox() {
@@ -14,12 +14,18 @@ export function DashboardAskBox() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const run = useServerFn(runModelAgent);
+  const availabilityFn = useServerFn(getAiUiAvailability);
+  const availability = useQuery({
+    queryKey: ["ai-ui-availability", "dashboard-ask"],
+    queryFn: () => availabilityFn(),
+    enabled: canAsk,
+  });
   const mut = useMutation({
     mutationFn: () => run({ data: { agentKey: "dashboard_qa", hint: question } }),
     onSuccess: (result) => setAnswer(result.error || String((result.output as { answer?: string } | null)?.answer ?? result.status)),
     onError: (error) => setAnswer(error instanceof Error ? error.message : "Could not ask"),
   });
-  if (!canAsk) return null;
+  if (!canAsk || !availability.data?.dashboardQaEnabled) return null;
   return (
     <Card data-testid="dashboard-ask">
       <CardHeader>

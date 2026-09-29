@@ -1,6 +1,6 @@
 -- SCRUM-64: configurable AI agents, Phase 1 schema.
 -- Status: REPO ONLY / NOT APPLIED. Do not apply to sandbox or live without Atlas go-ahead and Vivek's GO.
--- Release order: after 20260928120200, before the app publish that reads these tables.
+-- Release order: after 20260928143000, before the app publish that reads these tables.
 -- One transaction. Additive. Does not alter ai_cc_* or the four audit-log tables.
 -- No agent tool reads transaction_activity_log, customer_audit_log, role_audit_log or permission_audit_log.
 --

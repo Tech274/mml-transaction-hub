@@ -1,5 +1,5 @@
 -- SCRUM-64: ai_cc_* reads require an active account, and viewers cannot read Inbox money.
--- Status: REPO ONLY / NOT APPLIED. Apply after 20260928130100, one transaction, then publish the app.
+-- Status: REPO ONLY / NOT APPLIED. Apply after 20260930010200, one transaction, then publish the app.
 -- Release order: this file before the Phase 1 app publish. Old app code keeps working: the three
 -- agent keys are seeded, new columns have defaults, and writes still use the service role.
 -- Does not change policies on transaction_activity_log, customer_audit_log, role_audit_log or
@@ -9,6 +9,17 @@
 -- Flag: SCRUM-64 is the migration-discipline ticket. There is no dedicated AI-agents Jira id yet.
 --
 -- Rollback:
+--   -- First, handle rows that use new action values before restoring the old CHECK:
+--   -- these values were introduced in this migration and would violate
+--   -- action IN ('run','propose','confirm','reject').
+--   UPDATE public.ai_cc_audit SET action = 'run'
+--   WHERE action IN ('kill_switch','test_run','eval_run','budget_block');
+--   UPDATE public.ai_cc_audit SET action = 'propose'
+--   WHERE action IN ('config_create','config_version','activate','pause','resume','archive','rollback');
+--   DELETE FROM public.ai_cc_audit
+--   WHERE action NOT IN ('run','propose','confirm','reject');
+--
+--   -- Remove new FKs/CHECKs and restore previous checks.
 --   ALTER TABLE public.ai_cc_runs DROP CONSTRAINT IF EXISTS ai_cc_runs_agent_key_fkey;
 --   ALTER TABLE public.ai_cc_inbox DROP CONSTRAINT IF EXISTS ai_cc_inbox_agent_key_fkey;
 --   ALTER TABLE public.ai_cc_runs DROP CONSTRAINT IF EXISTS ai_cc_runs_agent_key_check;
@@ -23,7 +34,14 @@
 --   DROP POLICY IF EXISTS "Active roles read ai inbox" ON public.ai_cc_inbox;
 --   DROP POLICY IF EXISTS "Active roles read ai audit" ON public.ai_cc_audit;
 --   DROP POLICY IF EXISTS "Active roles read ai lab requests" ON public.ai_cc_lab_requests;
---   Then recreate the previous EXISTS (user_roles) policies from 20260917103912.
+--   CREATE POLICY "Roled users read ai runs" ON public.ai_cc_runs FOR SELECT TO authenticated
+--     USING (EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid()));
+--   CREATE POLICY "Roled users read ai inbox" ON public.ai_cc_inbox FOR SELECT TO authenticated
+--     USING (EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid()));
+--   CREATE POLICY "Roled users read ai audit" ON public.ai_cc_audit FOR SELECT TO authenticated
+--     USING (EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid()));
+--   CREATE POLICY "Roled users read ai lab requests" ON public.ai_cc_lab_requests FOR SELECT TO authenticated
+--     USING (EXISTS (SELECT 1 FROM public.user_roles ur WHERE ur.user_id = auth.uid()));
 --   New columns may stay; they are nullable or defaulted.
 
 ALTER TABLE public.ai_cc_inbox ADD COLUMN IF NOT EXISTS contains_money boolean NOT NULL DEFAULT false;

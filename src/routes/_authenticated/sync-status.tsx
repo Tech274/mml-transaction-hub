@@ -22,13 +22,20 @@ import {
   getSyncOverview, triggerSyncNow, listSnapshotRows, type SyncRunRow, type SnapshotRow,
 } from "@/lib/sync.functions";
 import type { SyncHealth } from "@/lib/sync-health";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
+import { requireRouteRoles } from "@/lib/route-guard";
 
 export const Route = createFileRoute("/_authenticated/sync-status")({
+  beforeLoad: requireRouteRoles("/sync-status"),
   component: SyncStatusPage,
 });
 
 function SyncStatusPage() {
   const qc = useQueryClient();
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const { hasAnyRole } = useAuth();
   const isAdmin = hasAnyRole(["admin"]);
   const overviewFn = useServerFn(getSyncOverview);
@@ -36,7 +43,11 @@ function SyncStatusPage() {
   const rowsFn = useServerFn(listSnapshotRows);
   const [openRun, setOpenRun] = useState<SyncRunRow | null>(null);
 
-  const overview = useQuery({ queryKey: ["sync", "overview"], queryFn: () => overviewFn() });
+  const overview = useQuery({
+    queryKey: ["sync", "overview"],
+    queryFn: () => overviewFn(),
+    enabled: !isExampleCaptureMode,
+  });
 
   const runNow = useMutation({
     mutationFn: () => runNowFn(),
@@ -54,10 +65,11 @@ function SyncStatusPage() {
   const detailRows = useQuery({
     queryKey: ["sync", "rows", openRun?.id],
     queryFn: () => rowsFn({ data: { run_id: openRun!.id, limit: 200 } }) as Promise<SnapshotRow[]>,
-    enabled: !!openRun,
+    enabled: !!openRun && !isExampleCaptureMode,
   });
 
-  const d = overview.data;
+  const d = isExampleCaptureMode ? EXAMPLE_SYNC_OVERVIEW : overview.data;
+  const detailRowsData = isExampleCaptureMode ? EXAMPLE_SNAPSHOT_ROWS : detailRows.data;
 
   return (
     <AppShell title="Sync status">
@@ -213,7 +225,7 @@ function SyncStatusPage() {
             {detailRows.data && detailRows.data.length === 0 && (
               <p className="text-sm text-muted-foreground">No snapshot rows for this run.</p>
             )}
-            {!!detailRows.data?.length && (
+            {!!detailRowsData?.length && (
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -229,7 +241,7 @@ function SyncStatusPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {detailRows.data.map((row, i) => (
+                  {detailRowsData.map((row, i) => (
                     <TableRow key={row.id ?? i}>
                       <TableCell>{row.month}/{row.year}</TableCell>
                       <TableCell>{row.customer_name}</TableCell>
@@ -251,6 +263,48 @@ function SyncStatusPage() {
     </AppShell>
   );
 }
+
+const EXAMPLE_FRESHDESK_RUNS: SyncRunRow[] = [
+  { id: "fd-1", kind: "freshdesk", trigger_source: "cron", status: "success", customers_count: 0, transactions_count: 0, report_rows: 0, error_message: null, triggered_by_email: null, started_at: "2026-09-29T04:00:00Z", finished_at: "2026-09-29T04:01:00Z", duration_ms: 61000, fetched_count: 122, upserted_count: 27 },
+  { id: "fd-2", kind: "freshdesk", trigger_source: "cron", status: "success", customers_count: 0, transactions_count: 0, report_rows: 0, error_message: null, triggered_by_email: null, started_at: "2026-09-29T03:00:00Z", finished_at: "2026-09-29T03:00:51Z", duration_ms: 51000, fetched_count: 118, upserted_count: 19 },
+  { id: "fd-3", kind: "freshdesk", trigger_source: "cron", status: "error", customers_count: 0, transactions_count: 0, report_rows: 0, error_message: "Freshdesk timeout after 30s", triggered_by_email: null, started_at: "2026-09-29T02:00:00Z", finished_at: "2026-09-29T02:00:31Z", duration_ms: 31000, fetched_count: 0, upserted_count: 0 },
+];
+
+const EXAMPLE_SYNC_RUNS: SyncRunRow[] = [
+  { id: "sn-1", kind: "snapshot", trigger_source: "manual", status: "success", customers_count: 14, transactions_count: 118, report_rows: 62, error_message: null, triggered_by_email: "admin.demo@mml.local", started_at: "2026-09-29T05:08:00Z", finished_at: "2026-09-29T05:08:15Z", duration_ms: 15000 },
+  { id: "sn-2", kind: "snapshot", trigger_source: "cron", status: "success", customers_count: 14, transactions_count: 116, report_rows: 61, error_message: null, triggered_by_email: null, started_at: "2026-09-29T02:00:00Z", finished_at: "2026-09-29T02:00:12Z", duration_ms: 12000 },
+  { id: "sn-3", kind: "snapshot", trigger_source: "cron", status: "error", customers_count: 14, transactions_count: 115, report_rows: 0, error_message: "Could not read report_snapshots: connection reset", triggered_by_email: null, started_at: "2026-09-28T02:00:00Z", finished_at: "2026-09-28T02:00:07Z", duration_ms: 7000 },
+];
+
+const EXAMPLE_SNAPSHOT_ROWS: SnapshotRow[] = [
+  { id: "r1", year: 2026, month: 9, customer_name: "Cognizant", lab_name: "DevOps Pro", cloud_provider: "Azure", line_of_business: "Training", transactions_count: 8, total_users: 92, revenue: 348000, cost: 247500, profit: 100500, margin_pct: 28.9 },
+  { id: "r2", year: 2026, month: 9, customer_name: "Infosys", lab_name: "Data Engineering", cloud_provider: "AWS", line_of_business: "Delivery", transactions_count: 6, total_users: 71, revenue: 264000, cost: 181200, profit: 82800, margin_pct: 31.4 },
+  { id: "r3", year: 2026, month: 9, customer_name: "TCS", lab_name: "AI Foundations", cloud_provider: "Azure", line_of_business: "Training", transactions_count: 7, total_users: 84, revenue: 309000, cost: 219100, profit: 89900, margin_pct: 29.1 },
+];
+
+const EXAMPLE_SYNC_OVERVIEW = {
+  runs: EXAMPLE_SYNC_RUNS,
+  last_success: EXAMPLE_SYNC_RUNS[0],
+  live_counts: { customers: 14, transactions: 118 },
+  snapshot_rows: 62,
+  count_error_refs: [],
+  next_cron_at: "2026-09-30T02:00:00Z",
+  snapshot_schedule_utc: "02:00 UTC",
+  freshdesk: {
+    runs: EXAMPLE_FRESHDESK_RUNS,
+    health: {
+      state: "warning" as SyncHealth["state"],
+      message: "Last run failed once; monitoring",
+      lastRunAt: "2026-09-29T04:00:00Z",
+      consecutiveFailures: 1,
+      runsLast24h: 8,
+      failuresLast24h: 1,
+      lastSuccessAt: "2026-09-29T04:00:00Z",
+      lastFailureAt: "2026-09-29T02:00:00Z",
+      lastError: "Freshdesk timeout after 30s",
+    },
+  },
+};
 
 const HEALTH_BADGE: Record<SyncHealth["state"], { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   ok: { label: "Healthy", variant: "default" },

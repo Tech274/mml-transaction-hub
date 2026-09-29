@@ -1,7 +1,7 @@
 -- SCRUM-64: seed the three rule agents and the two Phase 1 model agents.
--- Status: REPO ONLY / NOT APPLIED. Apply after 20260928130000 and before 20260928130200.
+-- Status: REPO ONLY / NOT APPLIED. Apply after 20260930010100 and before 20260930010300.
 -- Release order: migration only. Safe to re-run: inserts are skipped when the row exists.
--- Generalist and Cost / ADR are paused. Support stays active. Model agents stay draft until tests pass.
+-- Generalist, Support and Cost / ADR stay active. Model agents stay draft until tests pass.
 -- ticket_triage defaults to Anthropic Claude Haiku 4.5. dashboard_qa defaults to OpenAI GPT-6 Luna.
 -- Gemini remains in the price list as a secondary provider.
 -- Nothing is deleted. The four audit-log tables are not referenced.
@@ -16,9 +16,9 @@
 
 INSERT INTO public.ai_agents (key, name, status, engine, is_system)
 VALUES
-  ('generalist', 'Generalist (Lab Solution Guide)', 'paused', 'rules', true),
+  ('generalist', 'Generalist (Lab Solution Guide)', 'active', 'rules', true),
   ('support', 'Support desk', 'active', 'rules', true),
-  ('cost_adr', 'Cost / ADR entry', 'paused', 'rules', true),
+  ('cost_adr', 'Cost / ADR entry', 'active', 'rules', true),
   ('ticket_triage', 'Support ticket triage', 'draft', 'model', true),
   ('dashboard_qa', 'Dashboard Q&A', 'draft', 'model', true)
 ON CONFLICT (key) DO NOTHING;
@@ -37,7 +37,7 @@ SELECT a.id, 1,
   '{"manual":true}'::jsonb,
   ARRAY['solution_guide','email_draft']::text[],
   '{"per_run_usd":0,"per_day_runs":200,"per_month_usd":5,"max_tool_calls":0,"max_turns":0}'::jsonb,
-  'pending', 'Seeded from the existing rules agent. Paused because it quotes fixed prices.'
+  'pending', 'Seeded from the existing rules agent. Active in Phase 1.'
 FROM public.ai_agents a
 WHERE a.key = 'generalist'
   AND NOT EXISTS (SELECT 1 FROM public.ai_agent_versions v WHERE v.agent_id = a.id AND v.version = 1);
@@ -75,7 +75,7 @@ SELECT a.id, 1,
   '{"manual":true}'::jsonb,
   ARRAY['adr_field_map']::text[],
   '{"per_run_usd":0,"per_day_runs":200,"per_month_usd":5,"max_tool_calls":0,"max_turns":0}'::jsonb,
-  'pending', 'Seeded from the existing rules agent. Paused. The anomaly checker is a later phase.'
+  'pending', 'Seeded from the existing rules agent. Active in Phase 1.'
 FROM public.ai_agents a
 WHERE a.key = 'cost_adr'
   AND NOT EXISTS (SELECT 1 FROM public.ai_agent_versions v WHERE v.agent_id = a.id AND v.version = 1);

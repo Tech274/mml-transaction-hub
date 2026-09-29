@@ -40,6 +40,11 @@ import {
   getRetentionDays, setRetentionDays, getLastCleanedAt, runCleanup,
   getNextCleanupAt, validateRetentionDays, retryJob, hasRetryHandler,
 } from "@/lib/export-jobs";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
+import { ASSIGNABLE_ROLES, isParkedRole } from "@/lib/role-rollout";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   ssr: false,
@@ -47,7 +52,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
   component: AdminPage,
 });
 
-const ROLES: AppRole[] = ["admin", "leadership", "finance", "ops_lead", "ops_user", "viewer"];
+const ROLE_ASSIGNMENT_ROLES: AppRole[] = [...ASSIGNABLE_ROLES];
 const ROLE_LABEL: Record<AppRole, string> = {
   admin: "Super Admin",
   leadership: "Leadership",
@@ -58,6 +63,9 @@ const ROLE_LABEL: Record<AppRole, string> = {
 };
 
 function AdminPage() {
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
+  if (isExampleCaptureMode) return <ExampleAdminReviewPage />;
+
   const { user: me } = useAuth();
   const qc = useQueryClient();
   const { can } = usePermissions();
@@ -151,7 +159,7 @@ function AdminPage() {
                       canReset={can("feature_user_reset_password")}
                       onSave={async (v) => { await updateProfileFn({ data: { userId: u.id, ...v } }); toast.success("User updated"); refresh(); }}
                       onSetActive={async (active) => { await setActiveFn({ data: { userId: u.id, active } }); toast.success(active ? "User enabled" : "User disabled"); refresh(); }}
-                      onDelete={async () => { await deleteUserFn({ data: { userId: u.id } }); toast.success(`Deleted ${u.email ?? "user"}`); refresh(); }}
+                      onDelete={async () => { await deleteUserFn({ data: { userId: u.id } }); toast.success(`Disabled ${u.email ?? "user"}`); refresh(); }}
                       onResetPassword={async (tempPassword) => {
                         await resetPasswordFn({ data: { userId: u.id, tempPassword } });
                         try { await navigator.clipboard.writeText(tempPassword); } catch { /* clipboard may be blocked */ }
@@ -228,6 +236,110 @@ function AdminPage() {
             <ExportJobsPanel />
           </TabsContent>
         )}
+      </Tabs>
+    </AppShell>
+  );
+}
+
+function ExampleAdminReviewPage() {
+  const users = [
+    { id: "u-1", name: "Admin Demo", email: "admin.demo@mml.local", roles: ["Super Admin"], active: true },
+    { id: "u-2", name: "Ops Lead Demo", email: "opslead.demo@mml.local", roles: ["Ops Lead"], active: true },
+    { id: "u-3", name: "Finance Demo", email: "finance.demo@mml.local", roles: ["Finance"], active: true },
+    { id: "u-4", name: "Viewer Demo", email: "viewer.demo@mml.local", roles: ["Viewer"], active: false },
+  ];
+  return (
+    <AppShell title="Admin Settings" actions={<Button size="sm">Add user</Button>}>
+      <Tabs defaultValue="users" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="users">Users & Roles</TabsTrigger>
+          <TabsTrigger value="permissions">Permissions</TabsTrigger>
+          <TabsTrigger value="audit">Role Audit Log</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="users">
+          <Card>
+            <CardHeader><CardTitle>Users</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>User</TableHead>
+                    <TableHead>Roles</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((u) => (
+                    <TableRow key={u.id}>
+                      <TableCell>
+                        <div className="font-medium">{u.name}</div>
+                        <div className="text-xs text-muted-foreground">{u.email}</div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {u.roles.map((role) => <Badge key={role} variant={role === "Super Admin" ? "default" : "secondary"}>{role}</Badge>)}
+                        </div>
+                      </TableCell>
+                      <TableCell><Badge variant={u.active ? "default" : "secondary"}>{u.active ? "Active" : "Disabled"}</Badge></TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button size="sm" variant="outline">Edit</Button>
+                          <Button size="sm" variant="outline">Reset password</Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="permissions">
+          <Card>
+            <CardHeader><CardTitle>Permission matrix (example)</CardTitle></CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              48 permission toggles loaded across Leadership, Finance, Ops Lead, Ops User and Viewer roles.
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="audit">
+          <Card>
+            <CardHeader><CardTitle>Role Audit Log</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>When</TableHead>
+                    <TableHead>Action</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Target user</TableHead>
+                    <TableHead>Performed by</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell>2026-09-29 05:21</TableCell>
+                    <TableCell><Badge>grant</Badge></TableCell>
+                    <TableCell>Ops Lead</TableCell>
+                    <TableCell>opslead.demo@mml.local</TableCell>
+                    <TableCell>admin.demo@mml.local</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell>2026-09-29 04:48</TableCell>
+                    <TableCell><Badge variant="destructive">revoke</Badge></TableCell>
+                    <TableCell>Viewer</TableCell>
+                    <TableCell>viewer.demo@mml.local</TableCell>
+                    <TableCell>admin.demo@mml.local</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </AppShell>
   );
@@ -936,7 +1048,9 @@ function UserRow({
   onResetPassword: (tempPassword: string) => Promise<void>;
 }) {
   const [editing, setEditing] = useState(false);
-  const [selected, setSelected] = useState<AppRole[]>(user.roles.map((r) => r.role));
+  const [selected, setSelected] = useState<AppRole[]>(
+    user.roles.map((r) => r.role).filter((role) => !isParkedRole(role)),
+  );
   const [fullName, setFullName] = useState(user.full_name ?? "");
   const [email, setEmail] = useState(user.email ?? "");
   const [active, setActive] = useState(user.is_active);
@@ -950,8 +1064,14 @@ function UserRow({
     setSelected((cur) => (cur.includes(r) ? cur.filter((x) => x !== r) : [...cur, r]));
 
   async function save() {
-    if (selected.length === 0) return toast.error("Pick at least one role.");
     if (!email.trim()) return toast.error("Email is required.");
+    const preservedParkedRoles = user.roles
+      .map((r) => r.role)
+      .filter((role) => isParkedRole(role));
+    const nextRoles = Array.from(
+      new Set<AppRole>([...selected.filter((role) => !isParkedRole(role)), ...preservedParkedRoles]),
+    );
+    if (nextRoles.length === 0) return toast.error("Pick at least one role.");
     setBusy(true);
     try {
       const payload: { fullName?: string; email?: string; isActive?: boolean; roles?: AppRole[] } = {};
@@ -959,8 +1079,8 @@ function UserRow({
       const nextEmail = email.trim().toLowerCase();
       if (nextEmail !== (user.email ?? "").toLowerCase()) payload.email = nextEmail;
       const before = user.roles.map((r) => r.role).sort().join(",");
-      const after = [...selected].sort().join(",");
-      if (before !== after) payload.roles = selected;
+      const after = [...nextRoles].sort().join(",");
+      if (before !== after) payload.roles = nextRoles;
       if (active !== user.is_active) payload.isActive = active;
       if (Object.keys(payload).length === 0) { setEditing(false); return; }
       await onSave(payload);
@@ -1016,7 +1136,7 @@ function UserRow({
               onOpenChange={(o) => {
                 setEditing(o);
                 if (o) {
-                  setSelected(user.roles.map((r) => r.role));
+                  setSelected(user.roles.map((r) => r.role).filter((role) => !isParkedRole(role)));
                   setFullName(user.full_name ?? "");
                   setEmail(user.email ?? "");
                   setActive(user.is_active);
@@ -1041,7 +1161,7 @@ function UserRow({
                   <div className="space-y-2">
                     <Label>Roles</Label>
                     <div className="grid grid-cols-2 gap-2">
-                      {ROLES.map((r) => (
+                      {ROLE_ASSIGNMENT_ROLES.map((r) => (
                         <label key={r} className="flex items-center gap-2 text-sm rounded-md border border-border p-2">
                           <Checkbox checked={selected.includes(r)} onCheckedChange={() => toggle(r)} />
                           <span>{ROLE_LABEL[r]}</span>
@@ -1103,23 +1223,23 @@ function UserRow({
                   size="sm"
                   variant="destructive"
                   disabled={isSelf || isLastAdmin}
-                  title={isSelf ? "You cannot delete your own account" : isLastAdmin ? "Cannot delete the last Super Admin" : "Delete this user"}
+                  title={isSelf ? "You cannot disable your own account" : isLastAdmin ? "Cannot disable the last Super Admin" : "Disable this user"}
                   data-testid="delete-user-open"
                 >
-                  Delete
+                  Disable
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete user</AlertDialogTitle>
+                  <AlertDialogTitle>Disable user</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Permanently delete {user.email}? This removes their login and cannot be undone.
+                    Disable {user.email}? This keeps history but blocks sign-in until re-enabled.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={(e) => { e.preventDefault(); void doDelete(); }} data-testid="delete-user-confirm">
-                    {busy ? "Deleting…" : "Delete permanently"}
+                    {busy ? "Disabling…" : "Disable user"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -1136,7 +1256,7 @@ function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; passwor
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [roles, setRoles] = useState<AppRole[]>(["viewer"]);
+  const [roles, setRoles] = useState<AppRole[]>(["leadership"]);
   const [isActive, setIsActive] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -1148,7 +1268,7 @@ function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; passwor
     setBusy(true);
     try {
       await onCreate({ email: email.trim().toLowerCase(), password, fullName: fullName.trim(), roles, isActive });
-      setOpen(false); setEmail(""); setPassword(""); setFullName(""); setRoles(["viewer"]); setIsActive(true);
+      setOpen(false); setEmail(""); setPassword(""); setFullName(""); setRoles(["leadership"]); setIsActive(true);
     } catch (e) { toast.error((e as Error).message); } finally { setBusy(false); }
   }
 
@@ -1173,7 +1293,7 @@ function CreateUserDialog({ onCreate }: { onCreate: (v: { email: string; passwor
           <div className="space-y-2">
             <Label>Roles</Label>
             <div className="grid grid-cols-2 gap-2">
-              {ROLES.map((r) => (
+              {ROLE_ASSIGNMENT_ROLES.map((r) => (
                 <label key={r} className="flex items-center gap-2 text-sm rounded-md border border-border p-2">
                   <Checkbox checked={roles.includes(r)} onCheckedChange={() => toggle(r)} />
                   <span>{ROLE_LABEL[r]}</span>

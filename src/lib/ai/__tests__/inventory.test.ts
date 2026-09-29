@@ -5,11 +5,11 @@ import { DEFAULT_MODEL_ID, DEFAULT_PROVIDER, MODEL_CATALOG, PRIMARY_PROVIDERS, P
 import { PHASE1_TOOL_KEYS, TOOL_CATALOG } from "../tool-catalog";
 
 const schema = readFileSync(
-  resolve(__dirname, "../../../../supabase/migrations/20260928130000_scrum64_ai_agents_schema.sql"),
+  resolve(__dirname, "../../../../supabase/migrations/20260930010100_scrum64_ai_agents_schema.sql"),
   "utf8",
 );
 const seed = readFileSync(
-  resolve(__dirname, "../../../../supabase/migrations/20260928130100_scrum64_ai_agents_seed.sql"),
+  resolve(__dirname, "../../../../supabase/migrations/20260930010200_scrum64_ai_agents_seed.sql"),
   "utf8",
 );
 

@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { updateAdrTransaction } from "@/lib/transactions.functions";
+import { adminCorrectTransactionCosts, updateAdrTransaction } from "@/lib/transactions.functions";
 import { adrEditSchema, marginNote, SYSTEM_CONFIG_OPTIONS, type AdrEdit } from "@/lib/adr-entry";
 import { AdrExtraFields } from "@/components/adr-extra-fields";
 import { useAuth } from "@/lib/auth-context";
@@ -58,7 +58,13 @@ const empty = (v: string | number | null | undefined) => (v == null ? "" : Strin
 export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => void }) {
   const qc = useQueryClient();
   const save = useServerFn(updateAdrTransaction);
+  const correctCosts = useServerFn(adminCorrectTransactionCosts);
   const [submitting, setSubmitting] = useState(false);
+  const [correctingCost, setCorrectingCost] = useState(false);
+  const [costCorrectionError, setCostCorrectionError] = useState<string | null>(null);
+  const [costCorrectionReason, setCostCorrectionReason] = useState("");
+  const [correctedInputCost, setCorrectedInputCost] = useState(empty(tx.input_cost));
+  const [correctedSellingCost, setCorrectedSellingCost] = useState(empty(tx.selling_cost));
   const { isAdmin } = useAuth();
   const form = useForm<AdrEdit>({
     resolver: zodResolver(adrEditSchema) as Resolver<AdrEdit>,
@@ -121,6 +127,50 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
       toast.error((e as Error).message);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function onCorrectCost() {
+    if (!isAdmin) return;
+    const inputCost = Number(correctedInputCost);
+    const sellingCost = Number(correctedSellingCost);
+    const reason = costCorrectionReason.trim();
+    if (!Number.isFinite(inputCost) || inputCost < 0) {
+      setCostCorrectionError("Enter a valid input cost.");
+      return;
+    }
+    if (!Number.isFinite(sellingCost) || sellingCost < 0) {
+      setCostCorrectionError("Enter a valid selling cost.");
+      return;
+    }
+    if (reason.length < 3) {
+      setCostCorrectionError("Correction reason is required.");
+      return;
+    }
+
+    setCorrectingCost(true);
+    setCostCorrectionError(null);
+    try {
+      await correctCosts({
+        data: {
+          id: tx.id,
+          input_cost: inputCost,
+          selling_cost: sellingCost,
+          reason,
+        },
+      });
+      toast.success("Cost corrected");
+      qc.invalidateQueries({ queryKey: ["transaction", tx.id] });
+      qc.invalidateQueries({ queryKey: ["transactions"] });
+      qc.invalidateQueries({ queryKey: ["dashboard"] });
+      setCostCorrectionReason("");
+      onSaved?.();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Could not correct cost";
+      setCostCorrectionError(msg);
+      toast.error(msg);
+    } finally {
+      setCorrectingCost(false);
     }
   }
 
@@ -196,11 +246,67 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
           <Input type="number" {...form.register("total_users")} />
         </Field>
         <Field label="Input cost (INR, estimate)" error={form.formState.errors.input_cost?.message}>
-          <Input type="number" step="0.01" {...form.register("input_cost")} />
+          <Input type="number" step="0.01" value={empty(tx.input_cost)} readOnly />
         </Field>
         <Field label="Selling cost (INR)" error={form.formState.errors.selling_cost?.message}>
-          <Input type="number" step="0.01" {...form.register("selling_cost")} />
+          <Input type="number" step="0.01" value={empty(tx.selling_cost)} readOnly />
         </Field>
+        <div className="col-span-2 rounded-md border border-border bg-muted/20 p-2 text-xs">
+          <p className="text-muted-foreground" data-testid="cost-lock-note">
+            Cost fields are locked. Super Admin can correct them with a reason.
+          </p>
+          {isAdmin ? (
+            <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2 md:items-end">
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Correct input cost</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={correctedInputCost}
+                  onChange={(e) => setCorrectedInputCost(e.target.value)}
+                  data-testid="correct-input-cost"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground">Correct selling cost</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={correctedSellingCost}
+                  onChange={(e) => setCorrectedSellingCost(e.target.value)}
+                  data-testid="correct-selling-cost"
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <Label className="text-[11px] text-muted-foreground">Reason</Label>
+                <Input
+                  className="w-full"
+                  value={costCorrectionReason}
+                  onChange={(e) => setCostCorrectionReason(e.target.value)}
+                  placeholder="Required reason for cost correction"
+                  data-testid="correct-cost-reason"
+                />
+              </div>
+              <div className="md:col-span-2 md:flex md:justify-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={onCorrectCost}
+                  disabled={correctingCost}
+                  data-testid="correct-cost-button"
+                >
+                  {correctingCost ? "Correcting…" : "Correct cost"}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+          {costCorrectionError ? (
+            <p className="mt-1 text-xs text-destructive" data-testid="cost-correction-error">
+              {costCorrectionError}
+            </p>
+          ) : null}
+        </div>
       </div>
       <AdrExtraFields form={form} isAdmin={isAdmin} mode="edit" />
       {note && (
