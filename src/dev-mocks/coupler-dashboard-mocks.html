@@ -696,28 +696,25 @@
         `;
       }
 
-      function renderHeader(view) {
-        const tabs = [
-          { id: "overview", label: "Overview", active: view.tab === "overview" },
-          { id: "public", label: "Public cloud", active: view.tab === "public" },
-          { id: "private", label: "Private cloud", active: view.tab === "private" },
-          { id: "support", label: "Support", active: view.tab === "support" },
-        ];
+      function renderHeader(title) {
         return `
           <header class="mock-header">
             <div>
               <span class="mock-label">MOCK (EXAMPLE DATA)</span>
-              <h1 class="mock-title">${view.title}</h1>
-              <p class="mock-subtitle">${view.description}</p>
-            </div>
-            <div class="mock-actions">
-              <button class="pill-button">Filter</button>
-              <button class="pill-button ai">AI Insights</button>
+              <h1 class="mock-title">${title}</h1>
             </div>
           </header>
-          <nav class="mock-tabs">
-            ${tabs.map((tab) => `<span class="mock-tab ${tab.active ? "active" : ""}">${tab.label}</span>`).join("")}
-          </nav>
+        `;
+      }
+
+      function helperTicketCard() {
+        return `
+          <section class="card" style="margin-bottom:10px;">
+            <div class="card-body">
+              <h3 class="card-title" style="margin-bottom:6px;">See your own ticket numbers here</h3>
+              <p class="helper-text">Pick your helpdesk name on the Support tickets page to track tickets closed, average resolution time and tickets per month.</p>
+            </div>
+          </section>
         `;
       }
 
@@ -726,67 +723,81 @@
         const cost = sum(series.map((row) => row.cost));
         const profit = revenue - cost;
         const users = sum(DASHBOARD_ROWS.map((row) => row.total_users));
+        const curMonthUsers = DASHBOARD_ROWS.filter((row) => row.month === 9 && row.year === 2026).reduce((acc, row) => acc + row.total_users, 0);
+        const providerRows = providerSplit().map((row) => ({ name: row.name, users: row.value }));
         return `
           ${kpiGrid([
             { label: "Total transactions", value: fmtInt(DASHBOARD_ROWS.length) },
+            { label: "Public cloud", value: fmtInt(DASHBOARD_ROWS.filter((row) => row.repository_type === "public_cloud").length) },
+            { label: "Private cloud", value: fmtInt(DASHBOARD_ROWS.filter((row) => row.repository_type === "private_cloud").length) },
             { label: "Total users", value: fmtInt(users) },
             { label: "Total revenue", value: fmtCurrency(revenue) },
             { label: "Total input cost", value: fmtCurrency(cost) },
             { label: "Total profit", value: fmtCurrency(profit) },
             { label: "Margin", value: `${((profit / revenue) * 100).toFixed(1)}%` },
+            { label: "Avg selling cost", value: fmtCurrency(DASHBOARD_ROWS.length ? revenue / DASHBOARD_ROWS.length : 0) },
+            { label: "Current month revenue", value: fmtCurrency(series[11].revenue) },
+            { label: "Current month profit", value: fmtCurrency(series[11].profit) },
+            { label: "Current month users", value: fmtInt(curMonthUsers) },
           ])}
+          ${helperTicketCard()}
           <section class="chart-grid">
-            ${chartCard("Revenue and Margin (12 months)", comboSvg(series, "revenue", "marginPct", "%"))}
-            ${chartCard("Public vs Private transactions by month", stackedSvg(series, "publicTx", "privateTx", "Public cloud", "Private cloud"))}
-            ${chartCard("Line of Business split", donutChart(lobs))}
-            ${chartCard("Top customers by revenue", horizontalBars(tops.revenue, "revenue", fmtCurrency))}
-            ${chartCard("Top customers by users", horizontalBars(tops.users, "users", fmtInt, "var(--mock-sky)"))}
-            ${chartCard("Top customers by profit", horizontalBars(tops.profit, "profit", fmtCurrency, "var(--mock-green)"))}
+            ${chartCard("Transactions by Month — 2026", comboSvg(series, "tx", "marginPct", "%"))}
+            ${chartCard("Revenue by Month — 2026", comboSvg(series, "revenue", "marginPct", "%"))}
+            ${chartCard("Public vs Private Cloud", donutChart([{ name: "Public Cloud", value: sum(series.map((row) => row.publicTx)) }, { name: "Private Cloud", value: sum(series.map((row) => row.privateTx)) }]))}
+            ${chartCard("Public Cloud Provider Split", horizontalBars(providerRows, "users", fmtInt, "var(--mock-accent)"))}
+            ${chartCard("Top Customers by Revenue", horizontalBars(tops.revenue, "revenue", fmtCurrency))}
+            ${chartCard("Top Customers by Users", horizontalBars(tops.users, "users", fmtInt, "var(--mock-sky)"))}
+            ${chartCard("Top Customers by Profit", horizontalBars(tops.profit, "profit", fmtCurrency, "var(--mock-green)"))}
+            ${chartCard("Line of Business Split", donutChart(lobs))}
           </section>
-          ${tableCard("Monthly summary table", summaryTable(series))}
         `;
       }
 
-      function renderFinance(series, tops, lobs) {
+      function renderFinance(series, tops) {
         const revenue = sum(series.map((row) => row.revenue));
         const cost = sum(series.map((row) => row.cost));
         const profit = revenue - cost;
         return `
           ${kpiGrid([
-            { label: "YTD revenue", value: fmtCurrency(revenue) },
-            { label: "YTD input cost", value: fmtCurrency(cost) },
-            { label: "YTD profit", value: fmtCurrency(profit) },
-            { label: "Gross margin", value: `${((profit / revenue) * 100).toFixed(1)}%` },
-            { label: "Avg monthly revenue", value: fmtCurrency(revenue / 12) },
-            { label: "Avg monthly profit", value: fmtCurrency(profit / 12) },
+            { label: "Total revenue", value: fmtCurrency(revenue) },
+            { label: "Total input cost", value: fmtCurrency(cost) },
+            { label: "Total profit", value: fmtCurrency(profit) },
+            { label: "Margin", value: `${((profit / revenue) * 100).toFixed(1)}%` },
+            { label: "Avg selling cost", value: fmtCurrency(DASHBOARD_ROWS.length ? revenue / DASHBOARD_ROWS.length : 0) },
+            { label: "Current month revenue", value: fmtCurrency(series[11].revenue) },
+            { label: "Current month profit", value: fmtCurrency(series[11].profit) },
           ])}
+          ${helperTicketCard()}
           <section class="chart-grid">
-            ${chartCard("Revenue and Margin (dual-axis)", comboSvg(series, "revenue", "marginPct", "%", "var(--mock-red)"))}
-            ${chartCard("Revenue vs Input cost (stacked)", stackedSvg(series, "cost", "profit", "Input cost", "Profit"))}
-            ${chartCard("Line of Business split", donutChart(lobs))}
-            ${chartCard("Top customers by revenue", horizontalBars(tops.revenue, "revenue", fmtCurrency))}
-            ${chartCard("Top customers by profit", horizontalBars(tops.profit, "profit", fmtCurrency, "var(--mock-green)"))}
-            ${chartCard("Top customers by users", horizontalBars(tops.users, "users", fmtInt, "var(--mock-sky)"))}
+            ${chartCard("Revenue by Month — 2026", comboSvg(series, "revenue", "marginPct", "%", "var(--mock-red)"))}
+            ${chartCard("Top Customers by Revenue", horizontalBars(tops.revenue, "revenue", fmtCurrency))}
+            ${chartCard("Top Customers by Profit", horizontalBars(tops.profit, "profit", fmtCurrency, "var(--mock-green)"))}
           </section>
-          ${tableCard("Commercial summary table", summaryTable(series))}
         `;
       }
 
-      function renderOpsUser(series, tops) {
+      function renderOpsUser(series) {
         const openQueue = 9;
+        const users = sum(DASHBOARD_ROWS.map((row) => row.total_users));
+        const curMonthUsers = DASHBOARD_ROWS.filter((row) => row.month === 9 && row.year === 2026).reduce((acc, row) => acc + row.total_users, 0);
         return `
           ${kpiGrid([
-            { label: "Tickets closed (6 months)", value: fmtInt(135) },
-            { label: "Avg resolution", value: "6.4 h" },
-            { label: "Tickets this month", value: fmtInt(22) },
-            { label: "In my queue", value: fmtInt(openQueue), note: "Ritu Sharma" },
-            { label: "Current month revenue", value: fmtCurrency(series[11].revenue) },
-            { label: "Current month margin", value: `${series[11].marginPct.toFixed(1)}%` },
+            { label: "Total transactions", value: fmtInt(DASHBOARD_ROWS.length) },
+            { label: "Public cloud", value: fmtInt(DASHBOARD_ROWS.filter((row) => row.repository_type === "public_cloud").length) },
+            { label: "Private cloud", value: fmtInt(DASHBOARD_ROWS.filter((row) => row.repository_type === "private_cloud").length) },
+            { label: "Total users", value: fmtInt(users) },
+            { label: "Current month users", value: fmtInt(curMonthUsers) },
           ])}
           <section class="card" style="margin-bottom:10px;">
             <div class="card-body">
               <h3 class="queue-title">My support tickets — Ritu Sharma</h3>
-              <p class="helper-text">Open my queue view with assigned vs closed ticket flow across the last six months.</p>
+              <section class="kpi-grid" style="grid-template-columns: repeat(4,minmax(0,1fr)); margin-bottom:10px;">
+                <article class="kpi-tile"><p class="kpi-label">Tickets Closed</p><p class="kpi-value">135</p></article>
+                <article class="kpi-tile"><p class="kpi-label">Avg Resolution Time</p><p class="kpi-value">6.4 h</p></article>
+                <article class="kpi-tile"><p class="kpi-label">Tickets This Month</p><p class="kpi-value">22</p></article>
+                <article class="kpi-tile"><p class="kpi-label">In My Queue</p><p class="kpi-value">${openQueue}</p></article>
+              </section>
               ${stackedSvg(
                 SUPPORT_PROFILE.map((row) => ({ label: row.month, assigned: row.assigned, closed: row.closed })),
                 "assigned",
@@ -797,43 +808,16 @@
             </div>
           </section>
           <section class="chart-grid">
-            ${chartCard("Revenue and Margin trend", comboSvg(series, "revenue", "marginPct", "%"))}
-            ${chartCard("Top customers by users", horizontalBars(tops.users, "users", fmtInt, "var(--mock-sky)"))}
-            ${chartCard("Top customers by revenue", horizontalBars(tops.revenue, "revenue", fmtCurrency))}
-            ${chartCard("Top customers by profit", horizontalBars(tops.profit, "profit", fmtCurrency, "var(--mock-green)"))}
+            ${chartCard("Transactions by Month — 2026", comboSvg(series, "tx", "marginPct", "%"))}
           </section>
-          ${tableCard(
-            "My open queue summary table",
-            `
-            <table class="summary-table">
-              <thead>
-                <tr>
-                  <th>Ticket</th>
-                  <th>Status</th>
-                  <th>Priority</th>
-                  <th class="align-right">Age (days)</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td>S1421 · VM launch failure</td><td>Open</td><td>High</td><td class="align-right">2</td></tr>
-                <tr><td>S1412 · Access mismatch</td><td>Pending</td><td>Medium</td><td class="align-right">3</td></tr>
-                <tr><td>S1403 · DNS issue APAC</td><td>Waiting on customer</td><td>Low</td><td class="align-right">5</td></tr>
-                <tr><td>S1398 · Webhook retries</td><td>Open</td><td>Urgent</td><td class="align-right">1</td></tr>
-              </tbody>
-            </table>
-          `,
-          )}
         `;
       }
 
-      function renderPublicCloud(series) {
+      function renderPublicCloud() {
         const revenue = sum(PUBLIC_ROWS.map((row) => row.sellingCost));
         const cost = sum(PUBLIC_ROWS.map((row) => row.inputCost));
         const credit = sum(PUBLIC_ROWS.map((row) => row.creditAllocated));
         const actual = sum(PUBLIC_ROWS.map((row) => row.actualConsumption));
-        const lobs = Array.from(
-          PUBLIC_ROWS.reduce((map, row) => map.set(row.lob, (map.get(row.lob) ?? 0) + 1), new Map()).entries(),
-        ).map(([name, value]) => ({ name, value }));
         const bodyRows = PUBLIC_ROWS.map(
           (row) => `
           <tr>
@@ -849,93 +833,63 @@
         ).join("");
 
         return `
-          ${kpiGrid([
-            { label: "Transactions shown", value: fmtInt(PUBLIC_ROWS.length) },
-            { label: "Revenue", value: fmtCurrency(revenue) },
-            { label: "Input cost", value: fmtCurrency(cost) },
-            { label: "Credit allocated", value: fmtCurrency(credit) },
-            { label: "Actual consumption", value: fmtCurrency(actual) },
-            { label: "Actual margin", value: fmtCurrency(revenue - actual) },
-          ])}
-          <section class="chart-grid">
-            ${chartCard("Revenue and Margin (public cloud)", comboSvg(series, "revenue", "marginPct", "%"))}
-            ${chartCard("Provider split", donutChart(providerSplit()))}
-            ${chartCard(
-              "Credit allocated vs actual consumption",
-              stackedSvg(
-                series.map((row) => ({
-                  label: row.label,
-                  credit: Math.round((row.revenue * 0.72) / 1000),
-                  actual: Math.round((row.cost * 0.68) / 1000),
-                })),
-                "actual",
-                "credit",
-                "Actual (₹K)",
-                "Credit allocated (₹K)",
-              ),
-            )}
-            ${chartCard("LOB split", donutChart(lobs))}
+          <section class="card" style="margin-bottom:10px;">
+            <div class="card-body">
+              <section class="kpi-grid" style="grid-template-columns: repeat(4,minmax(0,1fr)); margin-bottom:10px;">
+                <article class="kpi-tile"><p class="kpi-label">Fuzzy search</p><p class="kpi-note">customer, lab, potential ID</p></article>
+                <article class="kpi-tile"><p class="kpi-label">Hybrid only</p><p class="kpi-note">(0)</p></article>
+                <article class="kpi-tile"><p class="kpi-label">Period</p><p class="kpi-note">All months · All years</p></article>
+                <article class="kpi-tile"><p class="kpi-label">Scope</p><p class="kpi-note">All customers · All providers</p></article>
+              </section>
+              <p class="helper-text">10 records · Page revenue ${fmtCurrency(revenue)} · Page cost ${fmtCurrency(cost)}</p>
+            </div>
           </section>
           ${tableCard(
-            "Public cloud transactions (10 rows)",
+            "Public cloud transactions (example)",
             `<table class="summary-table"><thead><tr><th>Potential ID</th><th>Customer</th><th>Provider</th><th>LOB</th><th class="align-right">Users</th><th class="align-right">Input cost</th><th class="align-right">Selling cost</th></tr></thead><tbody>${bodyRows}</tbody></table>`,
+          )}
+          ${tableCard(
+            "KPI insights (current page)",
+            `<table class="summary-table"><thead><tr><th>Metric</th><th class="align-right">Value</th></tr></thead><tbody><tr><td>Transactions shown</td><td class="align-right">${fmtInt(PUBLIC_ROWS.length)}</td></tr><tr><td>Credit allocated</td><td class="align-right">${fmtCurrency(credit)}</td></tr><tr><td>Actual consumption</td><td class="align-right">${fmtCurrency(actual)}</td></tr><tr><td>Unused credit</td><td class="align-right">${fmtCurrency(credit - actual)}</td></tr><tr><td>Actual margin</td><td class="align-right">${fmtCurrency(revenue - actual)}</td></tr></tbody></table>`,
           )}
         `;
       }
 
-      function renderPrivateCloud(series) {
+      function renderPrivateCloud() {
         const totalRevenue = sum(PRIVATE_BATCHES.map((row) => row.revenue));
         const totalActualCost = sum(PRIVATE_BATCHES.map((row) => row.actualCost));
         const totalEstimatedCost = sum(PRIVATE_BATCHES.map((row) => row.estimatedCost));
-        const batchBars = PRIVATE_BATCHES.map((row) => ({
-          label: row.batchCode.replace("LB-PRIV-", ""),
-          revenue: row.revenue,
-          marginPct: ((row.revenue - row.actualCost) / row.revenue) * 100,
-          actual: row.actualCost,
-          estimate: row.estimatedCost,
-        }));
-        const tableRows = PRIVATE_BATCHES.map(
-          (row) => `
-          <tr>
-            <td>${row.batchCode}</td>
-            <td>${row.status}</td>
-            <td class="align-right">${fmtCurrency(row.revenue)}</td>
-            <td class="align-right">${fmtCurrency(row.actualCost)}</td>
-            <td class="align-right">${fmtCurrency(row.revenue - row.actualCost)}</td>
-          </tr>
-        `,
-        ).join("");
-
+        const selected = PRIVATE_BATCHES[0];
+        const selectedLines = [
+          { line: "AKS Foundations", users: 25, cost: 58200 },
+          { line: "Azure DevSecOps", users: 19, cost: 47200 },
+          { line: "FinOps Lab", users: 22, cost: 56900 },
+        ];
+        const selectedLineCost = sum(selectedLines.map((row) => row.cost));
         return `
           ${kpiGrid([
             { label: "Private batches", value: fmtInt(PRIVATE_BATCHES.length) },
-            { label: "Open batches", value: fmtInt(PRIVATE_BATCHES.filter((row) => row.status === "open").length) },
+            { label: "Open batches", value: fmtInt(PRIVATE_BATCHES.filter((row) => row.status === "open").length), note: `${fmtInt(PRIVATE_BATCHES.filter((row) => row.status === "closed").length)} closed` },
             { label: "Revenue total", value: fmtCurrency(totalRevenue) },
-            { label: "Actual cost total", value: fmtCurrency(totalActualCost) },
-            { label: "Estimated cost total", value: fmtCurrency(totalEstimatedCost) },
-            { label: "Actual profit total", value: fmtCurrency(totalRevenue - totalActualCost) },
+            { label: "Profit total", value: fmtCurrency(totalRevenue - totalActualCost), note: `Estimated ${fmtCurrency(totalRevenue - totalEstimatedCost)} · Actual ${fmtCurrency(totalRevenue - totalActualCost)}` },
           ])}
-          <section class="chart-grid">
-            ${chartCard("Batch revenue and margin", comboSvg(batchBars, "revenue", "marginPct", "%"))}
-            ${chartCard("Estimated vs actual cost by batch", stackedSvg(batchBars, "actual", "estimate", "Actual cost", "Estimated cost"))}
-            ${chartCard(
-              "Revenue share by batch",
-              donutChart(PRIVATE_BATCHES.map((row) => ({ name: row.batchCode, value: row.revenue }))),
+          <section class="chart-grid" style="grid-template-columns: 1.2fr 1fr;">
+            ${tableCard(
+              "Private cloud batches",
+              `<table class="summary-table"><thead><tr><th>Batch</th><th>Status</th><th class="align-right">Revenue</th><th class="align-right">Profit</th></tr></thead><tbody>${PRIVATE_BATCHES.map((row) => `<tr><td>${row.batchCode}</td><td>${row.status}</td><td class="align-right">${fmtCurrency(row.revenue)}</td><td class="align-right">${fmtCurrency(row.revenue - row.actualCost)}</td></tr>`).join("")}</tbody></table>`,
             )}
-            ${chartCard(
-              "Users per batch",
-              horizontalBars(
-                PRIVATE_BATCHES.map((row) => ({ name: row.batchCode, users: row.users })),
-                "users",
-                fmtInt,
-                "var(--mock-sky)",
-              ),
-            )}
+            <section class="card">
+              <header class="card-header"><h3 class="card-title">${selected.batchCode} details</h3></header>
+              <div class="card-body">
+                <p class="helper-text"><strong>open</strong> · updated 29 Sep 2026, 05:28</p>
+                <p class="helper-text">Revenue ${fmtCurrency(selected.revenue)}</p>
+                <p class="helper-text">Estimated cost ${fmtCurrency(selected.estimatedCost)} · Estimated profit ${fmtCurrency(selected.revenue - selected.estimatedCost)}</p>
+                <p class="helper-text">Actual cost ${fmtCurrency(selected.actualCost)} · Actual profit ${fmtCurrency(selected.revenue - selected.actualCost)}</p>
+                <section class="card" style="margin-bottom:10px;"><div class="card-body"><p class="helper-text">Actual reconciliation: Σ line actual cost = ${fmtCurrency(selectedLineCost)} · batch actual cost = ${fmtCurrency(selected.actualCost)} <strong>Reconciled ✓</strong></p><p class="helper-text">Estimate reference: batch estimated cost = ${fmtCurrency(selected.estimatedCost)}</p></div></section>
+                <table class="summary-table"><thead><tr><th>Line</th><th class="align-right">Users</th><th class="align-right">Cost</th></tr></thead><tbody>${selectedLines.map((row) => `<tr><td>${row.line}</td><td class="align-right">${fmtInt(row.users)}</td><td class="align-right">${fmtCurrency(row.cost)}</td></tr>`).join("")}</tbody></table>
+              </div>
+            </section>
           </section>
-          ${tableCard(
-            "Private cloud batch summary",
-            `<table class="summary-table"><thead><tr><th>Batch</th><th>Status</th><th class="align-right">Revenue</th><th class="align-right">Actual cost</th><th class="align-right">Actual profit</th></tr></thead><tbody>${tableRows}</tbody></table>`,
-          )}
         `;
       }
 
@@ -946,45 +900,30 @@
         const lobs = lobSplit();
         const views = {
           "mock-dashboard-leadership": {
-            title: "Leadership dashboard — Coupler style mock",
-            description:
-              "Refreshed executive dashboard mock with cleaner cards, denser KPIs and modern chart treatment using the existing example dataset.",
-            tab: "overview",
+            title: "Dashboard",
             content: renderLeadership(series, tops, lobs),
           },
           "mock-dashboard-finance": {
-            title: "Finance dashboard — Coupler style mock",
-            description:
-              "Commercial-first dashboard mock with revenue/cost/profit emphasis, dual-axis trend and cleaner comparative charting.",
-            tab: "overview",
-            content: renderFinance(series, tops, lobs),
+            title: "Dashboard",
+            content: renderFinance(series, tops),
           },
           "mock-dashboard-ops-user": {
-            title: "Ops user dashboard — Coupler style mock",
-            description:
-              "Support-agent view mock for Ritu Sharma focusing on personal queue metrics while preserving platform trend context.",
-            tab: "support",
-            content: renderOpsUser(series, tops),
+            title: "Dashboard",
+            content: renderOpsUser(series),
           },
           "mock-public-cloud": {
-            title: "Public cloud dashboard — Coupler style mock",
-            description:
-              "Public cloud transactions mock with provider/LOB splits and margin trend aligned to the same capture-mode sample rows.",
-            tab: "public",
-            content: renderPublicCloud(series),
+            title: "Public Cloud Transactions",
+            content: renderPublicCloud(),
           },
           "mock-private-cloud": {
-            title: "Private cloud dashboard — Coupler style mock",
-            description:
-              "Batch-focused private cloud mock with reconciliation-friendly KPI framing and cost comparison charts.",
-            tab: "private",
-            content: renderPrivateCloud(series),
+            title: "Private Cloud Batches",
+            content: renderPrivateCloud(),
           },
         };
 
         const selected = views[slug] ?? views["mock-dashboard-leadership"];
         document.getElementById("app").innerHTML = `
-          ${renderHeader(selected)}
+          ${renderHeader(selected.title)}
           ${selected.content}
         `;
       }
