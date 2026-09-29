@@ -170,6 +170,10 @@
     border-color: var(--color-border);
   }
 
+  html {
+    font-size: clamp(12px, 0.5rem + 0.39vw, 15px);
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
