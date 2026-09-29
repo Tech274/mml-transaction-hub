@@ -33,6 +33,8 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  hoverExpanded: boolean;
+  setHoverExpanded: (value: boolean) => void;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -68,6 +70,7 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile();
     const [openMobile, setOpenMobile] = React.useState(false);
+    const [hoverExpanded, setHoverExpanded] = React.useState(false);
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
@@ -110,6 +113,10 @@ const SidebarProvider = React.forwardRef<
     // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? "expanded" : "collapsed";
 
+    React.useEffect(() => {
+      if (state !== "collapsed" || isMobile) setHoverExpanded(false);
+    }, [state, isMobile]);
+
     const contextValue = React.useMemo<SidebarContextProps>(
       () => ({
         state,
@@ -119,8 +126,20 @@ const SidebarProvider = React.forwardRef<
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        hoverExpanded,
+        setHoverExpanded,
       }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
+      [
+        state,
+        open,
+        setOpen,
+        isMobile,
+        openMobile,
+        setOpenMobile,
+        toggleSidebar,
+        hoverExpanded,
+        setHoverExpanded,
+      ],
     );
 
     return (
@@ -156,6 +175,7 @@ const Sidebar = React.forwardRef<
     side?: "left" | "right";
     variant?: "sidebar" | "floating" | "inset";
     collapsible?: "offcanvas" | "icon" | "none";
+    hoverExpandOnRail?: boolean;
   }
 >(
   (
@@ -163,13 +183,27 @@ const Sidebar = React.forwardRef<
       side = "left",
       variant = "sidebar",
       collapsible = "offcanvas",
+      hoverExpandOnRail = false,
       className,
       children,
       ...props
     },
     ref,
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+    const { isMobile, state, openMobile, setOpenMobile, hoverExpanded, setHoverExpanded } =
+      useSidebar();
+    const canHoverExpand =
+      hoverExpandOnRail && !isMobile && collapsible === "icon" && state === "collapsed";
+
+    const onHoverStart = React.useCallback(() => {
+      if (!canHoverExpand) return;
+      setHoverExpanded(true);
+    }, [canHoverExpand, setHoverExpanded]);
+
+    const onHoverEnd = React.useCallback(() => {
+      if (!canHoverExpand) return;
+      setHoverExpanded(false);
+    }, [canHoverExpand, setHoverExpanded]);
 
     if (collapsible === "none") {
       return (
@@ -216,6 +250,7 @@ const Sidebar = React.forwardRef<
         className="group peer hidden text-sidebar-foreground md:block"
         data-state={state}
         data-collapsible={state === "collapsed" ? collapsible : ""}
+        data-hover-expanded={hoverExpanded ? "true" : "false"}
         data-variant={variant}
         data-side={side}
       >
@@ -240,8 +275,19 @@ const Sidebar = React.forwardRef<
             variant === "floating" || variant === "inset"
               ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
               : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
+            "group-data-[hover-expanded=true]:w-(--sidebar-width)",
             className,
           )}
+          onMouseEnter={onHoverStart}
+          onMouseLeave={onHoverEnd}
+          onFocusCapture={onHoverStart}
+          onBlurCapture={(event) => {
+            if (!canHoverExpand) return;
+            const nextTarget = event.relatedTarget;
+            if (!(nextTarget instanceof Node) || !event.currentTarget.contains(nextTarget)) {
+              setHoverExpanded(false);
+            }
+          }}
           {...props}
         >
           <div
