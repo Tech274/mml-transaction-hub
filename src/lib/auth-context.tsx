@@ -3,6 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "@tanstack/react-router";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
 
 export type AppRole = "admin" | "leadership" | "finance" | "ops_lead" | "ops_user" | "viewer";
 
@@ -19,14 +23,32 @@ interface AuthState {
 
 const Ctx = createContext<AuthState | null>(null);
 
+const SUPERADMIN_CAPTURE_USER = {
+  id: "00000000-0000-4000-8000-000000000044",
+  aud: "authenticated",
+  role: "authenticated",
+  email: "admin.demo@mml.local",
+  created_at: "2026-01-01T00:00:00.000Z",
+  app_metadata: { provider: "email", providers: ["email"] },
+  user_metadata: { full_name: "Super Admin Demo User" },
+} as unknown as User;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
   const qc = useQueryClient();
   const router = useRouter();
+  const isCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
 
   useEffect(() => {
+    if (isCaptureMode) {
+      setUser(SUPERADMIN_CAPTURE_USER);
+      setRoles(["admin"]);
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
     const loadRoles = async (u: User | null) => {
       if (!u) {
@@ -58,12 +80,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       mounted = false;
       sub.subscription.unsubscribe();
     };
-  }, [qc, router]);
+  }, [isCaptureMode, qc, router]);
 
   const hasRole = (r: AppRole) => roles.includes(r);
   const hasAnyRole = (rs: AppRole[]) => rs.some((r) => roles.includes(r));
 
   const signOut = async () => {
+    if (isCaptureMode) {
+      window.location.href = "/dashboard";
+      return;
+    }
     await qc.cancelQueries();
     qc.clear();
     await supabase.auth.signOut();
