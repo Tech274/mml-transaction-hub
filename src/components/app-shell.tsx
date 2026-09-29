@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./app-sidebar";
@@ -12,18 +12,40 @@ import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
+import { getSidebarOpenFromStorage, persistSidebarCollapsed } from "@/lib/sidebar-prefs";
 
-export function AppShell({ title, actions, children }: { title: string; actions?: ReactNode; children: ReactNode }) {
+export function AppShell({
+  title,
+  actions,
+  children,
+}: {
+  title: string;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
   const pathname = useRouterState({ select: (router) => router.location.pathname });
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    getSidebarOpenFromStorage(typeof window !== "undefined" ? window.localStorage : null),
+  );
   const isUiReviewEnabled = isScrum44UiReviewEnabled(getScrum44UiReviewEnvForClient());
   const isCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const KEEP_HOME_SCREEN_UNCHANGED = true;
   const shouldApplyAzureTheme =
     isUiReviewEnabled && (!KEEP_HOME_SCREEN_UNCHANGED || pathname !== "/dashboard");
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    persistSidebarCollapsed(window.localStorage, !sidebarOpen);
+  }, [sidebarOpen]);
+
   return (
-    <SidebarProvider>
-      <div className={cn("min-h-screen flex w-full bg-background", shouldApplyAzureTheme && "azure-theme")}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={setSidebarOpen}>
+      <div
+        className={cn(
+          "min-h-screen flex w-full bg-background",
+          shouldApplyAzureTheme && "azure-theme",
+        )}
+      >
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-14 flex items-center gap-3 border-b border-border bg-card px-4 sticky top-0 z-20">
