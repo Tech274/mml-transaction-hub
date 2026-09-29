@@ -293,6 +293,7 @@ const EXAMPLE_SYNC_OVERVIEW = {
     health: {
       state: "warning" as SyncHealth["state"],
       message: "Last run failed once; monitoring",
+      lastRunAt: "2026-09-29T04:00:00Z",
       consecutiveFailures: 1,
       runsLast24h: 8,
       failuresLast24h: 1,

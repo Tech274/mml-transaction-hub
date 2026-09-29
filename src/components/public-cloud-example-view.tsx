@@ -36,9 +36,10 @@ const EXAMPLE_ROWS: ExampleRow[] = [
 
 export function PublicCloudExampleView() {
   const hash = useRouterState({ select: (router) => router.location.hash });
+  const windowHash = typeof window !== "undefined" ? window.location.hash : "";
   const [selectedId, setSelectedId] = useState<string>(EXAMPLE_ROWS[0]?.id ?? "");
   const selected = EXAMPLE_ROWS.find((row) => row.id === selectedId) ?? EXAMPLE_ROWS[0];
-  const showSidePanel = hash === "#side-panel";
+  const showSidePanel = hash === "#side-panel" || windowHash === "#side-panel";
 
   const insights = useMemo(() => {
     const txCount = EXAMPLE_ROWS.length;
