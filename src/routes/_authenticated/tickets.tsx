@@ -987,11 +987,11 @@ function SupportTicketsSummary({
             <LineChart data={weeklyTrend}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="week" fontSize={11} />
-              <YAxis fontSize={11} allowDecimals={false} />
+              <YAxis fontSize={11} allowDecimals={false} domain={[0, "auto"]} />
               <Tooltip />
               <Legend />
-              <Line type="monotone" dataKey="opened" name="Opened" stroke="var(--chart-1)" strokeWidth={2} />
-              <Line type="monotone" dataKey="resolved" name="Resolved/Closed" stroke="var(--chart-3)" strokeWidth={2} />
+              <Line type="linear" dataKey="opened" name="Opened" stroke="var(--chart-1)" strokeWidth={2} />
+              <Line type="linear" dataKey="resolved" name="Resolved/Closed" stroke="var(--chart-3)" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         </SummaryChartCard>

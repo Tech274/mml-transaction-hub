@@ -51,7 +51,7 @@ const EXAMPLE_RUNS: RunRow[] = [
   { id: "run-901", agent_key: "support", status: "done", created_at: "2026-09-29T05:31:00Z", finished_at: "2026-09-29T05:31:28Z" },
   { id: "run-902", agent_key: "generalist", status: "done", created_at: "2026-09-29T05:21:00Z", finished_at: "2026-09-29T05:21:35Z" },
   { id: "run-903", agent_key: "cost_adr", status: "done", created_at: "2026-09-29T04:55:00Z", finished_at: "2026-09-29T04:55:17Z" },
-  { id: "run-904", agent_key: "support", status: "done", created_at: "2026-09-28T12:11:00Z", finished_at: "2026-09-28T12:11:19Z" },
+  { id: "run-904", agent_key: "support", status: "error", created_at: "2026-09-28T12:11:00Z", finished_at: "2026-09-28T12:11:19Z" },
 ];
 
 const EXAMPLE_INBOX: InboxRow[] = [
@@ -99,7 +99,6 @@ export function AgentsSummary() {
 
       const runs = runsRows as RunRow[];
       const inbox = inboxRows as InboxRow[];
-      const activeAgents = (agents as AgentSummary[]).length;
       const pending = inbox.filter((row) => row.status === "pending").length;
       const confirmed = inbox.filter((row) => row.status === "confirmed").length;
       const rejected = inbox.filter((row) => row.status === "rejected").length;
@@ -159,7 +158,6 @@ export function AgentsSummary() {
         byAgent,
         runsPerDay,
         recentRuns: runs.slice(0, 10),
-        activeAgents,
         totalAgents: AGENTS.length,
         totalRuns: runs.length,
         totalProposals: inbox.length,
@@ -192,11 +190,8 @@ export function AgentsSummary() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">
-        <strong>Active agents: {fmtNumber(data.activeAgents)} of {fmtNumber(data.totalAgents)}</strong>
-      </div>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-        <SummaryKpi label="Active agents" value={`${fmtNumber(data.activeAgents)} of ${fmtNumber(data.totalAgents)}`} />
+        <SummaryKpi label="Agents" value={fmtNumber(data.totalAgents)} />
         <SummaryKpi label="Runs" value={fmtNumber(data.totalRuns)} />
         <SummaryKpi label="Proposals" value={fmtNumber(data.totalProposals)} />
         <SummaryKpi label="Awaiting review" value={fmtNumber(data.pending)} />
