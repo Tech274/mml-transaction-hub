@@ -1360,7 +1360,7 @@ export function DashboardSuperAdminSummary() {
                           data={lobRows}
                           dataKey="value"
                           nameKey="name"
-                          innerRadius="18%"
+                          innerRadius={0}
                           outerRadius="82%"
                           stroke="#fff"
                           strokeWidth={2}
@@ -1397,7 +1397,10 @@ export function DashboardSuperAdminSummary() {
                       style={{ borderColor: PALETTE.border }}
                     >
                       <div className="flex items-center justify-between text-[11px]">
-                        <span>{lob.name}</span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="h-2 w-2 rounded-full" style={{ background: color }} />
+                          {lob.name}
+                        </span>
                         <strong>{pct.toFixed(1)}%</strong>
                       </div>
                       <div className="mt-1 h-1.5 rounded-full bg-[#edf1fb]">
