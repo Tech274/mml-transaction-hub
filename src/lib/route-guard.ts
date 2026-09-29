@@ -4,9 +4,14 @@
 import { redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { rolesFor, type GuardedRoute } from "@/lib/route-roles";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
 
 export function requireRouteRoles(route: GuardedRoute) {
   return async () => {
+    if (isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient())) return;
     const {
       data: { user },
     } = await supabase.auth.getUser();

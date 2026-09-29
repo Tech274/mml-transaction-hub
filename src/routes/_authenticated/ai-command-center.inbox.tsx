@@ -25,10 +25,16 @@ import { EXTERNAL_WRITE_ROLE_MESSAGE, EXTERNAL_WRITE_ROLES, writesExternally } f
 import {
   listInbox, confirmInboxItem, rejectInboxItem, AGENTS, type AgentKey, type InboxItem,
 } from "@/lib/ai-command-center.functions";
+import {
+  getSuperadminCaptureModeEnvForClient,
+  isSuperadminCaptureModeEnabled,
+} from "@/lib/superadmin-capture-mode";
+import { requireRouteRoles } from "@/lib/route-guard";
 
 const AGENT_KEYS: AgentKey[] = ["generalist", "support", "cost_adr"];
 
 export const Route = createFileRoute("/_authenticated/ai-command-center/inbox")({
+  beforeLoad: requireRouteRoles("/ai-command-center/inbox"),
   validateSearch: (search: Record<string, unknown>) => ({
     agent: AGENT_KEYS.includes(search.agent as AgentKey) ? (search.agent as AgentKey) : undefined,
   }),
@@ -43,6 +49,7 @@ const TYPE_LABEL: Record<string, string> = {
 };
 
 function InboxPage() {
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
   const search = Route.useSearch();
   const qc = useQueryClient();
   const [agentFilter, setAgentFilter] = useState<string>(search.agent ?? "all");
@@ -67,6 +74,7 @@ function InboxPage() {
     queryKey: ["ai-cc", "inbox", agentFilter, statusFilter],
     queryFn: () => listFn({ data: { agent_key: agentFilter, status: statusFilter } }) as Promise<InboxItem[]>,
     refetchInterval: 20000,
+    enabled: !isExampleCaptureMode,
   });
 
   function openItem(item: InboxItem) {
@@ -112,7 +120,7 @@ function InboxPage() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Could not reject"),
   });
 
-  const items = q.data ?? [];
+  const items = isExampleCaptureMode ? EXAMPLE_INBOX_ITEMS : (q.data ?? []);
   const openPayload = (open?.payload ?? {}) as Record<string, unknown>;
 
   return (
@@ -309,6 +317,64 @@ function InboxPage() {
     </AppShell>
   );
 }
+
+const EXAMPLE_INBOX_ITEMS: InboxItem[] = [
+  {
+    id: "inb-55",
+    run_id: "run-901",
+    agent_key: "support",
+    item_type: "ticket_proposal",
+    title: "Ticket #5142 — VM launch failure response and assignment",
+    summary: "Proposes urgent priority, assignment to Ritu Sharma, and a guided response with next checks.",
+    payload: {
+      ticket_id: 5142,
+      priority: "Urgent",
+      status: "Open",
+      assignee: "Ritu Sharma",
+      body: "We have restarted the lab orchestrator and validated quota. Please retry launch in 5 minutes.",
+    },
+    status: "pending",
+    decision_note: null,
+    decided_by_email: null,
+    decided_at: null,
+    created_at: "2026-09-29T05:31:14Z",
+  },
+  {
+    id: "inb-58",
+    run_id: "run-902",
+    agent_key: "generalist",
+    item_type: "solution_guide",
+    title: "Lab solution guide — Cognizant BPMN cohort",
+    summary: "OSS-first recommendation, cost ranges, delivery model and caveats.",
+    payload: {
+      customer: "Cognizant",
+      topic: "Kogito BPMN Automation",
+      key_points: ["Open-source preferred", "3-week cohort window", "Cost model attached"],
+    },
+    status: "pending",
+    decision_note: null,
+    decided_by_email: null,
+    decided_at: null,
+    created_at: "2026-09-29T05:35:05Z",
+  },
+  {
+    id: "inb-49",
+    run_id: "run-884",
+    agent_key: "cost_adr",
+    item_type: "adr_field_map",
+    title: "ADR draft mapping — TCS AKS Platform Engineering",
+    summary: "Mapped requisition to customer, lab batch, users, and estimated input/selling costs.",
+    payload: {
+      request_code: "LR-2026-093",
+      mapped_fields: { users: 38, estimated_input_cost: 142000, estimated_selling_cost: 209000 },
+    },
+    status: "confirmed",
+    decision_note: "Approved after finance review",
+    decided_by_email: "admin.demo@mml.local",
+    decided_at: "2026-09-29T04:02:19Z",
+    created_at: "2026-09-29T03:56:09Z",
+  },
+];
 
 function ItemBody({
   item,

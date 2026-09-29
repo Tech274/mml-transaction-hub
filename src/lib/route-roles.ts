@@ -6,6 +6,13 @@ import type { AppRole } from "@/lib/auth-context";
 export const ROUTE_ROLES = {
   "/admin": ["admin"],
   "/mcp-audit": ["admin"],
+  "/tickets": ["admin"],
+  "/sync-status": ["admin"],
+  "/ai-command-center": ["admin"],
+  "/ai-command-center/agents": ["admin"],
+  "/ai-command-center/inbox": ["admin"],
+  "/ai-command-center/run-now": ["admin"],
+  "/ai-command-center/audit": ["admin"],
   // Master ADR Entry: ops roles enter data; leadership may view import history.
   "/entry": ["admin", "ops_lead", "ops_user", "leadership"],
   "/mml-lab/lab-catalog": ["admin", "leadership", "finance", "ops_lead", "ops_user", "viewer"],

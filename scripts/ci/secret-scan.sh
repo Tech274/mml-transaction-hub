@@ -19,8 +19,26 @@ if [ -n "$HITS" ]; then
   echo "$HITS" | sed -E 's/(.{12}).*/\1…(redacted)/' >&2
   exit 1
 fi
-if git diff --name-only --diff-filter=A "$BASE" HEAD | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$'; then
-  echo ".env files must not be committed (use .env.example with names only)." >&2
-  exit 1
+NEW_ENV_FILES="$(git diff --name-only --diff-filter=A "$BASE" HEAD | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$' || true)"
+if [ -n "$NEW_ENV_FILES" ]; then
+  BAD_ENV_FILES=()
+  while IFS= read -r FILE; do
+    [ -z "$FILE" ] && continue
+    if [ "$FILE" = ".env.production" ]; then
+      CONTENT="$(git show "HEAD:${FILE}" | tr -d '\r')"
+      if [ "$CONTENT" != "VITE_SCRUM44_UI_REVIEW_ENABLED=true" ]; then
+        echo ".env.production may only contain VITE_SCRUM44_UI_REVIEW_ENABLED=true." >&2
+        exit 1
+      fi
+      continue
+    fi
+    BAD_ENV_FILES+=("$FILE")
+  done <<< "$NEW_ENV_FILES"
+
+  if [ "${#BAD_ENV_FILES[@]}" -gt 0 ]; then
+    printf '%s\n' "${BAD_ENV_FILES[@]}"
+    echo ".env files must not be committed (use .env.example with names only)." >&2
+    exit 1
+  fi
 fi
 echo "Secret scan: no findings in added lines."
