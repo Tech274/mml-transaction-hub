@@ -25,6 +25,49 @@ It also sets `VITE_SCRUM44_UI_REVIEW_ENABLED=true` in `.env.local` so the
 SCRUM-44 review UI (azure theme + public/private cloud screen refresh) is on
 for local demo runs.
 
+## Local migrations required for the demo scope
+
+`scripts/demo-local.sh` applies every SQL file in `supabase/migrations` to the
+local database. For this HOLD branch demo, the critical ones are:
+
+- `20260928120200_mml_lab_batches_and_margin.sql` (batch totals, margin model)
+- `20260928143000_scrum44_lab_transaction_locks_and_ai_assignment.sql`
+  (cost lock, AI worker claim/release path, approval gate statuses)
+- `20260925130000_scrum103_import_batches.sql` +
+  `20260928031000_scrum103_lenient_import.sql` +
+  `20260928040000_scrum103_customer_name_normalize.sql`
+  (strict import path and legacy import hardening)
+- `20260925150000_scrum92_freshdesk_stale_marker.sql`
+  (stale-ticket marker column; sweep stays flag-off unless explicitly enabled)
+- `20260928090500_scrum78_role_check_respects_active.sql`
+  (disabled users blocked server-side)
+
+If you start from an already running local Supabase stack, re-apply these by
+re-running `bash scripts/demo-local.sh` from repo root.
+
+## Dev-only capture smoke path (no hosted dependencies)
+
+When local Supabase bootstrap is unavailable, run the UI smoke review against
+the dev-only capture mode (compiled out of production):
+
+```bash
+VITE_SUPERADMIN_CAPTURE_MODE=true \
+VITE_SCRUM44_UI_REVIEW_ENABLED=true \
+npm run dev -- --host 127.0.0.1 --port 4173
+```
+
+Then open:
+
+- `http://127.0.0.1:4173/auth` (login screen)
+- `http://127.0.0.1:4173/dashboard?captureRole=<role>`
+  where role is `admin|leadership|finance|ops_lead|ops_user|viewer`
+- `http://127.0.0.1:4173/transactions?captureRole=admin`
+- `http://127.0.0.1:4173/public-cloud?captureRole=admin`
+- `http://127.0.0.1:4173/private-cloud?captureRole=admin`
+- `http://127.0.0.1:4173/tickets?captureRole=admin`
+- `http://127.0.0.1:4173/ai-command-center/inbox?captureRole=admin`
+- `http://127.0.0.1:4173/admin?captureRole=admin`
+
 Passwords (local only): `DemoLocal!2026`
 
 | Email | Role |

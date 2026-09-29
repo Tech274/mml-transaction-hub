@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { dbError, logIfError } from "@/lib/app-error";
+import { dbError, logAudit, logIfError } from "@/lib/app-error";
 import { APP_ROLES, requireRole, type RoleContext } from "@/lib/require-role";
 import { applyActive, assertNotLastAdmin, assignCreatedUserRoles, syncRoles } from "@/lib/admin-guards";
 
@@ -127,13 +127,18 @@ export const adminDeleteUser = createServerFn({ method: "POST" })
   .inputValidator((d: { userId: string }) => z.object({ userId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
-    if (data.userId === context.userId) throw new Error("You cannot delete your own account.");
+    if (data.userId === context.userId) throw new Error("You cannot disable your own account.");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    await assertNotLastAdmin(supabaseAdmin, data.userId, false, "delete");
-
-    const { error } = await supabaseAdmin.auth.admin.deleteUser(data.userId);
-    if (error) throw dbError(error, "admin.adminDeleteUser");
+    // SCRUM-105 (G-11): keep history and foreign-key references intact by disabling
+    // the account instead of hard deleting auth.users rows.
+    await assertNotLastAdmin(supabaseAdmin, data.userId, false, "disable", { activeOnly: true });
+    await applyActive(supabaseAdmin, data.userId, false, context.userId);
+    logAudit("admin.user.deactivate", {
+      actor_user_id: context.userId,
+      target_user_id: data.userId,
+      action: "deactivate",
+    });
     return { ok: true };
   });
 

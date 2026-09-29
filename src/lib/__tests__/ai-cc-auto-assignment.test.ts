@@ -91,9 +91,9 @@ describe("approval gate", () => {
     expect(statusAfterPreparation("publish")).toBe("needs_approval");
   });
 
-  it("allows non-live tasks to finish preparation automatically", () => {
+  it("marks non-live tasks as assigned without the approval gate", () => {
     expect(requiresHumanApproval("task_create")).toBe(false);
     expect(requiresHumanApproval("analysis")).toBe(false);
-    expect(statusAfterPreparation("task_create")).toBe("prepared");
+    expect(statusAfterPreparation("task_create")).toBe("assigned");
   });
 });

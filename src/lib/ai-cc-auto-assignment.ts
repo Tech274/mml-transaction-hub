@@ -29,8 +29,8 @@ export function requiresHumanApproval(workType: AiCcWorkType): boolean {
   return workType === "publish" || workType === "deploy" || workType === "live_write";
 }
 
-export function statusAfterPreparation(workType: AiCcWorkType): "prepared" | "needs_approval" {
-  return requiresHumanApproval(workType) ? "needs_approval" : "prepared";
+export function statusAfterPreparation(workType: AiCcWorkType): "assigned" | "needs_approval" {
+  return requiresHumanApproval(workType) ? "needs_approval" : "assigned";
 }
 
 /**

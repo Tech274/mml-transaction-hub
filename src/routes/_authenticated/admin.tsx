@@ -158,7 +158,7 @@ function AdminPage() {
                       canReset={can("feature_user_reset_password")}
                       onSave={async (v) => { await updateProfileFn({ data: { userId: u.id, ...v } }); toast.success("User updated"); refresh(); }}
                       onSetActive={async (active) => { await setActiveFn({ data: { userId: u.id, active } }); toast.success(active ? "User enabled" : "User disabled"); refresh(); }}
-                      onDelete={async () => { await deleteUserFn({ data: { userId: u.id } }); toast.success(`Deleted ${u.email ?? "user"}`); refresh(); }}
+                      onDelete={async () => { await deleteUserFn({ data: { userId: u.id } }); toast.success(`Disabled ${u.email ?? "user"}`); refresh(); }}
                       onResetPassword={async (tempPassword) => {
                         await resetPasswordFn({ data: { userId: u.id, tempPassword } });
                         try { await navigator.clipboard.writeText(tempPassword); } catch { /* clipboard may be blocked */ }
@@ -1214,23 +1214,23 @@ function UserRow({
                   size="sm"
                   variant="destructive"
                   disabled={isSelf || isLastAdmin}
-                  title={isSelf ? "You cannot delete your own account" : isLastAdmin ? "Cannot delete the last Super Admin" : "Delete this user"}
+                  title={isSelf ? "You cannot disable your own account" : isLastAdmin ? "Cannot disable the last Super Admin" : "Disable this user"}
                   data-testid="delete-user-open"
                 >
-                  Delete
+                  Disable
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete user</AlertDialogTitle>
+                  <AlertDialogTitle>Disable user</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Permanently delete {user.email}? This removes their login and cannot be undone.
+                    Disable {user.email}? This keeps history but blocks sign-in until re-enabled.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
                   <AlertDialogAction onClick={(e) => { e.preventDefault(); void doDelete(); }} data-testid="delete-user-confirm">
-                    {busy ? "Deleting…" : "Delete permanently"}
+                    {busy ? "Disabling…" : "Disable user"}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

@@ -100,7 +100,7 @@ export const PERMISSIONS: PermDef[] = [
     label: "Create and edit users (email, name, roles, status)",
     group: "Admin",
   },
-  { key: "feature_user_delete", kind: "feature", label: "Delete users", group: "Admin" },
+  { key: "feature_user_delete", kind: "feature", label: "Disable users", group: "Admin" },
   {
     key: "feature_user_reset_password",
     kind: "feature",

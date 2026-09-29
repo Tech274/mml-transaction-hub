@@ -30,7 +30,7 @@ for publish/migration · **Open** = known gap · **Waits** = blocked on a decisi
 |---|---|---|---|---|
 | Sign-in `src/routes/auth.tsx` | Email + password; no public sign-up | OK (live since 25 Sep) | Account review (SCRUM-45, Vivek) | _to do_ |
 | Dashboard `src/routes/_authenticated/dashboard.tsx` | Revenue/cost/margin KPIs, agent KPIs | Fixed, not live: reads all rows (no 1,000 cap, #16) | Finance cards hidden only in the browser (SCRUM-58, Vivek); KPI definitions (SCRUM-69, Vivek) | _to do_ |
-| Master ADR entry `src/routes/_authenticated/entry.tsx` | Single entry form + bulk import + import history | Fixed, not live: shared validation and server-side create (#21); strict importer behind a flag, legacy importer admin-only (#8–#11) | Strict importer rules + sample (SCRUM-103, Vivek) | _to do_ |
+| Master ADR entry `src/routes/_authenticated/entry.tsx` | Single entry form + bulk import + import history | Fixed, not live: shared validation and server-side create (#21); strict importer is now the only UI import path (legacy importer no longer exposed) (#8–#11, #46 HOLD) | Strict importer rules + sample (SCRUM-103, Vivek) | _to do_ |
 | Transactions `src/routes/_authenticated/transactions.tsx` | Paged list, search, soft delete | OK; unused delete grants removed in a repo-only migration (#28) | Cost columns visible to all roles (SCRUM-58) | _to do_ |
 | Public cloud `src/routes/_authenticated/public-cloud.tsx` | Transactions filtered to public cloud | OK | Classification rules (SCRUM-68, Vivek) | _to do_ |
 | Private cloud `src/routes/_authenticated/private-cloud.tsx` | Transactions filtered to private cloud | OK | Classification rules (SCRUM-68, Vivek) | _to do_ |
