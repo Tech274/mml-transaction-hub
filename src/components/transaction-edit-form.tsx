@@ -256,7 +256,7 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
             Cost fields are locked. Super Admin can correct them with a reason.
           </p>
           {isAdmin ? (
-            <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-[1fr_1fr_2fr_auto] md:items-end">
+            <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2 md:items-end">
               <div className="space-y-1">
                 <Label className="text-[11px] text-muted-foreground">Correct input cost</Label>
                 <Input
@@ -277,25 +277,28 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
                   data-testid="correct-selling-cost"
                 />
               </div>
-              <div className="space-y-1">
+              <div className="space-y-1 md:col-span-2">
                 <Label className="text-[11px] text-muted-foreground">Reason</Label>
                 <Input
+                  className="w-full"
                   value={costCorrectionReason}
                   onChange={(e) => setCostCorrectionReason(e.target.value)}
-                  placeholder="Required reason"
+                  placeholder="Required reason for cost correction"
                   data-testid="correct-cost-reason"
                 />
               </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={onCorrectCost}
-                disabled={correctingCost}
-                data-testid="correct-cost-button"
-              >
-                {correctingCost ? "Correcting…" : "Correct cost"}
-              </Button>
+              <div className="md:col-span-2 md:flex md:justify-end">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={onCorrectCost}
+                  disabled={correctingCost}
+                  data-testid="correct-cost-button"
+                >
+                  {correctingCost ? "Correcting…" : "Correct cost"}
+                </Button>
+              </div>
             </div>
           ) : null}
           {costCorrectionError ? (
