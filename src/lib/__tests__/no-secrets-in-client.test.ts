@@ -11,6 +11,10 @@ const files = import.meta.glob(["/src/**/*.{ts,tsx}", "!/src/**/__tests__/**"], 
 const SERVER_ONLY_SECRETS: Record<string, string[]> = {
   SUPABASE_SERVICE_ROLE_KEY: ["/src/integrations/supabase/client.server.ts"],
   FRESHDESK_API_KEY: ["/src/lib/freshdesk.server.ts"],
+  OPENAI_API_KEY: ["/src/lib/ai/providers/env.server.ts"],
+  ANTHROPIC_API_KEY: ["/src/lib/ai/providers/env.server.ts"],
+  GEMINI_API_KEY: ["/src/lib/ai/providers/env.server.ts"],
+  OPENAI_COMPAT_API_KEY: ["/src/lib/ai/providers/env.server.ts"],
 };
 
 describe("secrets stay server-side", () => {
