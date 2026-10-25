@@ -21,7 +21,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { RefreshCw, LifeBuoy, AlertTriangle, Eye, Loader2, CheckCircle2, X, UserCheck, History, Flame } from "lucide-react";
+import { RefreshCw, LifeBuoy, AlertTriangle, Eye, Loader2, CheckCircle2, X, UserCheck, History, Flame, Bot } from "lucide-react";
+import { getAiUiAvailability, runModelAgent } from "@/lib/ai/agent.functions";
 import { useAuth } from "@/lib/auth-context";
 import {
   getTicketsOverview, syncFreshdeskNow, getAgentDirectory, setMyAgentIdentity,
@@ -163,6 +164,7 @@ function TicketsPage() {
   const overviewFn = useServerFn(getTicketsOverview);
   const syncFn = useServerFn(syncFreshdeskNow);
   const directoryFn = useServerFn(getAgentDirectory);
+  const aiUiAvailabilityFn = useServerFn(getAiUiAvailability);
 
   const search = Route.useSearch();
   const [view, setView] = useState<"all" | "mine">(search.view);
@@ -190,6 +192,11 @@ function TicketsPage() {
   const directory = useQuery({
     queryKey: ["freshdesk", "agents"],
     queryFn: () => directoryFn(),
+    enabled: !isExampleCaptureMode,
+  });
+  const aiUiAvailability = useQuery({
+    queryKey: ["ai-ui-availability", "tickets"],
+    queryFn: () => aiUiAvailabilityFn(),
     enabled: !isExampleCaptureMode,
   });
 
@@ -495,6 +502,7 @@ function TicketsPage() {
         ticket={open}
         onClose={() => setOpen(null)}
         canAct={canAct}
+        canDraftWithAi={aiUiAvailability.data?.ticketTriageEnabled ?? false}
         agents={directoryData?.agents ?? []}
       />
     </AppShell>
@@ -550,16 +558,23 @@ function AgentIdentityBar({
 }
 
 function TicketDetailSheet({
-  ticket, onClose, canAct, agents,
+  ticket, onClose, canAct, canDraftWithAi, agents,
 }: {
   ticket: TicketRow | null;
   onClose: () => void;
   canAct: boolean;
+  canDraftWithAi: boolean;
   agents: { id: number; name: string; email: string | null }[];
 }) {
   const qc = useQueryClient();
   const historyFn = useServerFn(getTicketHistory);
   const resolveFn = useServerFn(resolveTicket);
+  const draftFn = useServerFn(runModelAgent);
+  const draft = useMutation({
+    mutationFn: () => draftFn({ data: { agentKey: "ticket_triage", hint: `Ticket ${ticket?.id}` } }),
+    onSuccess: (result) => toast.success(result.status === "done" ? "Draft is in the Inbox. Nothing was sent." : (result.error ?? "The agent did not finish")),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not draft a reply"),
+  });
 
   const [assignee, setAssignee] = useState<string>("");
   const [nextStatus, setNextStatus] = useState<string>("");
@@ -621,6 +636,12 @@ function TicketDetailSheet({
             </TabsList>
 
             <TabsContent value="overview" className="space-y-4 text-sm">
+              {canAct && canDraftWithAi && (
+                <Button size="sm" variant="outline" data-testid="draft-with-ai" disabled={draft.isPending} onClick={() => draft.mutate()}>
+                  {draft.isPending ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Bot className="mr-1 h-3.5 w-3.5" />}
+                  Draft with AI
+                </Button>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <Field label="Status" value={ticket.status} />
                 <Field label="Priority" value={ticket.priority} />

@@ -201,4 +201,23 @@ SELECT public.recompute_lab_batch_costs(id, 'invoice')
   FROM public.lab_batches
  WHERE batch_code IN ('LB-DEMO-USD', 'LB-DEMO-GAP', 'LB-DEMO-PRIV', 'LB-DEMO-LATE', 'LB-DEMO-OPEN');
 
+-- Ticket the local triage walkthrough opens. Synthetic only.
+INSERT INTO public.freshdesk_tickets (id, subject, status, company_name, description_text, requester_email, priority)
+VALUES (
+  9001001,
+  'DEMO cannot access the lab portal',
+  'Open',
+  'Northwind Training',
+  'The portal says access denied.',
+  'learner@example.test',
+  'High'
+)
+ON CONFLICT (id) DO UPDATE SET
+  subject = EXCLUDED.subject,
+  status = EXCLUDED.status,
+  company_name = EXCLUDED.company_name,
+  description_text = EXCLUDED.description_text,
+  requester_email = EXCLUDED.requester_email,
+  priority = EXCLUDED.priority;
+
 COMMIT;

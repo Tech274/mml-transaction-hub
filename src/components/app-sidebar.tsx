@@ -17,6 +17,7 @@ import {
   Inbox,
   Play,
   History,
+  Gauge,
   FlaskConical,
   Calculator,
   Layers,
@@ -109,6 +110,7 @@ const aiCommandCenterNav: NavItem[] = [
   { to: "/ai-command-center/inbox", label: "Inbox", icon: Inbox, roles: ["admin"] },
   { to: "/ai-command-center/run-now", label: "Run now", icon: Play, roles: ["admin"] },
   { to: "/ai-command-center/audit", label: "Audit", icon: History, roles: ["admin"] },
+  { to: "/ai-command-center/usage", label: "Usage", icon: Gauge, roles: ["admin"] },
 ];
 
 export function AppSidebar() {
