@@ -32,7 +32,7 @@ Run on `main` at `da003d4` from a fresh clone. Values were never printed or reco
 
 | Check | Result |
 |---|---|
-| Full git history scan (gitleaks 8.21.2, all 130 commits) | 3 hits, **none a real secret**: the public Supabase anon key (JWT `role: anon`) in the two cron migrations listed below, and the fake test fixture `AKIAABCDEFGHIJKLMNOP` in an old revision of a test file |
+| Full git history scan (gitleaks 8.21.2, all 130 commits) | 3 hits, **none a real secret**: the public Supabase anon key (JWT `role: anon`) in the two cron migrations listed below, and a fake AWS-style test fixture (not a real key) in an old revision of a test file |
 | Current source scan (`src/`, gitleaks) | no leaks |
 | Production client bundle (`bun run build` with placeholder env, `.output/public`, gitleaks + grep for `SUPABASE_SERVICE_ROLE_KEY`, `FRESHDESK_API_KEY`, `service_role`, private-key headers) | no leaks; the only match is the library's `sb_secret_` prefix check, which is not a key |
 | `src/lib/__tests__/no-secrets-in-client.test.ts` | 5/5 pass |
