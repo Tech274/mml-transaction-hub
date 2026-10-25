@@ -4,6 +4,10 @@ One place for every known error in MML Transaction Hub: where it came from, its 
 is reproduced, what is fixed in `main`, and what is still open. Updated 28 Sep 2026 (main after
 PR #31). All times IST.
 
+- **Update, 25 Oct 2026 (MML-78):** the "nothing from GitHub is live yet" line below is out of
+  date. `main` was first published on 28 Sep 2026 (`docs/runbooks/publish-main.md`), and PRs
+  #39–#48 followed through 30 Sep. Per-row live status has not been re-audited since, so read
+  **Code status** as `main` only. The owner-reported error list (section 1) is still not received.
 - **Code status** covers `main` only. **Nothing from GitHub is live yet.** Live still runs the
   Lovable build from 25 Sep. The only live fixes are the 25 Sep emergency lockdown changes
   (sign-up closed, no default role, anon locked out), which PR #1 brought into the repo.

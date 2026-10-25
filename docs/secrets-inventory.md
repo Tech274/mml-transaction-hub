@@ -22,9 +22,24 @@ No other API keys (AI providers, email, payment) are read by the code.
 - **Unit test** `src/lib/__tests__/no-secrets-in-client.test.ts`: the two secret env
   names may only be read in their `*.server.ts` modules; no `VITE_*` name may look
   like a secret; no JWT, `sb_secret_` or private-key text in `src/` source.
-- **Not yet confirmed:** GitHub secret scanning and push protection for the repository.
-  The repository owner needs to enable these (Settings → Code security); agents do not
-  change repository settings.
+- **GitHub secret scanning and push protection:** enabled on this repository on
+  24 Oct 2026 (19:53 IST), under the MML blanket approval (MML-65). Open secret-scanning
+  alerts on 25 Oct 2026: 0.
+
+## Verification, 25 Oct 2026 (MML-65)
+
+Run on `main` at `da003d4` from a fresh clone. Values were never printed or recorded.
+
+| Check | Result |
+|---|---|
+| Full git history scan (gitleaks 8.21.2, all 130 commits) | 3 hits, **none a real secret**: the public Supabase anon key (JWT `role: anon`) in the two cron migrations listed below, and a fake AWS-style test fixture (not a real key) in an old revision of a test file |
+| Current source scan (`src/`, gitleaks) | no leaks |
+| Production client bundle (`bun run build` with placeholder env, `.output/public`, gitleaks + grep for `SUPABASE_SERVICE_ROLE_KEY`, `FRESHDESK_API_KEY`, `service_role`, private-key headers) | no leaks; the only match is the library's `sb_secret_` prefix check, which is not a key |
+| `src/lib/__tests__/no-secrets-in-client.test.ts` | 5/5 pass |
+| GitHub secret-scanning alerts | 0 |
+
+Result: no private keys in the repository or the browser bundle; private values live only in
+the hosting secret store and Supabase Vault, as listed above.
 
 ## Known exposure (not a secret leak, still to fix)
 

@@ -1,5 +1,12 @@
 # SNAPSHOT: review copy synced to live HEAD
 
+> **Update, 25 Oct 2026 (MML-78).** This file describes the 25 Sep 2026 snapshot and is kept as
+> history. Since then this repository is where reviewed changes land as pull requests (PRs #1–#48,
+> `main` at `da003d4` on 30 Sep 2026). Live is built from the Lovable-linked repository
+> `Tech274/mml-internal`; changes reach it only through `docs/runbooks/publish-main.md`, with the
+> approvals listed there. A merge here does **not** reach live on its own. `supabase/config.toml`
+> `project_id` was checked on 25 Oct 2026 and matches the live project ref `kxqbpmgstdakissfrdwc`.
+
 This repository mirrors the MML Transaction Hub source at Lovable HEAD.
 
 | Item | Value |
