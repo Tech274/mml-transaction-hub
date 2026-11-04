@@ -116,7 +116,7 @@
       {
         "name": "reports_summary",
         "title": "Reports summary",
-        "description": "Return aggregate totals (revenue, input cost, profit, margin %, transaction count, user count) for a given year, optionally filtered by cloud_provider and line_of_business.",
+        "description": "Return aggregate totals (revenue, input cost, profit, margin %, transaction count, user count) for a given year, optionally filtered by cloud_provider and line_of_business. Also returns how many of those transactions are Incomplete (price missing or 0, or a required field blank) and their value; Incomplete rows are included in the totals.",
         "annotations": {
           "readOnlyHint": true,
           "idempotentHint": true,
