@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
+import { pageHead, pageShell } from "@/lib/nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,10 +28,28 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { requireRouteRoles } from "@/lib/route-guard";
-import { PUBLIC_CLOUD_PROVIDERS, LINES_OF_BUSINESS, PRIVATE_CLOUD_PROVIDER } from "@/lib/adr-entry";
+import { LINES_OF_BUSINESS } from "@/lib/adr-entry";
+import {
+  isCloudType,
+  isProviderAllowedForCloudType,
+  normalizeProvider,
+} from "@/lib/cloud-provider";
+import { LAB_TYPE_OPTIONS, labTypeLabel } from "@/lib/lab-type-label";
+import { CloudTypeBadge } from "@/components/cloud/cloud-type-badge";
+import { ProviderSelectItems } from "@/components/cloud/provider-select-items";
 import { toast } from "sonner";
+import { Plus } from "lucide-react";
+import {
+  FilterActions,
+  FilterBar,
+  FilterSearch,
+  FilterSelect,
+  FilterSummary,
+} from "@/components/filter-bar";
+import { TableStateRow } from "@/components/data-table-parts";
 
 export const Route = createFileRoute("/_authenticated/mml-lab/lab-catalog")({
+  head: () => pageHead("/mml-lab/lab-catalog"),
   beforeLoad: requireRouteRoles("/mml-lab/lab-catalog"),
   component: LabCatalogPage,
 });
@@ -54,7 +73,8 @@ const empty = {
   title: "",
   summary: "",
   description: "",
-  lab_type: "public_cloud",
+  // SCRUM-129: no default cloud type; the user must choose.
+  lab_type: "",
   cloud_provider: "",
   vm_tier_id: "",
   default_duration_days: "",
@@ -90,7 +110,12 @@ function LabCatalogPage() {
     },
   });
 
-  const { data: rows = [], isLoading } = useQuery({
+  const {
+    data: rows = [],
+    isLoading,
+    isError,
+    refetch,
+  } = useQuery({
     queryKey: ["lab-catalog"],
     queryFn: async () => {
       const { data, error } = await supabase.from("lab_catalog").select("*").order("title");
@@ -139,6 +164,27 @@ function LabCatalogPage() {
   }
 
   async function save() {
+    // SCRUM-129: lab type required; provider one of the six and matching the type.
+    if (!form.lab_type) {
+      toast.error("Choose a lab type: Private cloud, Public cloud or Hybrid");
+      return;
+    }
+    if (form.cloud_provider && !normalizeProvider(form.cloud_provider).ok) {
+      toast.error("Choose one of the six cloud providers");
+      return;
+    }
+    if (isCloudType(form.lab_type)) {
+      if (!form.cloud_provider) {
+        toast.error("Cloud Provider is required");
+        return;
+      }
+      if (!isProviderAllowedForCloudType(form.cloud_provider, form.lab_type)) {
+        toast.error(
+          `${form.cloud_provider} is not ${labTypeLabel(form.lab_type)}. Private cloud is MakeMyLabs, Oracle or SAP; Public cloud is AWS, Azure or GCP.`,
+        );
+        return;
+      }
+    }
     const tags = form.tags
       .split(",")
       .map((t) => t.trim())
@@ -192,116 +238,154 @@ function LabCatalogPage() {
   }
 
   return (
-    <AppShell title="Lab catalog">
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="grow min-w-48">
-            <Label className="text-xs">Search</Label>
-            <Input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Title, summary or tag"
-              data-testid="lab-search"
-            />
-          </div>
-          <Filter
-            label="Lab type"
-            value={labType}
-            onChange={setLabType}
-            options={["all", "public_cloud", "private_cloud", "hybrid"]}
+    <AppShell {...pageShell("/mml-lab/lab-catalog")}>
+      {/* #29: the shared FilterBar (search, Lab type, grouped Provider, LOB, Status). */}
+      <FilterBar
+        summary={
+          <FilterSummary
+            items={[
+              {
+                label: "Showing",
+                value: `${filtered.length.toLocaleString()}${filtered.length === 50 ? " (first 50)" : ""}`,
+              },
+            ]}
           />
-          <Filter
-            label="Provider"
-            value={provider}
-            onChange={setProvider}
-            options={["all", ...PUBLIC_CLOUD_PROVIDERS, PRIVATE_CLOUD_PROVIDER]}
+        }
+      >
+        <FilterSearch
+          label="Search labs"
+          placeholder="Title, summary or tag"
+          value={q}
+          onChange={setQ}
+          testId="lab-search"
+        />
+        <FilterSelect
+          label="Lab type"
+          value={labType}
+          onValueChange={setLabType}
+          allLabel="All lab types"
+          options={LAB_TYPE_OPTIONS.map((o) => ({ value: o, label: labTypeLabel(o) }))}
+        />
+        <FilterSelect
+          label="Provider"
+          value={provider}
+          onValueChange={setProvider}
+          allLabel="All providers"
+        >
+          <ProviderSelectItems />
+        </FilterSelect>
+        <FilterSelect
+          label="Line of business"
+          value={lob}
+          onValueChange={setLob}
+          allLabel="All"
+          width="md"
+          options={LINES_OF_BUSINESS.map((l) => ({ value: l, label: l }))}
+        />
+        {canEdit && (
+          <FilterSelect
+            label="Status"
+            value={status}
+            onValueChange={setStatus}
+            allLabel="All statuses"
+            options={[
+              { value: "draft", label: "Draft" },
+              { value: "published", label: "Published" },
+              { value: "archived", label: "Archived" },
+            ]}
           />
-          <Filter
-            label="Line of business"
-            value={lob}
-            onChange={setLob}
-            options={["all", ...LINES_OF_BUSINESS]}
-          />
-          {canEdit && (
-            <Filter
-              label="Status"
-              value={status}
-              onChange={setStatus}
-              options={["all", "draft", "published", "archived"]}
-            />
-          )}
-          {canEdit && <Button onClick={startNew}>New entry</Button>}
-        </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Labs MML offers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading && <p className="text-sm text-muted-foreground">Loading…</p>}
-            {!isLoading && filtered.length === 0 && (
-              <p className="text-sm text-muted-foreground">No labs match</p>
-            )}
-            {filtered.length > 0 && (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Provider</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((r) => (
-                    <TableRow key={r.id} data-testid={`lab-row-${r.status}`}>
-                      <TableCell>
-                        <button
-                          className="text-left font-medium hover:underline"
-                          onClick={() => setDetail(r)}
+        )}
+        {canEdit && (
+          <FilterActions>
+            <Button size="sm" onClick={startNew}>
+              <Plus className="mr-1 size-4" />
+              New entry
+            </Button>
+          </FilterActions>
+        )}
+      </FilterBar>
+
+      <Card className="min-w-0">
+        <CardHeader>
+          <CardTitle className="text-sm">Labs MML offers</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Title</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Provider</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableStateRow colSpan={5}>Loading labs…</TableStateRow>
+              ) : isError ? (
+                <TableStateRow colSpan={5} onRetry={() => refetch()}>
+                  Could not load the lab catalog.
+                </TableStateRow>
+              ) : (
+                filtered.length === 0 && <TableStateRow colSpan={5}>No labs match.</TableStateRow>
+              )}
+              {filtered.map((r) => (
+                <TableRow key={r.id} data-testid={`lab-row-${r.status}`}>
+                  <TableCell>
+                    <button
+                      type="button"
+                      className="text-left font-medium hover:underline"
+                      onClick={() => setDetail(r)}
+                    >
+                      {r.title}
+                    </button>
+                    {r.summary && <div className="text-xs text-muted-foreground">{r.summary}</div>}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {r.lab_type === "hybrid" ? (
+                      <Badge variant="outline" className="whitespace-nowrap">
+                        Hybrid
+                      </Badge>
+                    ) : (
+                      <CloudTypeBadge value={r.lab_type} />
+                    )}
+                  </TableCell>
+                  <TableCell>{r.cloud_provider ?? "—"}</TableCell>
+                  <TableCell>
+                    <Badge variant={catalogStatusVariant(r.status)}>{r.status}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {canEdit && (
+                        <Button size="sm" variant="outline" onClick={() => startEdit(r)}>
+                          Edit
+                        </Button>
+                      )}
+                      {canEdit && r.status !== "published" && (
+                        <Button size="sm" onClick={() => changeStatus(r, "published")}>
+                          Publish
+                        </Button>
+                      )}
+                      {canEdit && r.status !== "archived" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => changeStatus(r, "archived")}
                         >
-                          {r.title}
-                        </button>
-                        {r.summary && (
-                          <div className="text-xs text-muted-foreground">{r.summary}</div>
-                        )}
-                      </TableCell>
-                      <TableCell>{r.lab_type.replace("_", " ")}</TableCell>
-                      <TableCell>{r.cloud_provider ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={r.status === "published" ? "default" : "secondary"}>
-                          {r.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-1">
-                        {canEdit && (
-                          <Button size="sm" variant="outline" onClick={() => startEdit(r)}>
-                            Edit
-                          </Button>
-                        )}
-                        {canEdit && r.status !== "published" && (
-                          <Button size="sm" onClick={() => changeStatus(r, "published")}>
-                            Publish
-                          </Button>
-                        )}
-                        {canEdit && r.status !== "archived" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => changeStatus(r, "archived")}
-                          >
-                            Archive
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                          Archive
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
 
       <Dialog open={!!detail} onOpenChange={(v) => !v && setDetail(null)}>
         <DialogContent>
@@ -310,12 +394,13 @@ function LabCatalogPage() {
           </DialogHeader>
           {detail && (
             <div className="space-y-2 text-sm">
-              <Badge>{detail.status}</Badge>
+              <Badge variant={catalogStatusVariant(detail.status)}>{detail.status}</Badge>
               <p>{detail.summary}</p>
               <p className="whitespace-pre-wrap">{detail.description}</p>
-              <p>
-                Type: {detail.lab_type} · Provider: {detail.cloud_provider ?? "—"} · Duration:{" "}
-                {detail.default_duration_days ?? "—"} days
+              <p className="text-muted-foreground">
+                Type: {labTypeLabel(detail.lab_type)} · Provider: {detail.cloud_provider ?? "—"} ·
+                Duration:{" "}
+                <span className="tabular-nums">{detail.default_duration_days ?? "—"}</span> days
               </p>
               {detail.document_url && (
                 <a
@@ -333,7 +418,7 @@ function LabCatalogPage() {
       </Dialog>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editing ? "Edit catalog entry" : "New catalog entry"}</DialogTitle>
           </DialogHeader>
@@ -354,22 +439,47 @@ function LabCatalogPage() {
               onChange={(e) => setForm({ ...form, description: e.target.value })}
             />
             <Label>Lab type</Label>
-            <Select value={form.lab_type} onValueChange={(v) => setForm({ ...form, lab_type: v })}>
-              <SelectTrigger>
-                <SelectValue />
+            <Select
+              value={form.lab_type || undefined}
+              onValueChange={(v) =>
+                setForm({
+                  ...form,
+                  lab_type: v,
+                  // Clear a provider that does not belong to the new type.
+                  cloud_provider:
+                    isCloudType(v) &&
+                    form.cloud_provider &&
+                    !isProviderAllowedForCloudType(form.cloud_provider, v)
+                      ? ""
+                      : form.cloud_provider,
+                })
+              }
+            >
+              <SelectTrigger aria-invalid={!form.lab_type}>
+                <SelectValue placeholder="Choose lab type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="public_cloud">Public cloud</SelectItem>
                 <SelectItem value="private_cloud">Private cloud</SelectItem>
+                <SelectItem value="public_cloud">Public cloud</SelectItem>
                 <SelectItem value="hybrid">Hybrid</SelectItem>
               </SelectContent>
             </Select>
             <Label>Cloud provider</Label>
-            <Input
-              value={form.cloud_provider}
-              onChange={(e) => setForm({ ...form, cloud_provider: e.target.value })}
-              placeholder="AWS, Azure, GCP or MakeMyLabs Private Cloud"
-            />
+            <Select
+              value={form.cloud_provider || undefined}
+              onValueChange={(v) => setForm({ ...form, cloud_provider: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Choose provider" />
+              </SelectTrigger>
+              <SelectContent>
+                <ProviderSelectItems only={isCloudType(form.lab_type) ? form.lab_type : null} />
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Private cloud is MakeMyLabs, Oracle or SAP. Public cloud is AWS, Azure or GCP. Hybrid
+              labs are not counted as Private or Public cloud.
+            </p>
             {(form.lab_type === "private_cloud" || form.lab_type === "hybrid") && (
               <>
                 <Label>VM tier</Label>
@@ -420,7 +530,9 @@ function LabCatalogPage() {
               value={form.document_url}
               onChange={(e) => setForm({ ...form, document_url: e.target.value })}
             />
-            <Button onClick={save}>Save</Button>
+            <div className="flex justify-end">
+              <Button onClick={save}>Save</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -428,32 +540,9 @@ function LabCatalogPage() {
   );
 }
 
-function Filter({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-}) {
-  return (
-    <div>
-      <Label className="text-xs">{label}</Label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-40">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o} value={o}>
-              {o === "all" ? "All" : o.replaceAll("_", " ")}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
+/** Catalog status badge (§4.8): published success, draft secondary, archived outline. */
+function catalogStatusVariant(status: string): "success" | "secondary" | "outline" {
+  if (status === "published") return "success";
+  if (status === "archived") return "outline";
+  return "secondary";
 }

@@ -19,13 +19,25 @@ describe("headers", () => {
     expect(matchHeaders(h).warnings).toEqual([]);
   });
   it("a missing column is stored blank, warned, and does not block", () => {
-    const r = validateStrict(HEADER.slice(0, 11), [{ line: 2, cells: row(2).cells.slice(0, 11) }]);
+    const keep = HEADER.map((_, i) => i).filter((i) => HEADER[i] !== "Lab Name");
+    const r = validateStrict(keep.map((i) => HEADER[i]), [{ line: 2, cells: keep.map((i) => row(2).cells[i]) }]);
     expect(r.ok).toBe(true);
-    expect(r.records[0].cloud_provider).toBeNull();
+    expect(r.records[0].lab_name).toBeNull();
     expect(r.warnings).toEqual([
-      expect.objectContaining({ header: "Cloud Provider", message: 'Column "Cloud Provider" is missing. Those cells are stored blank.' }),
+      expect.objectContaining({ header: "Lab Name", message: 'Column "Lab Name" is missing. Those cells are stored blank.' }),
     ]);
     expect(commitReady(r)).toBe(true);
+  });
+  it("SCRUM-129: a missing Cloud Provider column blocks every row (never stored blank)", () => {
+    const r = validateStrict(HEADER.slice(0, 11), [{ line: 2, cells: row(2).cells.slice(0, 11) }]);
+    expect(r.ok).toBe(false);
+    expect(r.records[0].cloud_provider).toBeNull();
+    expect(r.records[0].lab_type).toBeNull();
+    expect(r.rowErrors).toEqual([expect.objectContaining({ line: 2, header: "Cloud Provider", message: "Cloud Provider is required" })]);
+    expect(r.warnings).toEqual([
+      expect.objectContaining({ header: "Cloud Provider", message: 'Column "Cloud Provider" is missing. Every row needs a Cloud Provider, so every row is blocked.' }),
+    ]);
+    expect(commitReady(r)).toBe(false);
   });
   it("unknown extra columns are ignored, listed, and do not block", () => {
     const header = [...HEADER, "S.No", "Remarks"];
@@ -81,11 +93,12 @@ describe("headers", () => {
     expect(r.ok).toBe(false);
     expect(r.rowErrors.map((e) => e.message)).toEqual(["No recognised columns; please use the template."]);
   });
-  it("one recognised column is enough; the file is not blocked", () => {
-    const r = validateStrict(["Lab Name", "S.No"], [{ line: 2, cells: ["Lab Z", "1"] }]);
+  it("two recognised columns (one is Cloud Provider) are enough; the file is not blocked", () => {
+    const r = validateStrict(["Lab Name", "Cloud Provider", "S.No"], [{ line: 2, cells: ["Lab Z", "SAP", "1"] }]);
     expect(r.ok).toBe(true);
     expect(r.records).toHaveLength(1);
     expect(r.records[0].lab_name).toBe("Lab Z");
+    expect(r.records[0]).toMatchObject({ cloud_provider: "SAP", lab_type: "private_cloud" });
   });
   it("an explicitly ignored column produces no warning", () => {
     const r = validateStrict([...HEADER, "S.No"], [row(2)], { rules: { ...PROPOSED_RULES, ignoredHeaders: ["s.no"] } });
@@ -212,7 +225,7 @@ describe("blanks and unstorable cells (28 Sep)", () => {
       "Total Users": "",
       "Input Cost": null,
       "Selling Cost": "",
-      "Cloud Provider": "  ",
+      "Cloud Provider": "Oracle",
     })]);
     expect(r.ok).toBe(true);
     expect(r.rowErrors).toEqual([]);
@@ -221,7 +234,7 @@ describe("blanks and unstorable cells (28 Sep)", () => {
     expect(r.records[0].potential_id).toBeNull();
     expect(r.records[0].input_cost_cents).toBeNull();
     expect(r.records[0].selling_cost_cents).toBeNull();
-    expect(r.records[0].cloud_provider).toBeNull();
+    expect(r.records[0].cloud_provider).toBe("Oracle");
     expect(r.records[0].total_users).toBeNull();
   });
   it("blank costs are NULL, never 0", () => {
@@ -250,11 +263,12 @@ describe("blanks and unstorable cells (28 Sep)", () => {
     expect(users).toMatchObject({ line: 2, column: "I", value: "ten" });
     expect(cost).toMatchObject({ line: 2, column: "J", value: "₹100" });
   });
-  it("an unknown provider does not block; the cell is NULL and the original value is on the warning", () => {
+  it("SCRUM-129: an unknown provider BLOCKS the row; the original value is on the error", () => {
     const r = validateStrict(HEADER, [row(2, { "Cloud Provider": "OpenAI" })]);
-    expect(r.ok).toBe(true);
+    expect(r.ok).toBe(false);
     expect(r.records[0].cloud_provider).toBeNull();
-    expect(r.warnings[0]).toMatchObject({ line: 2, column: "L", header: "Cloud Provider", value: "OpenAI" });
+    expect(r.records[0].lab_type).toBeNull();
+    expect(r.rowErrors[0]).toMatchObject({ line: 2, column: "L", header: "Cloud Provider", value: "OpenAI" });
   });
   it("DD/MM text dates are stored blank with a warning", () => {
     const r = validateStrict(HEADER, [row(2, { "Start Date": "07/02/2026" })]);
@@ -288,10 +302,10 @@ describe("blanks and unstorable cells (28 Sep)", () => {
     expect(r.records[0].year).toBeNull();
     expect(r.warnings).toHaveLength(2);
   });
-  it("provider and line of business must match exactly; near misses are stored blank", () => {
+  it("provider matching ignores case (stored canonical); line of business must match exactly", () => {
     const provider = validateStrict(HEADER, [row(2, { "Cloud Provider": "aws" })]);
     expect(provider.ok).toBe(true);
-    expect(provider.records[0].cloud_provider).toBeNull();
+    expect(provider.records[0].cloud_provider).toBe("AWS");
     const lob = validateStrict(HEADER, [row(2, { "Line of Business": "vilt" })]);
     expect(lob.records[0].line_of_business).toBeNull();
     expect(lob.ok).toBe(true);
@@ -310,10 +324,10 @@ describe("blanks and unstorable cells (28 Sep)", () => {
     const r = validateStrict(HEADER, [row(2, { "Customer Name": "  ACME test CO " })]);
     expect(r.records[0].customer_name).toBe("ACME test CO");
   });
-  it("short rows: missing trailing cells are blank, never 0", () => {
+  it("short rows: missing trailing cells are blank, never 0 (and a missing provider blocks)", () => {
     const r = validateStrict(HEADER, [{ line: 2, cells: row(2).cells.slice(0, 9) }]);
-    expect(r.ok).toBe(true);
-    expect(r.rowErrors).toEqual([]);
+    expect(r.ok).toBe(false);
+    expect(r.rowErrors).toEqual([expect.objectContaining({ line: 2, header: "Cloud Provider", message: "Cloud Provider is required" })]);
     expect(r.records[0].input_cost_cents).toBeNull();
     expect(r.records[0].selling_cost_cents).toBeNull();
     expect(r.records[0].cloud_provider).toBeNull();

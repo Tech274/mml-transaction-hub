@@ -24,14 +24,6 @@ if [ -n "$NEW_ENV_FILES" ]; then
   BAD_ENV_FILES=()
   while IFS= read -r FILE; do
     [ -z "$FILE" ] && continue
-    if [ "$FILE" = ".env.production" ]; then
-      CONTENT="$(git show "HEAD:${FILE}" | tr -d '\r')"
-      if [ "$CONTENT" != "VITE_SCRUM44_UI_REVIEW_ENABLED=true" ]; then
-        echo ".env.production may only contain VITE_SCRUM44_UI_REVIEW_ENABLED=true." >&2
-        exit 1
-      fi
-      continue
-    fi
     BAD_ENV_FILES+=("$FILE")
   done <<< "$NEW_ENV_FILES"
 

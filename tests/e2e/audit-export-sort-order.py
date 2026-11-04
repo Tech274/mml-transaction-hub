@@ -71,7 +71,7 @@ async def main() -> int:
         await restore_session(page)
 
         await page.goto(f"{BASE}/admin", wait_until="networkidle")
-        tab = page.get_by_role("tab", name="Customer Audit")
+        tab = page.get_by_role("tab", name="Customer audit")
         if await tab.count() == 0:
             print("Customer Audit tab not visible — skipping."); await browser.close(); return 0
         await tab.click()

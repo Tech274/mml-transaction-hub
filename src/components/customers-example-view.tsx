@@ -1,6 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { fmtCurrency, fmtNumber } from "@/lib/format";
 
 type ExampleCustomer = {
@@ -14,10 +21,42 @@ type ExampleCustomer = {
 };
 
 const EXAMPLE_CUSTOMERS: ExampleCustomer[] = [
-  { name: "Cognizant", accountManager: "Ritu Sharma", status: "Active", transactions: 7, users: 138, revenue: 432000, cost: 311500 },
-  { name: "Infosys", accountManager: "Nisha Patel", status: "Active", transactions: 6, users: 115, revenue: 358000, cost: 249200 },
-  { name: "TCS", accountManager: "Ritu Sharma", status: "Active", transactions: 5, users: 102, revenue: 301000, cost: 217300 },
-  { name: "Wipro", accountManager: "Kavya Iyer", status: "Inactive", transactions: 3, users: 44, revenue: 118000, cost: 92300 },
+  {
+    name: "Cognizant",
+    accountManager: "Ritu Sharma",
+    status: "Active",
+    transactions: 7,
+    users: 138,
+    revenue: 432000,
+    cost: 311500,
+  },
+  {
+    name: "Infosys",
+    accountManager: "Nisha Patel",
+    status: "Active",
+    transactions: 6,
+    users: 115,
+    revenue: 358000,
+    cost: 249200,
+  },
+  {
+    name: "TCS",
+    accountManager: "Ritu Sharma",
+    status: "Active",
+    transactions: 5,
+    users: 102,
+    revenue: 301000,
+    cost: 217300,
+  },
+  {
+    name: "Wipro",
+    accountManager: "Kavya Iyer",
+    status: "Inactive",
+    transactions: 3,
+    users: 44,
+    revenue: 118000,
+    cost: 92300,
+  },
 ];
 
 export function CustomersExampleView() {
@@ -55,7 +94,7 @@ export function CustomersExampleView() {
             <TableHeader>
               <TableRow>
                 <TableHead>Customer</TableHead>
-                <TableHead>Account Manager</TableHead>
+                <TableHead>Account manager</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Transactions</TableHead>
                 <TableHead className="text-right">Users</TableHead>
@@ -70,13 +109,21 @@ export function CustomersExampleView() {
                   <TableCell className="font-medium">{row.name}</TableCell>
                   <TableCell>{row.accountManager}</TableCell>
                   <TableCell>
-                    <Badge variant={row.status === "Active" ? "default" : "secondary"}>{row.status}</Badge>
+                    <Badge variant={row.status === "Active" ? "success" : "secondary"}>
+                      {row.status}
+                    </Badge>
                   </TableCell>
-                  <TableCell className="text-right">{fmtNumber(row.transactions)}</TableCell>
-                  <TableCell className="text-right">{fmtNumber(row.users)}</TableCell>
-                  <TableCell className="text-right">{fmtCurrency(row.revenue)}</TableCell>
-                  <TableCell className="text-right">{fmtCurrency(row.cost)}</TableCell>
-                  <TableCell className="text-right">{fmtCurrency(row.revenue - row.cost)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtNumber(row.transactions)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtNumber(row.users)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtCurrency(row.revenue)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{fmtCurrency(row.cost)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtCurrency(row.revenue - row.cost)}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -65,7 +65,7 @@ async def main() -> int:
         await page.screenshot(path=str(SHOTS / "2_filters.png"))
 
         # Switch to Revenue Forecast tab
-        await page.get_by_role("tab", name="Revenue Forecast").click()
+        await page.get_by_role("tab", name="Revenue forecast").click()
         await page.wait_for_timeout(300)
         await page.screenshot(path=str(SHOTS / "3_forecast.png"))
 

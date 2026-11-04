@@ -1,0 +1,2017 @@
+{
+  "public.all": {
+    "totalsPeriod": {
+      "kind": "all-time"
+    },
+    "livePeriod": {
+      "kind": "now"
+    },
+    "completenessPeriod": {
+      "kind": "all-time"
+    },
+    "view": {
+      "rows": [
+        {
+          "id": "tx-1",
+          "potential_id": "DEMO-PUB-001",
+          "customer_name": "Cognizant",
+          "lab_name": "DevOps Pro",
+          "cloud_provider": "Azure",
+          "line_of_business": "VILT",
+          "selling_cost": 67600,
+          "input_cost": 48200,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 46850,
+          "total_users": 42,
+          "start_date": "2026-09-01",
+          "end_date": "2026-09-28",
+          "public_credit_allocated": 52000,
+          "public_actual_consumption": 46850,
+          "public_unused_credit": 5150,
+          "month": 9,
+          "year": 2026
+        },
+        {
+          "id": "tx-2",
+          "potential_id": "DEMO-PUB-002",
+          "customer_name": "Infosys",
+          "lab_name": "Data Engineering",
+          "cloud_provider": "AWS",
+          "line_of_business": "Standalone",
+          "selling_cost": 57500,
+          "input_cost": 39100,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 38920,
+          "total_users": 30,
+          "start_date": "2026-09-03",
+          "end_date": "2026-09-26",
+          "public_credit_allocated": 43000,
+          "public_actual_consumption": 38920,
+          "public_unused_credit": 4080,
+          "month": 9,
+          "year": 2026
+        },
+        {
+          "id": "tx-3",
+          "potential_id": "DEMO-PUB-003",
+          "customer_name": "TCS",
+          "lab_name": "AI Foundations",
+          "cloud_provider": "Azure",
+          "line_of_business": "VILT",
+          "selling_cost": 96500,
+          "input_cost": 73400,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 72130,
+          "total_users": 55,
+          "start_date": "2026-09-05",
+          "end_date": "2026-09-30",
+          "public_credit_allocated": 76000,
+          "public_actual_consumption": 72130,
+          "public_unused_credit": 3870,
+          "month": 9,
+          "year": 2026
+        },
+        {
+          "id": "tx-4",
+          "potential_id": "DEMO-PUB-004",
+          "customer_name": "Wipro",
+          "lab_name": "Kubernetes Ops",
+          "cloud_provider": "GCP",
+          "line_of_business": "Standalone",
+          "selling_cost": 44600,
+          "input_cost": 28800,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 28240,
+          "total_users": 24,
+          "start_date": "2026-08-02",
+          "end_date": "2026-08-22",
+          "public_credit_allocated": 31500,
+          "public_actual_consumption": 28240,
+          "public_unused_credit": 3260,
+          "month": 8,
+          "year": 2026
+        },
+        {
+          "id": "tx-5",
+          "potential_id": "DEMO-PUB-005",
+          "customer_name": "Capgemini",
+          "lab_name": "Platform SRE",
+          "cloud_provider": "Azure",
+          "line_of_business": "Integrated",
+          "selling_cost": 35200,
+          "input_cost": 22900,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 21980,
+          "total_users": 20,
+          "start_date": "2026-08-10",
+          "end_date": "2026-08-27",
+          "public_credit_allocated": 25000,
+          "public_actual_consumption": 21980,
+          "public_unused_credit": 3020,
+          "month": 8,
+          "year": 2026
+        }
+      ],
+      "revenue": 301400,
+      "inputCost": 208120,
+      "profit": 93280,
+      "marginPct": 30.94890510948905,
+      "runningNow": 0,
+      "endingSoon": 0,
+      "creditUsed": 208120,
+      "completeness": {
+        "complete": {
+          "count": 5,
+          "users": 171,
+          "inputCost": 208120,
+          "sellingCost": 301400
+        },
+        "incomplete": {
+          "count": 0,
+          "users": 0,
+          "inputCost": 0,
+          "sellingCost": 0
+        }
+      },
+      "incompleteRevenue": 0,
+      "incompleteCost": 0,
+      "incompleteProfit": 0,
+      "incompleteCredit": 0,
+      "chartYear": 2026,
+      "byMonth": [
+        {
+          "month": "Jan",
+          "monthLabel": "Jan 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Feb",
+          "monthLabel": "Feb 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Mar",
+          "monthLabel": "Mar 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Apr",
+          "monthLabel": "Apr 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "May",
+          "monthLabel": "May 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Jun",
+          "monthLabel": "Jun 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Jul",
+          "monthLabel": "Jul 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Aug",
+          "monthLabel": "Aug 26",
+          "revenue": 79800,
+          "cost": 50220
+        },
+        {
+          "month": "Sep",
+          "monthLabel": "Sep 26",
+          "revenue": 221600,
+          "cost": 157900
+        },
+        {
+          "month": "Oct",
+          "monthLabel": "Oct 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Nov",
+          "monthLabel": "Nov 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Dec",
+          "monthLabel": "Dec 26",
+          "revenue": 0,
+          "cost": 0
+        }
+      ],
+      "providerRevenue": [
+        {
+          "name": "Azure",
+          "value": 199300
+        },
+        {
+          "name": "AWS",
+          "value": 57500
+        },
+        {
+          "name": "GCP",
+          "value": 44600
+        }
+      ],
+      "providerCredit": [
+        {
+          "name": "Azure",
+          "used": 140960,
+          "allocated": 153000,
+          "utilizationPct": 92.1
+        },
+        {
+          "name": "AWS",
+          "used": 38920,
+          "allocated": 43000,
+          "utilizationPct": 90.5
+        },
+        {
+          "name": "GCP",
+          "used": 28240,
+          "allocated": 31500,
+          "utilizationPct": 89.7
+        }
+      ],
+      "lobSplit": [
+        {
+          "name": "VILT",
+          "value": 2
+        },
+        {
+          "name": "Standalone",
+          "value": 2
+        },
+        {
+          "name": "Integrated",
+          "value": 1
+        }
+      ],
+      "statusSplit": [
+        {
+          "name": "Completed",
+          "value": 5
+        }
+      ],
+      "topCustomers": [
+        {
+          "name": "TCS",
+          "value": 96500
+        },
+        {
+          "name": "Cognizant",
+          "value": 67600
+        },
+        {
+          "name": "Infosys",
+          "value": 57500
+        },
+        {
+          "name": "Wipro",
+          "value": 44600
+        },
+        {
+          "name": "Capgemini",
+          "value": 35200
+        }
+      ]
+    },
+    "cardSplit": {
+      "complete": {
+        "count": 5,
+        "users": 171,
+        "inputCost": 208120,
+        "sellingCost": 301400
+      },
+      "incomplete": {
+        "count": 0,
+        "users": 0,
+        "inputCost": 0,
+        "sellingCost": 0
+      }
+    },
+    "tabCounts": {
+      "all": 5,
+      "complete": 5,
+      "incomplete": 0
+    }
+  },
+  "private.all": {
+    "totalsPeriod": {
+      "kind": "all-time"
+    },
+    "completenessPeriod": {
+      "kind": "all-time"
+    },
+    "batchesPeriod": {
+      "kind": "all-time"
+    },
+    "batchStatePeriod": {
+      "kind": "now"
+    },
+    "view": {
+      "batches": [
+        {
+          "id": "pb-1",
+          "batch_code": "LB-PRIV-0929-A",
+          "name": "Azure FinOps Cohort",
+          "status": "open",
+          "revenue_total": 285000,
+          "estimated_cost_total": 169500,
+          "actual_cost_total": 162300,
+          "flags": ["cost_locked"],
+          "needs_recompute": false,
+          "updated_at": "2026-09-29T05:28:00Z"
+        },
+        {
+          "id": "pb-2",
+          "batch_code": "LB-PRIV-0929-B",
+          "name": "Cloud Security Bootcamp",
+          "status": "closed_actual",
+          "revenue_total": 212000,
+          "estimated_cost_total": 132400,
+          "actual_cost_total": 128000,
+          "flags": [],
+          "needs_recompute": false,
+          "updated_at": "2026-09-28T15:20:00Z"
+        },
+        {
+          "id": "pb-3",
+          "batch_code": "LB-PRIV-0929-C",
+          "name": "Data Platform Residency",
+          "status": "open",
+          "revenue_total": 196000,
+          "estimated_cost_total": 118000,
+          "actual_cost_total": 112200,
+          "flags": [],
+          "needs_recompute": true,
+          "updated_at": "2026-09-27T11:45:00Z"
+        }
+      ],
+      "tx": [
+        {
+          "id": "t1",
+          "potential_id": "DEMO-PRIV-1",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "MakeMyLabs Private Cloud",
+          "total_users": 20,
+          "lab_batch_id": "pb-1",
+          "customer_name": "Cognizant",
+          "month": 9,
+          "year": 2026,
+          "selling_cost": 98000,
+          "input_cost": 60000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 58200
+        },
+        {
+          "id": "t2",
+          "potential_id": "DEMO-PRIV-2",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "MakeMyLabs Private Cloud",
+          "total_users": 20,
+          "lab_batch_id": "pb-1",
+          "customer_name": "Infosys",
+          "month": 9,
+          "year": 2026,
+          "selling_cost": 93000,
+          "input_cost": 51000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 47200
+        },
+        {
+          "id": "t3",
+          "potential_id": "DEMO-PRIV-3",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "MakeMyLabs Private Cloud",
+          "total_users": 20,
+          "lab_batch_id": "pb-1",
+          "customer_name": "TCS",
+          "month": 9,
+          "year": 2026,
+          "selling_cost": 94000,
+          "input_cost": 57500,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 56900
+        },
+        {
+          "id": "t4",
+          "potential_id": "DEMO-PRIV-4",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "Oracle",
+          "total_users": 20,
+          "lab_batch_id": "pb-2",
+          "customer_name": "Wipro",
+          "month": 8,
+          "year": 2026,
+          "selling_cost": 106000,
+          "input_cost": 65000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 64200
+        },
+        {
+          "id": "t5",
+          "potential_id": "DEMO-PRIV-5",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "Oracle",
+          "total_users": 20,
+          "lab_batch_id": "pb-2",
+          "customer_name": "HCL",
+          "month": 8,
+          "year": 2026,
+          "selling_cost": 106000,
+          "input_cost": 64000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 63800
+        },
+        {
+          "id": "t6",
+          "potential_id": "DEMO-PRIV-6",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "SAP",
+          "total_users": 20,
+          "lab_batch_id": "pb-3",
+          "customer_name": "Accenture",
+          "month": 7,
+          "year": 2026,
+          "selling_cost": 98000,
+          "input_cost": 56000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 55300
+        },
+        {
+          "id": "t7",
+          "potential_id": "DEMO-PRIV-7",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "MakeMyLabs Private Cloud",
+          "total_users": 20,
+          "lab_batch_id": "pb-3",
+          "customer_name": "Capgemini",
+          "month": 7,
+          "year": 2026,
+          "selling_cost": 98000,
+          "input_cost": 57000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 56900
+        }
+      ],
+      "inBatches": 7,
+      "txRevenue": 693000,
+      "txCost": 402500,
+      "txUsers": 140,
+      "completeness": {
+        "complete": {
+          "count": 7,
+          "users": 140,
+          "inputCost": 402500,
+          "sellingCost": 693000
+        },
+        "incomplete": {
+          "count": 0,
+          "users": 0,
+          "inputCost": 0,
+          "sellingCost": 0
+        }
+      },
+      "incompleteRevenue": 0,
+      "incompleteCost": 0,
+      "incompleteUsers": 0,
+      "providerSplit": [
+        {
+          "name": "MakeMyLabs Private Cloud",
+          "rows": 4,
+          "revenue": 383000
+        },
+        {
+          "name": "Oracle",
+          "rows": 2,
+          "revenue": 212000
+        },
+        {
+          "name": "SAP",
+          "rows": 1,
+          "revenue": 98000
+        }
+      ],
+      "year": 2026,
+      "revenue": 693000,
+      "actualCost": 402500,
+      "estimatedCost": 419900,
+      "profit": 290500,
+      "marginPct": 41.91919191919192,
+      "byMonth": [
+        {
+          "month": "Jan",
+          "monthLabel": "Jan 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Feb",
+          "monthLabel": "Feb 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Mar",
+          "monthLabel": "Mar 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Apr",
+          "monthLabel": "Apr 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "May",
+          "monthLabel": "May 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Jun",
+          "monthLabel": "Jun 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Jul",
+          "monthLabel": "Jul 26",
+          "revenue": 196000,
+          "cost": 112200,
+          "marginPct": 42.8
+        },
+        {
+          "month": "Aug",
+          "monthLabel": "Aug 26",
+          "revenue": 212000,
+          "cost": 128000,
+          "marginPct": 39.6
+        },
+        {
+          "month": "Sep",
+          "monthLabel": "Sep 26",
+          "revenue": 285000,
+          "cost": 162300,
+          "marginPct": 43.1
+        },
+        {
+          "month": "Oct",
+          "monthLabel": "Oct 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Nov",
+          "monthLabel": "Nov 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Dec",
+          "monthLabel": "Dec 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        }
+      ],
+      "statusSplit": [
+        {
+          "name": "Open",
+          "value": 2
+        },
+        {
+          "name": "Closed",
+          "value": 1
+        }
+      ],
+      "reconciliation": [
+        {
+          "id": "pb-1",
+          "batch_code": "LB-PRIV-0929-A",
+          "name": "Azure FinOps Cohort",
+          "status": "open",
+          "revenue_total": 285000,
+          "estimated_cost_total": 169500,
+          "actual_cost_total": 162300,
+          "flags": ["cost_locked"],
+          "needs_recompute": false,
+          "updated_at": "2026-09-29T05:28:00Z",
+          "lineActual": 162300,
+          "reconciled": true,
+          "batchActual": 162300,
+          "batchEstimate": 169500
+        },
+        {
+          "id": "pb-2",
+          "batch_code": "LB-PRIV-0929-B",
+          "name": "Cloud Security Bootcamp",
+          "status": "closed_actual",
+          "revenue_total": 212000,
+          "estimated_cost_total": 132400,
+          "actual_cost_total": 128000,
+          "flags": [],
+          "needs_recompute": false,
+          "updated_at": "2026-09-28T15:20:00Z",
+          "lineActual": 128000,
+          "reconciled": true,
+          "batchActual": 128000,
+          "batchEstimate": 132400
+        },
+        {
+          "id": "pb-3",
+          "batch_code": "LB-PRIV-0929-C",
+          "name": "Data Platform Residency",
+          "status": "open",
+          "revenue_total": 196000,
+          "estimated_cost_total": 118000,
+          "actual_cost_total": 112200,
+          "flags": [],
+          "needs_recompute": true,
+          "updated_at": "2026-09-27T11:45:00Z",
+          "lineActual": 112200,
+          "reconciled": true,
+          "batchActual": 112200,
+          "batchEstimate": 118000
+        }
+      ],
+      "topCustomers": [
+        {
+          "name": "Wipro",
+          "value": 106000
+        },
+        {
+          "name": "HCL",
+          "value": 106000
+        },
+        {
+          "name": "Cognizant",
+          "value": 98000
+        },
+        {
+          "name": "Accenture",
+          "value": 98000
+        },
+        {
+          "name": "Capgemini",
+          "value": 98000
+        }
+      ],
+      "locked": 1,
+      "recomputePending": 1
+    },
+    "cardSplit": {
+      "complete": {
+        "count": 7,
+        "users": 140,
+        "inputCost": 402500,
+        "sellingCost": 693000
+      },
+      "incomplete": {
+        "count": 0,
+        "users": 0,
+        "inputCost": 0,
+        "sellingCost": 0
+      }
+    },
+    "tabCounts": {
+      "all": 7,
+      "complete": 7,
+      "incomplete": 0
+    }
+  },
+  "public.complete": {
+    "totalsPeriod": {
+      "kind": "all-time"
+    },
+    "livePeriod": {
+      "kind": "now"
+    },
+    "completenessPeriod": {
+      "kind": "all-time"
+    },
+    "view": {
+      "rows": [
+        {
+          "id": "tx-1",
+          "potential_id": "DEMO-PUB-001",
+          "customer_name": "Cognizant",
+          "lab_name": "DevOps Pro",
+          "cloud_provider": "Azure",
+          "line_of_business": "VILT",
+          "selling_cost": 67600,
+          "input_cost": 48200,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 46850,
+          "total_users": 42,
+          "start_date": "2026-09-01",
+          "end_date": "2026-09-28",
+          "public_credit_allocated": 52000,
+          "public_actual_consumption": 46850,
+          "public_unused_credit": 5150,
+          "month": 9,
+          "year": 2026
+        },
+        {
+          "id": "tx-2",
+          "potential_id": "DEMO-PUB-002",
+          "customer_name": "Infosys",
+          "lab_name": "Data Engineering",
+          "cloud_provider": "AWS",
+          "line_of_business": "Standalone",
+          "selling_cost": 57500,
+          "input_cost": 39100,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 38920,
+          "total_users": 30,
+          "start_date": "2026-09-03",
+          "end_date": "2026-09-26",
+          "public_credit_allocated": 43000,
+          "public_actual_consumption": 38920,
+          "public_unused_credit": 4080,
+          "month": 9,
+          "year": 2026
+        },
+        {
+          "id": "tx-3",
+          "potential_id": "DEMO-PUB-003",
+          "customer_name": "TCS",
+          "lab_name": "AI Foundations",
+          "cloud_provider": "Azure",
+          "line_of_business": "VILT",
+          "selling_cost": 96500,
+          "input_cost": 73400,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 72130,
+          "total_users": 55,
+          "start_date": "2026-09-05",
+          "end_date": "2026-09-30",
+          "public_credit_allocated": 76000,
+          "public_actual_consumption": 72130,
+          "public_unused_credit": 3870,
+          "month": 9,
+          "year": 2026
+        },
+        {
+          "id": "tx-4",
+          "potential_id": "DEMO-PUB-004",
+          "customer_name": "Wipro",
+          "lab_name": "Kubernetes Ops",
+          "cloud_provider": "GCP",
+          "line_of_business": "Standalone",
+          "selling_cost": 44600,
+          "input_cost": 28800,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 28240,
+          "total_users": 24,
+          "start_date": "2026-08-02",
+          "end_date": "2026-08-22",
+          "public_credit_allocated": 31500,
+          "public_actual_consumption": 28240,
+          "public_unused_credit": 3260,
+          "month": 8,
+          "year": 2026
+        },
+        {
+          "id": "tx-5",
+          "potential_id": "DEMO-PUB-005",
+          "customer_name": "Capgemini",
+          "lab_name": "Platform SRE",
+          "cloud_provider": "Azure",
+          "line_of_business": "Integrated",
+          "selling_cost": 35200,
+          "input_cost": 22900,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 21980,
+          "total_users": 20,
+          "start_date": "2026-08-10",
+          "end_date": "2026-08-27",
+          "public_credit_allocated": 25000,
+          "public_actual_consumption": 21980,
+          "public_unused_credit": 3020,
+          "month": 8,
+          "year": 2026
+        }
+      ],
+      "revenue": 301400,
+      "inputCost": 208120,
+      "profit": 93280,
+      "marginPct": 30.94890510948905,
+      "runningNow": 0,
+      "endingSoon": 0,
+      "creditUsed": 208120,
+      "completeness": {
+        "complete": {
+          "count": 5,
+          "users": 171,
+          "inputCost": 208120,
+          "sellingCost": 301400
+        },
+        "incomplete": {
+          "count": 0,
+          "users": 0,
+          "inputCost": 0,
+          "sellingCost": 0
+        }
+      },
+      "incompleteRevenue": 0,
+      "incompleteCost": 0,
+      "incompleteProfit": 0,
+      "incompleteCredit": 0,
+      "chartYear": 2026,
+      "byMonth": [
+        {
+          "month": "Jan",
+          "monthLabel": "Jan 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Feb",
+          "monthLabel": "Feb 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Mar",
+          "monthLabel": "Mar 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Apr",
+          "monthLabel": "Apr 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "May",
+          "monthLabel": "May 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Jun",
+          "monthLabel": "Jun 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Jul",
+          "monthLabel": "Jul 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Aug",
+          "monthLabel": "Aug 26",
+          "revenue": 79800,
+          "cost": 50220
+        },
+        {
+          "month": "Sep",
+          "monthLabel": "Sep 26",
+          "revenue": 221600,
+          "cost": 157900
+        },
+        {
+          "month": "Oct",
+          "monthLabel": "Oct 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Nov",
+          "monthLabel": "Nov 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Dec",
+          "monthLabel": "Dec 26",
+          "revenue": 0,
+          "cost": 0
+        }
+      ],
+      "providerRevenue": [
+        {
+          "name": "Azure",
+          "value": 199300
+        },
+        {
+          "name": "AWS",
+          "value": 57500
+        },
+        {
+          "name": "GCP",
+          "value": 44600
+        }
+      ],
+      "providerCredit": [
+        {
+          "name": "Azure",
+          "used": 140960,
+          "allocated": 153000,
+          "utilizationPct": 92.1
+        },
+        {
+          "name": "AWS",
+          "used": 38920,
+          "allocated": 43000,
+          "utilizationPct": 90.5
+        },
+        {
+          "name": "GCP",
+          "used": 28240,
+          "allocated": 31500,
+          "utilizationPct": 89.7
+        }
+      ],
+      "lobSplit": [
+        {
+          "name": "VILT",
+          "value": 2
+        },
+        {
+          "name": "Standalone",
+          "value": 2
+        },
+        {
+          "name": "Integrated",
+          "value": 1
+        }
+      ],
+      "statusSplit": [
+        {
+          "name": "Completed",
+          "value": 5
+        }
+      ],
+      "topCustomers": [
+        {
+          "name": "TCS",
+          "value": 96500
+        },
+        {
+          "name": "Cognizant",
+          "value": 67600
+        },
+        {
+          "name": "Infosys",
+          "value": 57500
+        },
+        {
+          "name": "Wipro",
+          "value": 44600
+        },
+        {
+          "name": "Capgemini",
+          "value": 35200
+        }
+      ]
+    },
+    "cardSplit": {
+      "complete": {
+        "count": 5,
+        "users": 171,
+        "inputCost": 208120,
+        "sellingCost": 301400
+      },
+      "incomplete": {
+        "count": 0,
+        "users": 0,
+        "inputCost": 0,
+        "sellingCost": 0
+      }
+    },
+    "tabCounts": {
+      "all": 5,
+      "complete": 5,
+      "incomplete": 0
+    }
+  },
+  "private.complete": {
+    "totalsPeriod": {
+      "kind": "all-time"
+    },
+    "completenessPeriod": {
+      "kind": "all-time"
+    },
+    "batchesPeriod": {
+      "kind": "all-time"
+    },
+    "batchStatePeriod": {
+      "kind": "now"
+    },
+    "view": {
+      "batches": [
+        {
+          "id": "pb-1",
+          "batch_code": "LB-PRIV-0929-A",
+          "name": "Azure FinOps Cohort",
+          "status": "open",
+          "revenue_total": 285000,
+          "estimated_cost_total": 169500,
+          "actual_cost_total": 162300,
+          "flags": ["cost_locked"],
+          "needs_recompute": false,
+          "updated_at": "2026-09-29T05:28:00Z"
+        },
+        {
+          "id": "pb-2",
+          "batch_code": "LB-PRIV-0929-B",
+          "name": "Cloud Security Bootcamp",
+          "status": "closed_actual",
+          "revenue_total": 212000,
+          "estimated_cost_total": 132400,
+          "actual_cost_total": 128000,
+          "flags": [],
+          "needs_recompute": false,
+          "updated_at": "2026-09-28T15:20:00Z"
+        },
+        {
+          "id": "pb-3",
+          "batch_code": "LB-PRIV-0929-C",
+          "name": "Data Platform Residency",
+          "status": "open",
+          "revenue_total": 196000,
+          "estimated_cost_total": 118000,
+          "actual_cost_total": 112200,
+          "flags": [],
+          "needs_recompute": true,
+          "updated_at": "2026-09-27T11:45:00Z"
+        }
+      ],
+      "tx": [
+        {
+          "id": "t1",
+          "potential_id": "DEMO-PRIV-1",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "MakeMyLabs Private Cloud",
+          "total_users": 20,
+          "lab_batch_id": "pb-1",
+          "customer_name": "Cognizant",
+          "month": 9,
+          "year": 2026,
+          "selling_cost": 98000,
+          "input_cost": 60000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 58200
+        },
+        {
+          "id": "t2",
+          "potential_id": "DEMO-PRIV-2",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "MakeMyLabs Private Cloud",
+          "total_users": 20,
+          "lab_batch_id": "pb-1",
+          "customer_name": "Infosys",
+          "month": 9,
+          "year": 2026,
+          "selling_cost": 93000,
+          "input_cost": 51000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 47200
+        },
+        {
+          "id": "t3",
+          "potential_id": "DEMO-PRIV-3",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "MakeMyLabs Private Cloud",
+          "total_users": 20,
+          "lab_batch_id": "pb-1",
+          "customer_name": "TCS",
+          "month": 9,
+          "year": 2026,
+          "selling_cost": 94000,
+          "input_cost": 57500,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 56900
+        },
+        {
+          "id": "t4",
+          "potential_id": "DEMO-PRIV-4",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "Oracle",
+          "total_users": 20,
+          "lab_batch_id": "pb-2",
+          "customer_name": "Wipro",
+          "month": 8,
+          "year": 2026,
+          "selling_cost": 106000,
+          "input_cost": 65000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 64200
+        },
+        {
+          "id": "t5",
+          "potential_id": "DEMO-PRIV-5",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "Oracle",
+          "total_users": 20,
+          "lab_batch_id": "pb-2",
+          "customer_name": "HCL",
+          "month": 8,
+          "year": 2026,
+          "selling_cost": 106000,
+          "input_cost": 64000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 63800
+        },
+        {
+          "id": "t6",
+          "potential_id": "DEMO-PRIV-6",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "SAP",
+          "total_users": 20,
+          "lab_batch_id": "pb-3",
+          "customer_name": "Accenture",
+          "month": 7,
+          "year": 2026,
+          "selling_cost": 98000,
+          "input_cost": 56000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 55300
+        },
+        {
+          "id": "t7",
+          "potential_id": "DEMO-PRIV-7",
+          "lab_name": "Demo Lab",
+          "cloud_provider": "MakeMyLabs Private Cloud",
+          "total_users": 20,
+          "lab_batch_id": "pb-3",
+          "customer_name": "Capgemini",
+          "month": 7,
+          "year": 2026,
+          "selling_cost": 98000,
+          "input_cost": 57000,
+          "input_cost_auto": null,
+          "input_cost_actual_alloc": 56900
+        }
+      ],
+      "inBatches": 7,
+      "txRevenue": 693000,
+      "txCost": 402500,
+      "txUsers": 140,
+      "completeness": {
+        "complete": {
+          "count": 7,
+          "users": 140,
+          "inputCost": 402500,
+          "sellingCost": 693000
+        },
+        "incomplete": {
+          "count": 0,
+          "users": 0,
+          "inputCost": 0,
+          "sellingCost": 0
+        }
+      },
+      "incompleteRevenue": 0,
+      "incompleteCost": 0,
+      "incompleteUsers": 0,
+      "providerSplit": [
+        {
+          "name": "MakeMyLabs Private Cloud",
+          "rows": 4,
+          "revenue": 383000
+        },
+        {
+          "name": "Oracle",
+          "rows": 2,
+          "revenue": 212000
+        },
+        {
+          "name": "SAP",
+          "rows": 1,
+          "revenue": 98000
+        }
+      ],
+      "year": 2026,
+      "revenue": 693000,
+      "actualCost": 402500,
+      "estimatedCost": 419900,
+      "profit": 290500,
+      "marginPct": 41.91919191919192,
+      "byMonth": [
+        {
+          "month": "Jan",
+          "monthLabel": "Jan 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Feb",
+          "monthLabel": "Feb 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Mar",
+          "monthLabel": "Mar 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Apr",
+          "monthLabel": "Apr 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "May",
+          "monthLabel": "May 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Jun",
+          "monthLabel": "Jun 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Jul",
+          "monthLabel": "Jul 26",
+          "revenue": 196000,
+          "cost": 112200,
+          "marginPct": 42.8
+        },
+        {
+          "month": "Aug",
+          "monthLabel": "Aug 26",
+          "revenue": 212000,
+          "cost": 128000,
+          "marginPct": 39.6
+        },
+        {
+          "month": "Sep",
+          "monthLabel": "Sep 26",
+          "revenue": 285000,
+          "cost": 162300,
+          "marginPct": 43.1
+        },
+        {
+          "month": "Oct",
+          "monthLabel": "Oct 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Nov",
+          "monthLabel": "Nov 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Dec",
+          "monthLabel": "Dec 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        }
+      ],
+      "statusSplit": [
+        {
+          "name": "Open",
+          "value": 2
+        },
+        {
+          "name": "Closed",
+          "value": 1
+        }
+      ],
+      "reconciliation": [
+        {
+          "id": "pb-1",
+          "batch_code": "LB-PRIV-0929-A",
+          "name": "Azure FinOps Cohort",
+          "status": "open",
+          "revenue_total": 285000,
+          "estimated_cost_total": 169500,
+          "actual_cost_total": 162300,
+          "flags": ["cost_locked"],
+          "needs_recompute": false,
+          "updated_at": "2026-09-29T05:28:00Z",
+          "lineActual": 162300,
+          "reconciled": true,
+          "batchActual": 162300,
+          "batchEstimate": 169500
+        },
+        {
+          "id": "pb-2",
+          "batch_code": "LB-PRIV-0929-B",
+          "name": "Cloud Security Bootcamp",
+          "status": "closed_actual",
+          "revenue_total": 212000,
+          "estimated_cost_total": 132400,
+          "actual_cost_total": 128000,
+          "flags": [],
+          "needs_recompute": false,
+          "updated_at": "2026-09-28T15:20:00Z",
+          "lineActual": 128000,
+          "reconciled": true,
+          "batchActual": 128000,
+          "batchEstimate": 132400
+        },
+        {
+          "id": "pb-3",
+          "batch_code": "LB-PRIV-0929-C",
+          "name": "Data Platform Residency",
+          "status": "open",
+          "revenue_total": 196000,
+          "estimated_cost_total": 118000,
+          "actual_cost_total": 112200,
+          "flags": [],
+          "needs_recompute": true,
+          "updated_at": "2026-09-27T11:45:00Z",
+          "lineActual": 112200,
+          "reconciled": true,
+          "batchActual": 112200,
+          "batchEstimate": 118000
+        }
+      ],
+      "topCustomers": [
+        {
+          "name": "Wipro",
+          "value": 106000
+        },
+        {
+          "name": "HCL",
+          "value": 106000
+        },
+        {
+          "name": "Cognizant",
+          "value": 98000
+        },
+        {
+          "name": "Accenture",
+          "value": 98000
+        },
+        {
+          "name": "Capgemini",
+          "value": 98000
+        }
+      ],
+      "locked": 1,
+      "recomputePending": 1
+    },
+    "cardSplit": {
+      "complete": {
+        "count": 7,
+        "users": 140,
+        "inputCost": 402500,
+        "sellingCost": 693000
+      },
+      "incomplete": {
+        "count": 0,
+        "users": 0,
+        "inputCost": 0,
+        "sellingCost": 0
+      }
+    },
+    "tabCounts": {
+      "all": 7,
+      "complete": 7,
+      "incomplete": 0
+    }
+  },
+  "public.incomplete": {
+    "totalsPeriod": {
+      "kind": "all-time"
+    },
+    "livePeriod": {
+      "kind": "now"
+    },
+    "completenessPeriod": {
+      "kind": "all-time"
+    },
+    "view": {
+      "rows": [],
+      "revenue": 0,
+      "inputCost": 0,
+      "profit": 0,
+      "marginPct": 0,
+      "runningNow": 0,
+      "endingSoon": 0,
+      "creditUsed": 0,
+      "completeness": {
+        "complete": {
+          "count": 0,
+          "users": 0,
+          "inputCost": 0,
+          "sellingCost": 0
+        },
+        "incomplete": {
+          "count": 0,
+          "users": 0,
+          "inputCost": 0,
+          "sellingCost": 0
+        }
+      },
+      "incompleteRevenue": 0,
+      "incompleteCost": 0,
+      "incompleteProfit": 0,
+      "incompleteCredit": 0,
+      "chartYear": 2026,
+      "byMonth": [
+        {
+          "month": "Jan",
+          "monthLabel": "Jan 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Feb",
+          "monthLabel": "Feb 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Mar",
+          "monthLabel": "Mar 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Apr",
+          "monthLabel": "Apr 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "May",
+          "monthLabel": "May 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Jun",
+          "monthLabel": "Jun 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Jul",
+          "monthLabel": "Jul 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Aug",
+          "monthLabel": "Aug 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Sep",
+          "monthLabel": "Sep 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Oct",
+          "monthLabel": "Oct 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Nov",
+          "monthLabel": "Nov 26",
+          "revenue": 0,
+          "cost": 0
+        },
+        {
+          "month": "Dec",
+          "monthLabel": "Dec 26",
+          "revenue": 0,
+          "cost": 0
+        }
+      ],
+      "providerRevenue": [],
+      "providerCredit": [],
+      "lobSplit": [],
+      "statusSplit": [],
+      "topCustomers": []
+    },
+    "cardSplit": {
+      "complete": {
+        "count": 5,
+        "users": 171,
+        "inputCost": 208120,
+        "sellingCost": 301400
+      },
+      "incomplete": {
+        "count": 0,
+        "users": 0,
+        "inputCost": 0,
+        "sellingCost": 0
+      }
+    },
+    "tabCounts": {
+      "all": 5,
+      "complete": 5,
+      "incomplete": 0
+    }
+  },
+  "private.incomplete": {
+    "totalsPeriod": {
+      "kind": "all-time"
+    },
+    "completenessPeriod": {
+      "kind": "all-time"
+    },
+    "batchesPeriod": {
+      "kind": "all-time"
+    },
+    "batchStatePeriod": {
+      "kind": "now"
+    },
+    "view": {
+      "batches": [
+        {
+          "id": "pb-1",
+          "batch_code": "LB-PRIV-0929-A",
+          "name": "Azure FinOps Cohort",
+          "status": "open",
+          "revenue_total": 285000,
+          "estimated_cost_total": 169500,
+          "actual_cost_total": 162300,
+          "flags": ["cost_locked"],
+          "needs_recompute": false,
+          "updated_at": "2026-09-29T05:28:00Z"
+        },
+        {
+          "id": "pb-2",
+          "batch_code": "LB-PRIV-0929-B",
+          "name": "Cloud Security Bootcamp",
+          "status": "closed_actual",
+          "revenue_total": 212000,
+          "estimated_cost_total": 132400,
+          "actual_cost_total": 128000,
+          "flags": [],
+          "needs_recompute": false,
+          "updated_at": "2026-09-28T15:20:00Z"
+        },
+        {
+          "id": "pb-3",
+          "batch_code": "LB-PRIV-0929-C",
+          "name": "Data Platform Residency",
+          "status": "open",
+          "revenue_total": 196000,
+          "estimated_cost_total": 118000,
+          "actual_cost_total": 112200,
+          "flags": [],
+          "needs_recompute": true,
+          "updated_at": "2026-09-27T11:45:00Z"
+        }
+      ],
+      "tx": [],
+      "inBatches": 0,
+      "txRevenue": 0,
+      "txCost": 0,
+      "txUsers": 0,
+      "completeness": {
+        "complete": {
+          "count": 0,
+          "users": 0,
+          "inputCost": 0,
+          "sellingCost": 0
+        },
+        "incomplete": {
+          "count": 0,
+          "users": 0,
+          "inputCost": 0,
+          "sellingCost": 0
+        }
+      },
+      "incompleteRevenue": 0,
+      "incompleteCost": 0,
+      "incompleteUsers": 0,
+      "providerSplit": [
+        {
+          "name": "MakeMyLabs Private Cloud",
+          "rows": 0,
+          "revenue": 0
+        },
+        {
+          "name": "Oracle",
+          "rows": 0,
+          "revenue": 0
+        },
+        {
+          "name": "SAP",
+          "rows": 0,
+          "revenue": 0
+        }
+      ],
+      "year": 2026,
+      "revenue": 693000,
+      "actualCost": 402500,
+      "estimatedCost": 419900,
+      "profit": 290500,
+      "marginPct": 41.91919191919192,
+      "byMonth": [
+        {
+          "month": "Jan",
+          "monthLabel": "Jan 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Feb",
+          "monthLabel": "Feb 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Mar",
+          "monthLabel": "Mar 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Apr",
+          "monthLabel": "Apr 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "May",
+          "monthLabel": "May 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Jun",
+          "monthLabel": "Jun 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Jul",
+          "monthLabel": "Jul 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Aug",
+          "monthLabel": "Aug 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Sep",
+          "monthLabel": "Sep 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Oct",
+          "monthLabel": "Oct 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Nov",
+          "monthLabel": "Nov 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        },
+        {
+          "month": "Dec",
+          "monthLabel": "Dec 26",
+          "revenue": 0,
+          "cost": 0,
+          "marginPct": 0
+        }
+      ],
+      "statusSplit": [
+        {
+          "name": "Open",
+          "value": 2
+        },
+        {
+          "name": "Closed",
+          "value": 1
+        }
+      ],
+      "reconciliation": [
+        {
+          "id": "pb-1",
+          "batch_code": "LB-PRIV-0929-A",
+          "name": "Azure FinOps Cohort",
+          "status": "open",
+          "revenue_total": 285000,
+          "estimated_cost_total": 169500,
+          "actual_cost_total": 162300,
+          "flags": ["cost_locked"],
+          "needs_recompute": false,
+          "updated_at": "2026-09-29T05:28:00Z",
+          "lineActual": 162300,
+          "reconciled": true,
+          "batchActual": 162300,
+          "batchEstimate": 169500
+        },
+        {
+          "id": "pb-2",
+          "batch_code": "LB-PRIV-0929-B",
+          "name": "Cloud Security Bootcamp",
+          "status": "closed_actual",
+          "revenue_total": 212000,
+          "estimated_cost_total": 132400,
+          "actual_cost_total": 128000,
+          "flags": [],
+          "needs_recompute": false,
+          "updated_at": "2026-09-28T15:20:00Z",
+          "lineActual": 128000,
+          "reconciled": true,
+          "batchActual": 128000,
+          "batchEstimate": 132400
+        },
+        {
+          "id": "pb-3",
+          "batch_code": "LB-PRIV-0929-C",
+          "name": "Data Platform Residency",
+          "status": "open",
+          "revenue_total": 196000,
+          "estimated_cost_total": 118000,
+          "actual_cost_total": 112200,
+          "flags": [],
+          "needs_recompute": true,
+          "updated_at": "2026-09-27T11:45:00Z",
+          "lineActual": 112200,
+          "reconciled": true,
+          "batchActual": 112200,
+          "batchEstimate": 118000
+        }
+      ],
+      "topCustomers": [],
+      "locked": 1,
+      "recomputePending": 1
+    },
+    "cardSplit": {
+      "complete": {
+        "count": 7,
+        "users": 140,
+        "inputCost": 402500,
+        "sellingCost": 693000
+      },
+      "incomplete": {
+        "count": 0,
+        "users": 0,
+        "inputCost": 0,
+        "sellingCost": 0
+      }
+    },
+    "tabCounts": {
+      "all": 7,
+      "complete": 7,
+      "incomplete": 0
+    }
+  },
+  "aicc": {
+    "pending": [
+      {
+        "id": "inb-1",
+        "agent_key": "support",
+        "item_type": "ticket_proposal",
+        "title": "Ticket #5142 proposed update",
+        "summary": "Priority + assignee + note draft.",
+        "status": "pending",
+        "created_at": "2026-09-29T05:31:14Z"
+      },
+      {
+        "id": "inb-2",
+        "agent_key": "generalist",
+        "item_type": "solution_guide",
+        "title": "Lab solution guide draft",
+        "summary": "Cohort proposal for Cognizant.",
+        "status": "pending",
+        "created_at": "2026-09-29T05:22:14Z"
+      }
+    ],
+    "confirmed": 1,
+    "rejected": 1,
+    "runsToday": 0,
+    "automationHealthy": false,
+    "liveWork": [
+      {
+        "id": "run-901",
+        "agent_key": "support",
+        "status": "running",
+        "created_at": "2026-09-29T05:31:00Z",
+        "finished_at": null
+      }
+    ],
+    "alerts": [
+      {
+        "id": "run-904",
+        "agent_key": "support",
+        "status": "error",
+        "created_at": "2026-09-29T04:11:00Z",
+        "finished_at": "2026-09-29T04:11:20Z"
+      }
+    ],
+    "workByType": [
+      {
+        "name": "Ticket proposal",
+        "value": 1
+      },
+      {
+        "name": "Solution guide",
+        "value": 1
+      },
+      {
+        "name": "ADR field map",
+        "value": 1
+      },
+      {
+        "name": "Email draft",
+        "value": 1
+      }
+    ],
+    "reviewOutcomes": [
+      {
+        "name": "Confirmed",
+        "value": 1
+      },
+      {
+        "name": "Rejected",
+        "value": 1
+      },
+      {
+        "name": "Pending",
+        "value": 2
+      }
+    ],
+    "governance": {
+      "liveRoles": "Super Admin, Leadership",
+      "parkedRoles": "Finance, Ops Lead, Ops User, Viewer",
+      "leadershipAccess": "Leadership does not have AI Command Center access."
+    },
+    "auditRuns": 1,
+    "auditDecisions": 2
+  },
+  "agents": {
+    "agents": [
+      {
+        "key": "generalist",
+        "name": "Generalist (Lab Solution Guide)",
+        "blurb": "Drafts lab solution guides and response emails.",
+        "capabilities": [],
+        "status": "needs confirm",
+        "pending": 2,
+        "last_run_at": "2026-09-29T05:22:00Z",
+        "owns_email_draft": true
+      },
+      {
+        "key": "support",
+        "name": "Support desk",
+        "blurb": "Reviews open support tickets and drafts next actions.",
+        "capabilities": [],
+        "status": "running",
+        "pending": 3,
+        "last_run_at": "2026-09-29T05:31:00Z",
+        "owns_email_draft": true
+      },
+      {
+        "key": "cost_adr",
+        "name": "Cost / ADR entry",
+        "blurb": "Maps confirmed requests into ADR-ready field suggestions.",
+        "capabilities": [],
+        "status": "idle",
+        "pending": 1,
+        "last_run_at": "2026-09-29T04:55:00Z",
+        "owns_email_draft": false
+      }
+    ],
+    "byAgent": [
+      {
+        "key": "generalist",
+        "name": "Generalist (Lab Solution Guide)",
+        "runs": 1,
+        "proposals": 2,
+        "pending": 1,
+        "confirmed": 1,
+        "rejected": 0,
+        "confirmationRate": 100,
+        "avgDecisionHours": 0.1
+      },
+      {
+        "key": "support",
+        "name": "Support desk",
+        "runs": 2,
+        "proposals": 2,
+        "pending": 1,
+        "confirmed": 1,
+        "rejected": 0,
+        "confirmationRate": 100,
+        "avgDecisionHours": 0.1
+      },
+      {
+        "key": "cost_adr",
+        "name": "Cost / ADR entry",
+        "runs": 1,
+        "proposals": 2,
+        "pending": 1,
+        "confirmed": 0,
+        "rejected": 1,
+        "confirmationRate": 0,
+        "avgDecisionHours": 0.2
+      }
+    ],
+    "runsPerDay": [
+      {
+        "day": "2026-09-28",
+        "generalist": 0,
+        "support": 1,
+        "cost_adr": 0
+      },
+      {
+        "day": "2026-09-29",
+        "generalist": 1,
+        "support": 1,
+        "cost_adr": 1
+      }
+    ],
+    "recentRuns": [
+      {
+        "id": "run-901",
+        "agent_key": "support",
+        "status": "done",
+        "created_at": "2026-09-29T05:31:00Z",
+        "finished_at": "2026-09-29T05:31:28Z"
+      },
+      {
+        "id": "run-902",
+        "agent_key": "generalist",
+        "status": "done",
+        "created_at": "2026-09-29T05:21:00Z",
+        "finished_at": "2026-09-29T05:21:35Z"
+      },
+      {
+        "id": "run-903",
+        "agent_key": "cost_adr",
+        "status": "done",
+        "created_at": "2026-09-29T04:55:00Z",
+        "finished_at": "2026-09-29T04:55:17Z"
+      },
+      {
+        "id": "run-904",
+        "agent_key": "support",
+        "status": "error",
+        "created_at": "2026-09-28T12:11:00Z",
+        "finished_at": "2026-09-28T12:11:19Z"
+      }
+    ],
+    "totalAgents": 3,
+    "totalRuns": 4,
+    "totalProposals": 6,
+    "pending": 3,
+    "confirmationRate": 66.66666666666666,
+    "avgDecisionHours": 0.10555555555555556
+  }
+}

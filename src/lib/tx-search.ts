@@ -5,6 +5,8 @@ export type TxSearch = {
   provider?: string;
   lob?: string;
   systemConfig?: string;
+  /** SCRUM-131: Public/Private cloud view tab. Absent = All. */
+  completeness?: "complete" | "incomplete";
 };
 
 const num = (v: unknown) => {
@@ -20,5 +22,7 @@ export function validateTxSearch(s: Record<string, unknown>): TxSearch {
     provider: typeof s.provider === "string" && s.provider ? s.provider : undefined,
     lob: typeof s.lob === "string" && s.lob ? s.lob : undefined,
     systemConfig: typeof s.systemConfig === "string" && s.systemConfig ? s.systemConfig : undefined,
+    completeness:
+      s.completeness === "complete" || s.completeness === "incomplete" ? s.completeness : undefined,
   };
 }

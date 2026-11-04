@@ -85,7 +85,7 @@ async def audit_export_has_deactivation_reason(page, context) -> list[str]:
     failures: list[str] = []
     await page.goto(f"{BASE}/admin", wait_until="networkidle")
     # Switch to Customer Audit tab
-    await page.get_by_role("tab", name="Customer Audit").click()
+    await page.get_by_role("tab", name="Customer audit").click()
     await page.screenshot(path=str(SHOTS / "3_audit_tab.png"))
 
     # Flip sort order to ascending so we can verify it carries through

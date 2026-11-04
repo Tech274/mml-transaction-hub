@@ -1,4 +1,11 @@
 import { useEffect, useState } from "react";
+import {
+  cloudTypeLabel,
+  isProviderAllowedForCloudType,
+  providerCloudType,
+} from "@/lib/cloud-provider";
+import { CloudTypeBadge } from "@/components/cloud/cloud-type-badge";
+import { ProviderSelectItems } from "@/components/cloud/provider-select-items";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -11,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { CustomerCombobox, type CustomerOption } from "./customer-combobox";
 import { useConfig } from "@/hooks/use-config";
 import { useServerFn } from "@tanstack/react-start";
@@ -42,8 +49,6 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
   const qc = useQueryClient();
   const checkUnique = useServerFn(checkPotentialIdUnique);
   const createTx = useServerFn(createAdrTransaction);
-  const { data: labTypes = [] } = useConfig("lab_type");
-  const { data: providers = [] } = useConfig("cloud_provider");
   const { data: lobs = [] } = useConfig("line_of_business");
   const [customer, setCustomer] = useState<CustomerOption | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -59,7 +64,8 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
       customer_id: "",
       customer_name: "",
       lab_name: "",
-      lab_type: "public_cloud",
+      // SCRUM-129: no public default; the user chooses the cloud type.
+      lab_type: undefined as unknown as FormValues["lab_type"],
       cloud_provider: "",
       system_config: "",
       line_of_business: "",
@@ -87,9 +93,7 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
 
   const labType = form.watch("lab_type");
   useEffect(() => {
-    if (labType === "private_cloud") form.setValue("cloud_provider", "MakeMyLabs Private Cloud");
-    else if (form.getValues("cloud_provider") === "MakeMyLabs Private Cloud")
-      form.setValue("cloud_provider", "");
+    // System Config applies to Private cloud rows only.
     if (labType !== "private_cloud") form.setValue("system_config", "");
   }, [labType, form]);
 
@@ -101,6 +105,18 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
   }, [customer, form]);
 
   async function onSubmit(values: FormValues) {
+    // SCRUM-129 (D1): provider required and must match the cloud type (server re-checks).
+    if (
+      !values.cloud_provider ||
+      !isProviderAllowedForCloudType(values.cloud_provider, values.lab_type)
+    ) {
+      form.setError("cloud_provider", {
+        message: values.cloud_provider
+          ? `${values.cloud_provider} is not ${cloudTypeLabel(values.lab_type)}`
+          : "Choose a cloud provider",
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       // A Potential ID can cover several transactions, so an existing one is
@@ -137,18 +153,14 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
     }
   }
 
-  const providerOptions = providers.filter((p) => p.key !== "MakeMyLabs Private Cloud");
-
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Master ADR Entry</CardTitle>
+      {/* SCRUM-128 C8 (#38): no "Master ADR Entry" card title; the page header already says it. */}
+      <CardContent className="space-y-4 pt-6">
         <p className="text-sm text-muted-foreground">
           Blank fields are saved empty and can be filled in later. Selling below cost, and an end
           date before the start date, are allowed.
         </p>
-      </CardHeader>
-      <CardContent>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className="grid grid-cols-1 md:grid-cols-2 gap-4"
@@ -193,50 +205,41 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Lab Name" error={form.formState.errors.lab_name?.message}>
+          <Field label="Lab name" error={form.formState.errors.lab_name?.message}>
             <Input {...form.register("lab_name")} />
           </Field>
-          <Field label="Lab Type">
+          {/* SCRUM-129 (spec P4): the provider decides the cloud type. Grouped select of
+              the six; Cloud type is read-only and has no default. */}
+          <Field label="Cloud provider" error={form.formState.errors.cloud_provider?.message}>
             <Select
-              value={labType}
-              onValueChange={(v) =>
-                form.setValue("lab_type", v as "public_cloud" | "private_cloud")
-              }
+              value={form.watch("cloud_provider") || undefined}
+              onValueChange={(v) => {
+                form.setValue("cloud_provider", v, { shouldValidate: true });
+                const type = providerCloudType(v);
+                if (type) form.setValue("lab_type", type, { shouldValidate: true });
+              }}
             >
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger aria-invalid={!!form.formState.errors.cloud_provider}>
+                <SelectValue placeholder="Select provider" />
               </SelectTrigger>
               <SelectContent>
-                {labTypes.map((l) => (
-                  <SelectItem key={l.key} value={l.key}>
-                    {l.label}
-                  </SelectItem>
-                ))}
+                <ProviderSelectItems />
               </SelectContent>
             </Select>
           </Field>
-          <Field label="Cloud Provider" error={form.formState.errors.cloud_provider?.message}>
-            {labType === "private_cloud" ? (
-              <Input value="MakeMyLabs Private Cloud" disabled />
-            ) : (
-              <Select
-                value={form.watch("cloud_provider") ?? ""}
-                onValueChange={(v) => form.setValue("cloud_provider", v, { shouldValidate: true })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select provider" />
-                </SelectTrigger>
-                <SelectContent>
-                  {providerOptions.map((p) => (
-                    <SelectItem key={p.key} value={p.key}>
-                      {p.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+          <Field label="Cloud type" error={form.formState.errors.lab_type?.message}>
+            <div className="flex h-9 items-center gap-2" data-testid="adr-cloud-type">
+              {labType ? (
+                <CloudTypeBadge value={labType} />
+              ) : (
+                <span className="text-xs text-muted-foreground">Set by the provider</span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Private cloud is MakeMyLabs, Oracle or SAP. Public cloud is AWS, Azure or GCP.
+            </p>
           </Field>
-          <Field label="Line of Business" error={form.formState.errors.line_of_business?.message}>
+          <Field label="Line of business" error={form.formState.errors.line_of_business?.message}>
             <Select
               value={form.watch("line_of_business") ?? ""}
               onValueChange={(v) => form.setValue("line_of_business", v, { shouldValidate: true })}
@@ -254,7 +257,7 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
             </Select>
           </Field>
           {labType === "private_cloud" && (
-            <Field label="System Config" error={form.formState.errors.system_config?.message}>
+            <Field label="System config" error={form.formState.errors.system_config?.message}>
               <Select
                 value={form.watch("system_config") ?? ""}
                 onValueChange={(v) => form.setValue("system_config", v, { shouldValidate: true })}
@@ -272,13 +275,13 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
               </Select>
             </Field>
           )}
-          <Field label="Start Date" error={form.formState.errors.start_date?.message}>
+          <Field label="Start date" error={form.formState.errors.start_date?.message}>
             <Input type="date" {...form.register("start_date")} />
           </Field>
-          <Field label="End Date" error={form.formState.errors.end_date?.message}>
+          <Field label="End date" error={form.formState.errors.end_date?.message}>
             <Input type="date" {...form.register("end_date")} />
           </Field>
-          <Field label="Total Users" error={form.formState.errors.total_users?.message}>
+          <Field label="Total users" error={form.formState.errors.total_users?.message}>
             <Input type="number" min={1} {...form.register("total_users")} />
           </Field>
           <Field
@@ -318,12 +321,12 @@ export function MasterAdrForm({ onSaved }: { onSaved?: () => void }) {
               </>
             );
           })()}
-          <div className="md:col-span-2 flex justify-end gap-2 pt-2 border-t border-border">
+          <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-2 md:col-span-2">
             <Button type="button" variant="outline" onClick={() => form.reset()}>
               Reset
             </Button>
             <Button type="submit" disabled={submitting}>
-              {submitting ? "Saving…" : "Save Transaction"}
+              {submitting ? "Saving…" : "Save transaction"}
             </Button>
           </div>
         </form>
@@ -343,7 +346,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>

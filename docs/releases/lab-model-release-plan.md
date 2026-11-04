@@ -11,7 +11,7 @@ All PRs below must remain open and unmerged until the full set is complete.
 - Public cloud margin breakdown (service margin + unused credit from actual consumption).
 - Lab batch totals hard invariant: batch totals always equal the sum of transactions.
 - AI Command Center backend auto-assignment with strict admin approval gate for live-impacting work (`publish`, `deploy`, `live_write`).
-- Chief-approved UI implementation (29 Sep) for Public Cloud + Private Cloud screens and Azure design-system sweep, guarded behind `VITE_SCRUM44_UI_REVIEW_ENABLED` and kept HOLD.
+- Chief-approved UI implementation (29 Sep) for Public Cloud + Private Cloud screens and Azure design-system sweep, guarded behind `VITE_SCRUM44_UI_REVIEW_ENABLED` and kept HOLD. (SCRUM-128 retired that flag: the azure UI is now the only UI.)
 
 ### Post-demo / production hardening (by Mon 5 Oct 2026)
 
@@ -29,7 +29,7 @@ All PRs below must remain open and unmerged until the full set is complete.
 ## Single combined deploy step (after all PRs merge)
 
 1. Confirm CI green for all merged PRs and final `main`.
-2. Keep all new feature flags OFF (`AI_CC_AUTO_ASSIGN_ENABLED=false`, `VITE_SCRUM44_UI_REVIEW_ENABLED=false`).
+2. Keep all new feature flags OFF (`AI_CC_AUTO_ASSIGN_ENABLED=false`). The UI flag `VITE_SCRUM44_UI_REVIEW_ENABLED` no longer exists (retired in SCRUM-128).
 3. Apply approved migrations one-by-one to sandbox first; run verification tests/check queries.
 4. After explicit GO, apply same migrations one-by-one to live.
 5. Deploy application code from GitHub main.

@@ -1,4 +1,13 @@
 import { useState } from "react";
+import { isCloudType, normalizeProvider } from "@/lib/cloud-provider";
+import { ProviderSelectItems } from "@/components/cloud/provider-select-items";
+import { CloudTypeBadge } from "@/components/cloud/cloud-type-badge";
+import {
+  cloudTypeChanges,
+  cloudTypeFromProvider,
+  withCloudTypeFromProvider,
+} from "@/lib/edit-cloud-type";
+import { CLOUD_TYPE_LABEL } from "@/lib/cloud-provider";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useServerFn } from "@tanstack/react-start";
@@ -67,7 +76,14 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
   const [correctedSellingCost, setCorrectedSellingCost] = useState(empty(tx.selling_cost));
   const { isAdmin } = useAuth();
   const form = useForm<AdrEdit>({
-    resolver: zodResolver(adrEditSchema) as Resolver<AdrEdit>,
+    // SCRUM-129 (QC fix 3): lab_type always follows the provider, so the schema (and the
+    // server, which needs both to agree) sees the pair together.
+    resolver: ((values: AdrEdit, ctx: unknown, opts: unknown) =>
+      (zodResolver(adrEditSchema) as Resolver<AdrEdit>)(
+        withCloudTypeFromProvider(values),
+        ctx,
+        opts as Parameters<Resolver<AdrEdit>>[2],
+      )) as Resolver<AdrEdit>,
     defaultValues: {
       potential_id: tx.potential_id ?? "",
       month: (tx.month ?? "") as unknown as number | null,
@@ -75,7 +91,8 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
       customer_id: tx.customer_id ?? "",
       customer_name: tx.customer_name ?? "",
       lab_name: tx.lab_name ?? "",
-      lab_type: tx.lab_type === "private_cloud" ? "private_cloud" : "public_cloud",
+      // SCRUM-129: keep the stored type; never fall back to public.
+      lab_type: (isCloudType(tx.lab_type) ? tx.lab_type : undefined) as AdrEdit["lab_type"],
       cloud_provider: tx.cloud_provider ?? "",
       system_config:
         tx.system_config && (SYSTEM_CONFIG_OPTIONS as readonly string[]).includes(tx.system_config)
@@ -117,7 +134,7 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
   async function onSubmit(values: AdrEdit) {
     setSubmitting(true);
     try {
-      await save({ data: { id: tx.id, ...values } });
+      await save({ data: { id: tx.id, ...withCloudTypeFromProvider(values) } });
       toast.success("Transaction updated");
       qc.invalidateQueries({ queryKey: ["transaction", tx.id] });
       qc.invalidateQueries({ queryKey: ["transactions"] });
@@ -217,7 +234,41 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
           </Select>
         </Field>
         <Field label="Cloud provider" error={form.formState.errors.cloud_provider?.message}>
-          <Input {...form.register("cloud_provider")} placeholder="Blank" />
+          {/* SCRUM-129 (QC fix 3): any of the six. The provider decides the cloud type, so a
+              mis-typed row is corrected by choosing the right provider. */}
+          <Select
+            value={empty(form.watch("cloud_provider")) || undefined}
+            onValueChange={(v) => {
+              form.setValue("cloud_provider", v, { shouldValidate: true });
+              const t = cloudTypeFromProvider(v);
+              if (t) form.setValue("lab_type", t, { shouldValidate: true });
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Blank" />
+            </SelectTrigger>
+            <SelectContent>
+              <ProviderSelectItems />
+            </SelectContent>
+          </Select>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            Cloud type{" "}
+            <CloudTypeBadge value={cloudTypeFromProvider(form.watch("cloud_provider"))} />
+          </div>
+          {cloudTypeChanges(tx.lab_type, form.watch("cloud_provider")) && (
+            <p className="text-xs text-warning" data-testid="cloud-type-change-note">
+              Saving moves this row from{" "}
+              {isCloudType(tx.lab_type) ? CLOUD_TYPE_LABEL[tx.lab_type] : "Not set"} to{" "}
+              {CLOUD_TYPE_LABEL[cloudTypeFromProvider(form.watch("cloud_provider"))!]}.
+              {tx.lab_batch_id ? " It is linked to a lab batch; check the batch after saving." : ""}
+            </p>
+          )}
+          {tx.cloud_provider && !normalizeProvider(tx.cloud_provider).ok && (
+            <p className="text-xs text-destructive">
+              Stored provider &quot;{tx.cloud_provider}&quot; is not one of the six. Choose a
+              provider.
+            </p>
+          )}
         </Field>
         <Field label="System config" error={form.formState.errors.system_config?.message}>
           <Select
@@ -258,7 +309,7 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
           {isAdmin ? (
             <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2 md:items-end">
               <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">Correct input cost</Label>
+                <Label className="text-xs text-muted-foreground">Correct input cost</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -268,7 +319,7 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">Correct selling cost</Label>
+                <Label className="text-xs text-muted-foreground">Correct selling cost</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -278,7 +329,7 @@ export function TransactionEditForm({ tx, onSaved }: { tx: Tx; onSaved?: () => v
                 />
               </div>
               <div className="space-y-1 md:col-span-2">
-                <Label className="text-[11px] text-muted-foreground">Reason</Label>
+                <Label className="text-xs text-muted-foreground">Reason</Label>
                 <Input
                   className="w-full"
                   value={costCorrectionReason}
@@ -334,7 +385,7 @@ function Field({
 }) {
   return (
     <div className="space-y-1">
-      <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>

@@ -3,6 +3,16 @@
 // See docs/rls-audit.md for the table-by-table audit these tests pin.
 import { beforeAll, describe, expect, it } from "vitest";
 import type { PGlite } from "@electric-sql/pglite";
+
+async function asInternal<T>(db: PGlite, userId: string, fn: (q: PGlite) => Promise<T>): Promise<T> {
+  await db.exec("begin");
+  try {
+    await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: userId, role: "authenticated" })]);
+    return await fn(db);
+  } finally {
+    await db.exec("rollback");
+  }
+}
 import { asActor, createLocalDb, outcome } from "@/test-support/local-db";
 
 const U = {
@@ -370,13 +380,17 @@ describe("existing sandbox SQL checks also pass locally", () => {
     const path = await import("node:path");
     const root = path.resolve(__dirname, "../../..");
     const sql = readFileSync(path.join(root, "supabase/tests/rls/scrum103_import_batch.sql"), "utf8");
+    // SCRUM-131: its completeness cases assume the held is_complete rule (migrations-pending, Chief GO),
+    // so this check runs on its own database with that file loaded.
+    const pdb = await createLocalDb({ extraSqlFiles: ["supabase/migrations-pending/scrum131_is_complete_rule.sql"] });
     // SCRUM-44: this legacy import check updates costs in-place to validate "zero is a value".
     // Cost edits now require the audited admin correction path, so test-only override is set here.
-    await db.query("select set_config('mml.admin_cost_override', '1', false)");
-    await expect(db.exec(sql)).resolves.toBeDefined();
-    await db.query("select set_config('mml.admin_cost_override', '', false)");
-    await db.exec("rollback").catch(() => undefined);
-  });
+    await pdb.query("select set_config('mml.admin_cost_override', '1', false)");
+    await expect(pdb.exec(sql)).resolves.toBeDefined();
+    await pdb.query("select set_config('mml.admin_cost_override', '', false)");
+    await pdb.exec("rollback").catch(() => undefined);
+    await pdb.close();
+  }, 120_000);
 });
 
 // SCRUM-103: 20260928040000_scrum103_customer_name_normalize revokes EXECUTE on its two helpers from
@@ -419,10 +433,12 @@ describe("20260928040000_scrum103_customer_name_normalize: helper grants", () =>
   });
 
   it("an ops user calling import_transactions_batch creates a missing customer (RPC caller path)", async () => {
-    const got = await asActor(cdb, as(U.opsUser), async (q) => {
+    // SCRUM-131: clients cannot EXECUTE it any more (approve_import calls it after sign-off), so run its
+    // body as that internal caller does: owner role with the ops user's claims. Rolled back.
+    const got = await asInternal(cdb, U.opsUser, async (q) => {
       const res = await q.query<{ r: { inserted: number } }>(
         `select public.import_transactions_batch('public_cloud', 'grants.xlsx', $1, '2.0.0-proposed',
-           jsonb_build_array(jsonb_build_object('source_line', 2, 'customer_name', 'Rpc' || chr(160) || ' Grant  Labs', 'lab_name', 'Lab G')),
+           jsonb_build_array(jsonb_build_object('source_line', 2, 'customer_name', 'Rpc' || chr(160) || ' Grant  Labs', 'lab_name', 'Lab G', 'cloud_provider', 'AWS')),
            '[]'::jsonb) r`,
         ["e".repeat(64)],
       );
@@ -435,7 +451,11 @@ describe("20260928040000_scrum103_customer_name_normalize: helper grants", () =>
     expect(got).toEqual({ inserted: 1, customers: 1, linked: 1 });
   });
 
-  it("a viewer still cannot call import_transactions_batch", async () => {
+  it("a viewer still cannot call import_transactions_batch (directly, or as the internal caller)", async () => {
+    const internal = await asInternal(cdb, U.viewer, (q) =>
+      outcome(q.query("select public.import_transactions_batch('public_cloud', 'v.xlsx', $1, '2.0.0-proposed', jsonb_build_array(jsonb_build_object('source_line', 2, 'customer_name', 'V Co')), '[]'::jsonb)", ["f".repeat(64)])),
+    );
+    expect(internal).toBe("42501");
     const got = await asActor(cdb, as(U.viewer), (q) =>
       outcome(q.query("select public.import_transactions_batch('public_cloud', 'v.xlsx', $1, '2.0.0-proposed', jsonb_build_array(jsonb_build_object('source_line', 2, 'customer_name', 'V Co')), '[]'::jsonb)", ["f".repeat(64)])),
     );

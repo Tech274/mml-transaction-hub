@@ -58,7 +58,7 @@ async def main() -> int:
 
         await page.goto(f"{BASE}/admin", wait_until="networkidle")
         # Switch to Export Jobs tab
-        tab = page.get_by_role("tab", name="Export Jobs")
+        tab = page.get_by_role("tab", name="Export jobs")
         if await tab.count() == 0:
             print("Export Jobs tab not visible — current role lacks feature_export_jobs_view. Skipping.")
             await browser.close()

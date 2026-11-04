@@ -32,7 +32,8 @@ const blankEntry = {
   customer_name: "",
   lab_name: "",
   lab_type: "public_cloud" as const,
-  cloud_provider: "",
+  // SCRUM-129: Cloud Provider is the one required business field (it decides the cloud type).
+  cloud_provider: "Azure",
   system_config: "",
   line_of_business: "",
   start_date: "",
@@ -106,7 +107,7 @@ describe("edit form save with blanks", () => {
     customer_name: "",
     lab_name: "",
     lab_type: "public_cloud" as const,
-    cloud_provider: "",
+    cloud_provider: "gcp",
     system_config: "",
     line_of_business: "",
     start_date: "",
@@ -115,7 +116,7 @@ describe("edit form save with blanks", () => {
     input_cost: "",
     selling_cost: "",
   };
-  it("saves a row that is blank except lab type, with nulls and not zeros", () => {
+  it("saves a row that is blank except cloud type and provider, with nulls and not zeros", () => {
     const parsed = adrEditSchema.parse(blank);
     const row = toTransactionUpdate(parsed);
     expect(row.potential_id).toBeNull();
@@ -125,7 +126,7 @@ describe("edit form save with blanks", () => {
     expect(row.year).toBeNull();
     expect(row.start_date).toBeNull();
     expect(row.end_date).toBeNull();
-    expect(row.cloud_provider).toBeNull();
+    expect(row.cloud_provider).toBe("GCP");
     expect(row.total_users).toBeNull();
     expect(row.input_cost).toBeNull();
     expect(row.selling_cost).toBeNull();
@@ -149,10 +150,47 @@ describe("toTransactionInsert", () => {
     const row = toTransactionInsert(adrEntrySchema.parse(valid), "u1");
     expect(row).toMatchObject({ cloud_provider: "AWS", system_config: null, repository_type: "public_cloud", created_by: "u1" });
   });
-  it("private cloud fills MakeMyLabs only when the provider is blank", () => {
-    const blank = toTransactionInsert(adrEntrySchema.parse({ ...valid, lab_type: "private_cloud", cloud_provider: "", system_config: "8GB 2vCPUs" }), "u1");
-    expect(blank).toMatchObject({ cloud_provider: PRIVATE_CLOUD_PROVIDER, system_config: "8GB 2vCPUs" });
-    const kept = toTransactionInsert(adrEntrySchema.parse({ ...valid, lab_type: "private_cloud", cloud_provider: "AWS", system_config: "8GB 2vCPUs" }), "u1");
-    expect(kept.cloud_provider).toBe("AWS");
+  it("SCRUM-129: private cloud keeps Oracle and SAP (no MakeMyLabs lock) and stores the canonical name", () => {
+    const priv = (cloud_provider: string) =>
+      toTransactionInsert(adrEntrySchema.parse({ ...valid, lab_type: "private_cloud", cloud_provider, system_config: "8GB 2vCPUs" }), "u1");
+    expect(priv("Oracle")).toMatchObject({ cloud_provider: "Oracle", lab_type: "private_cloud", system_config: "8GB 2vCPUs" });
+    expect(priv("SAP").cloud_provider).toBe("SAP");
+    expect(priv("oci").cloud_provider).toBe("Oracle");
+    expect(priv("MakeMyLabs").cloud_provider).toBe(PRIVATE_CLOUD_PROVIDER);
+  });
+});
+
+describe("SCRUM-129 provider rule (form and server)", () => {
+  it.each([
+    ["private_cloud", "MakeMyLabs Private Cloud"],
+    ["private_cloud", "Oracle"],
+    ["private_cloud", "SAP"],
+    ["public_cloud", "AWS"],
+    ["public_cloud", "Microsoft Azure"],
+    ["public_cloud", "Google Cloud"],
+  ])("accepts %s with %s", (lab_type, cloud_provider) => {
+    expect(errs({ ...valid, lab_type, cloud_provider })).toEqual({});
+  });
+  it.each([
+    ["private_cloud", "", /required/],
+    ["public_cloud", "   ", /required/],
+    ["private_cloud", "AWS", /AWS is Public cloud/],
+    ["public_cloud", "SAP", /SAP is Private cloud/],
+    ["public_cloud", "Oracle", /Oracle is Private cloud/],
+    ["public_cloud", "MakeMyLabs", /Private cloud/],
+    ["public_cloud", "IBM", /not allowed/],
+    ["private_cloud", "Hybrid", /not allowed/],
+  ])("rejects %s with %j (never defaulted)", (lab_type, cloud_provider, msg) => {
+    const e = errs({ ...valid, lab_type, cloud_provider });
+    expect(Object.keys(e)).toEqual(["cloud_provider"]);
+    expect(e.cloud_provider).toMatch(msg);
+  });
+  it("the edit schema applies the same rule", () => {
+    expect(adrEditSchema.safeParse({ ...valid, lab_type: "public_cloud", cloud_provider: "SAP" }).success).toBe(false);
+  });
+  it("toTransactionInsert / toTransactionUpdate refuse to build a row that skipped the schema", () => {
+    const bad = { ...adrEntrySchema.parse(valid), cloud_provider: null };
+    expect(() => toTransactionInsert(bad, "u1")).toThrow(/required/);
+    expect(() => toTransactionUpdate({ ...bad, cloud_provider: "SAP" })).toThrow(/Private cloud/);
   });
 });

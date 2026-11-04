@@ -20,6 +20,10 @@ dist-ssr
 .nitro
 *.local
 
+# Python bytecode (e2e scripts; py_compile / running them writes these)
+__pycache__/
+*.pyc
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

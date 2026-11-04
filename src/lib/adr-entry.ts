@@ -6,9 +6,21 @@
 // the database already rejects it (existing valid workflows must keep working).
 import { z } from "zod";
 import { looksLikeSecret } from "@/lib/cost-calculator";
+import {
+  CLOUD_TYPE_LABEL,
+  MAKEMYLABS_PROVIDER,
+  PRIVATE_CLOUD_PROVIDERS,
+  PUBLIC_CLOUD_PROVIDERS,
+  normalizeProvider,
+  type CanonicalProvider,
+  type CloudType,
+} from "@/lib/cloud-provider";
 
-export const PUBLIC_CLOUD_PROVIDERS = ["AWS", "Azure", "GCP"] as const;
-export const PRIVATE_CLOUD_PROVIDER = "MakeMyLabs Private Cloud";
+// SCRUM-129: provider lists come from the shared rule (@/lib/cloud-provider). Re-exported for the
+// existing importers. Private cloud is MakeMyLabs, Oracle or SAP; it is no longer locked to MakeMyLabs.
+export { PUBLIC_CLOUD_PROVIDERS, PRIVATE_CLOUD_PROVIDERS };
+/** @deprecated SCRUM-129: private cloud is MakeMyLabs, Oracle or SAP. Use PRIVATE_CLOUD_PROVIDERS. */
+export const PRIVATE_CLOUD_PROVIDER = MAKEMYLABS_PROVIDER;
 /** Same list as the database check transactions_line_of_business_check. */
 export const LINES_OF_BUSINESS = ["VILT", "Standalone", "Integrated"] as const;
 export const SYSTEM_CONFIG_OPTIONS = [
@@ -98,12 +110,13 @@ const optionalDate = z.preprocess(
 );
 
 /**
- * SCRUM-103: new entry and editing share this schema. No business field is
- * required. Blanks become NULL. lab_type stays required because a transaction
- * is either public or private cloud (the column is NOT NULL).
+ * SCRUM-103: new entry and editing share this schema. Blanks become NULL. lab_type stays
+ * required because a transaction is either public or private cloud (the column is NOT NULL).
  * End before start and selling below cost are notes, not errors.
+ * SCRUM-129: Cloud Provider is required and must belong to the chosen cloud type
+ * (MakeMyLabs, Oracle, SAP = Private cloud; AWS, Azure, GCP = Public cloud). See adrEntrySchema.
  */
-export const adrEntrySchema = z.object({
+export const adrEntryObjectSchema = z.object({
   potential_id: optionalText(200),
   month: optionalInt(1, 12, "Month"),
   year: optionalInt(2000, 2100, "Year"),
@@ -111,7 +124,7 @@ export const adrEntrySchema = z.object({
   customer_name: optionalText(200),
   lab_name: optionalText(200),
   lab_type: z.enum(["public_cloud", "private_cloud"], {
-    errorMap: () => ({ message: "Choose Public or Private Cloud" }),
+    errorMap: () => ({ message: "Choose Private cloud or Public cloud" }),
   }),
   cloud_provider: optionalText(200),
   system_config: optionalText(200),
@@ -164,6 +177,38 @@ export const adrEntrySchema = z.object({
   ),
   is_hybrid: z.preprocess((v) => v === true || v === "true", z.boolean()),
 });
+
+/**
+ * SCRUM-129: the provider must map through the shared rule, and its cloud type must equal
+ * lab_type. A blank or unknown provider is an error (never defaulted to MakeMyLabs or public).
+ */
+export function providerIssue(v: { lab_type: CloudType; cloud_provider: string | null }): string | null {
+  const r = normalizeProvider(v.cloud_provider);
+  if (!r.ok) {
+    return r.code === "blank"
+      ? "Cloud Provider is required. Use MakeMyLabs, Oracle or SAP (Private cloud) or AWS, Azure or GCP (Public cloud)."
+      : r.message;
+  }
+  if (r.cloudType !== v.lab_type) {
+    const allowed = v.lab_type === "private_cloud" ? "MakeMyLabs, Oracle or SAP" : "AWS, Azure or GCP";
+    return `${r.provider} is ${CLOUD_TYPE_LABEL[r.cloudType]}. For ${CLOUD_TYPE_LABEL[v.lab_type]} choose ${allowed}.`;
+  }
+  return null;
+}
+
+export const adrEntrySchema = adrEntryObjectSchema.superRefine((v, ctx) => {
+  const issue = providerIssue(v);
+  if (issue) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["cloud_provider"], message: issue });
+});
+
+/** Canonical stored provider for an already-validated entry. Throws instead of defaulting. */
+export function canonicalProviderFor(v: { lab_type: CloudType; cloud_provider: string | null }): CanonicalProvider {
+  const r = normalizeProvider(v.cloud_provider);
+  if (!r.ok || r.cloudType !== v.lab_type) {
+    throw new Error(providerIssue(v) ?? "Cloud Provider does not match the cloud type");
+  }
+  return r.provider;
+}
 
 export type AdrEntry = z.infer<typeof adrEntrySchema>;
 /** Same rules as a new entry. */
@@ -236,7 +281,7 @@ export function toTransactionUpdate(v: AdrEdit) {
     lab_name: v.lab_name,
     lab_type: v.lab_type,
     repository_type: v.lab_type,
-    cloud_provider: v.cloud_provider,
+    cloud_provider: canonicalProviderFor(v) as string,
     system_config: v.lab_type === "private_cloud" ? v.system_config : null,
     line_of_business: v.line_of_business,
     start_date: v.start_date,
@@ -252,7 +297,6 @@ export function toTransactionUpdate(v: AdrEdit) {
 /** The row written to public.transactions (created_by is the signed-in user). Blank fields are NULL, never 0. */
 export function toTransactionInsert(v: AdrEntry, userId: string) {
   const isPrivate = v.lab_type === "private_cloud";
-  const provider = v.cloud_provider && v.cloud_provider.trim() !== "" ? v.cloud_provider : null;
   return {
     potential_id: v.potential_id,
     month: v.month,
@@ -262,7 +306,8 @@ export function toTransactionInsert(v: AdrEntry, userId: string) {
     lab_name: v.lab_name,
     lab_type: v.lab_type,
     repository_type: v.lab_type, // trigger normalizes
-    cloud_provider: isPrivate ? (provider ?? PRIVATE_CLOUD_PROVIDER) : provider,
+    // SCRUM-129: the chosen provider, canonical. No MakeMyLabs fallback for a blank private provider.
+    cloud_provider: canonicalProviderFor(v) as string,
     system_config: isPrivate ? v.system_config : null,
     line_of_business: v.line_of_business,
     start_date: v.start_date,

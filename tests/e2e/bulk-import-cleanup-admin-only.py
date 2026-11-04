@@ -3,7 +3,7 @@
 Assertions:
   1. When signed in as a non-admin (viewer), the "Run cleanup" button
      (data-testid="admin-cleanup-trigger") is NOT rendered in the
-     bulk-import history header.
+     bulk-import history header (Master ADR entry -> Import history).
   2. Directly invoking the `runArtifactCleanup` server function as a
      non-admin returns a 403 / "Forbidden" error and does NOT return a
      success payload.
@@ -58,8 +58,14 @@ async def main():
         context = await browser.new_context(viewport={"width": 1280, "height": 1800})
         page = await context.new_page()
         await restore_session(context, page)
-        await page.goto("http://localhost:8080/bulk-import", wait_until="domcontentloaded")
+        # SCRUM-128 C13: /bulk-import was deleted in C2; the history (and its admin-only
+        # "Run cleanup" button) lives on Master ADR entry -> "Import history".
+        await page.goto("http://localhost:8080/entry", wait_until="domcontentloaded")
         await page.wait_for_load_state("networkidle")
+        history_tab = page.get_by_role("tab", name="Import history")
+        if await history_tab.count():
+            await history_tab.click()
+            await page.wait_for_load_state("networkidle")
         await page.screenshot(path=str(ROOT / "1_history.png"))
 
         btn = page.locator('[data-testid="admin-cleanup-trigger"]')

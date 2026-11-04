@@ -6,7 +6,20 @@
 //  - fully blank rows are skipped and counted;
 //  - no suggestions, no auto-correction, no defaults (blank never becomes 0);
 //  - a value that cannot be stored becomes NULL and a warning (line, column, original value);
-//  - nothing about a blank or unstorable cell blocks the import.
+//  - nothing about a blank or unstorable cell blocks the import,
+//  - EXCEPT Cloud Provider (SCRUM-129): each row's provider decides that row's cloud type through
+//    the shared rule (@/lib/cloud-provider). Blank or unknown provider, or a Cloud Type cell that
+//    disagrees with it, is a blocking row error. Nothing is defaulted or stamped public.
+//
+// SCRUM-131 "approval" tiers (opts.tiers = "approval"; used after the Healer, see pipeline.ts):
+//  - BLOCKERS: the minimum identity set (Potential ID, Month, Year, Customer Name, Lab Name, plus
+//    Cloud Provider above) blank, Month/Year not storable, a required header missing, a date that is
+//    present but not a real date (the Healer already turned DD-MM-YYYY etc. into YYYY-MM-DD).
+//  - WARNINGS: a price that is blank, unreadable, negative or 0 is stored as 0 (NOT NULL) and the row
+//    is Incomplete; blank Total Users / Line of Business / dates; everything that was a note before.
+// The default ("lenient") keeps the 28 Sep behaviour above for existing callers.
+import { checkProviderRow, type CanonicalProvider, type CloudType } from "@/lib/cloud-provider";
+import { REQUIRED_TRANSACTION_FIELDS } from "@/lib/transaction-completeness";
 import { isBlankCell, isExcelDate, isIsoDate, type RawCell, type RawRow } from "./cells";
 import { PROPOSED_RULES, columnLetter, normalizeHeader, type StrictColumn, type StrictField, type StrictRules } from "./template";
 
@@ -32,7 +45,23 @@ export interface StrictRecord {
   /** Money in whole paise/cents to avoid float drift; null when blank/invalid. */
   input_cost_cents: number | null;
   selling_cost_cents: number | null;
-  cloud_provider: string | null;
+  /** SCRUM-129: canonical provider name (e.g. "OCI" -> "Oracle"). Null only on a blocked row. */
+  cloud_provider: CanonicalProvider | null;
+  /** SCRUM-129: decided by the provider. Null only on a blocked row (never defaulted). */
+  lab_type: CloudType | null;
+  /** Optional System Config cell; kept for private-cloud rows only. */
+  system_config: string | null;
+}
+
+/** File summary derived from the rows (never chosen in the UI, never defaulted). */
+export type BatchKind = CloudType | "mixed";
+
+/** private_cloud / public_cloud when every row has that type, "mixed" for both, null for none. */
+export function batchKindOf(types: readonly (CloudType | null)[]): BatchKind | null {
+  const set = new Set(types.filter((t): t is CloudType => t !== null));
+  if (set.size === 0) return null;
+  if (set.size > 1) return "mixed";
+  return [...set][0];
 }
 
 export interface StrictSummary {
@@ -44,10 +73,36 @@ export interface StrictSummary {
   totalSellingCents: number;
   totalInputCents: number;
   distinctCustomers: number;
+  /** SCRUM-129 read-only split (the provider decides each row). */
+  privateRows: number;
+  publicRows: number;
+  /** Rows blocked by a blank/unknown provider or a conflicting Cloud Type. */
+  providerErrorRows: number;
+  /** Rows whose provider spelling was mapped to the canonical name (e.g. "OCI" -> "Oracle"). */
+  providerAliasesApplied: number;
+  /** Derived from the rows; null when no row has a valid type. */
+  batchKind: BatchKind | null;
+}
+
+/** SCRUM-129: per-row provider outcome, for the preview table ("OCI -> Oracle", derived cloud type). */
+export interface ProviderRowInfo {
+  line: number;
+  /** The Cloud Provider cell as written in the file (trimmed). */
+  providerInFile: string;
+  /** Canonical name that will be stored; null when the row is blocked. */
+  storedProvider: CanonicalProvider | null;
+  /** Cloud type derived from the provider; null when the row is blocked. */
+  cloudType: CloudType | null;
+  /** True when the file's spelling was mapped to a different canonical name. */
+  aliasApplied: boolean;
+  /** True when the provider (or a conflicting Cloud Type cell) blocks this row. */
+  blocked: boolean;
 }
 
 export interface StrictValidationResult {
   rowErrors: RowIssue[];
+  /** One entry per non-blank row, in file order. */
+  providerRows: ProviderRowInfo[];
   warnings: RowIssue[];
   records: StrictRecord[];
   summary: StrictSummary;
@@ -95,13 +150,16 @@ export function matchHeaders(header: string[], rules: StrictRules = PROPOSED_RUL
   });
 
   for (const col of rules.columns) {
-    if (!map.has(col.field)) {
+    if (!map.has(col.field) && !col.optional) {
       warnings.push({
         line: 1,
         column: null,
         header: col.header,
         value: "",
-        message: `Column "${col.header}" is missing. Those cells are stored blank.`,
+        message:
+          col.type === "provider"
+            ? `Column "${col.header}" is missing. Every row needs a Cloud Provider, so every row is blocked.`
+            : `Column "${col.header}" is missing. Those cells are stored blank.`,
       });
     }
   }
@@ -133,13 +191,41 @@ export function toCents(n: number): number | null {
   return cents;
 }
 
-export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?: StrictRules; blankRowsIgnored?: number }): StrictValidationResult {
+/**
+ * SCRUM-131: the minimum identity set = Peter's REQUIRED_TRANSACTION_FIELDS without Cloud Provider (checked by
+ * the provider rule). Derived, so the import blockers and the Incomplete rule cannot drift apart.
+ * Blank = blocker in "approval" tiers.
+ */
+export const IDENTITY_FIELDS: readonly StrictField[] = REQUIRED_TRANSACTION_FIELDS.filter((f) => f !== "cloud_provider");
+/** SCRUM-131: headers that must be present in "approval" tiers (= REQUIRED_TRANSACTION_FIELDS). */
+export const REQUIRED_HEADER_FIELDS: readonly StrictField[] = [...REQUIRED_TRANSACTION_FIELDS];
+/** Blank is a warning (not a blocker) in "approval" tiers. Never makes a row Incomplete. */
+const WARN_IF_BLANK: readonly StrictField[] = ["line_of_business", "start_date", "end_date", "total_users"];
+
+export type ValidationTiers = "lenient" | "approval";
+
+export function validateStrict(
+  header: string[],
+  rows: RawRow[],
+  opts?: { rules?: StrictRules; blankRowsIgnored?: number; tiers?: ValidationTiers },
+): StrictValidationResult {
   const rules = opts?.rules ?? PROPOSED_RULES;
+  const approval = opts?.tiers === "approval";
   const { map, warnings: headerWarnings } = matchHeaders(header, rules);
   const rowErrors: RowIssue[] = [];
-  const warnings: RowIssue[] = [...headerWarnings];
+  const warnings: RowIssue[] = [];
+  for (const w of headerWarnings) {
+    const missing = approval && w.line === 1 && w.column === null && w.header !== null
+      ? rules.columns.find((c) => c.header === w.header && REQUIRED_HEADER_FIELDS.includes(c.field))
+      : undefined;
+    if (missing) rowErrors.push({ ...w, message: `Required column "${missing.header}" is missing. Add it to the file (use the template).` });
+    else warnings.push(w);
+  }
   const records: StrictRecord[] = [];
   let blankRows = opts?.blankRowsIgnored ?? 0;
+  let providerErrorRows = 0;
+  let providerAliasesApplied = 0;
+  const providerRows: ProviderRowInfo[] = [];
 
   const colFor = (f: StrictField) => rules.columns.find((c) => c.field === f)!;
 
@@ -185,17 +271,44 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
       potential_id: null, month: null, year: null, customer_name: null, lab_name: null,
       line_of_business: null, start_date: null, end_date: null, total_users: null,
       input_cost_cents: null, selling_cost_cents: null, cloud_provider: null,
+      lab_type: null, system_config: null,
     };
     const warn = (col: StrictColumn, idx: number | undefined, value: RawCell, message: string) =>
       warnings.push({ line: row.line, column: idx === undefined ? null : columnLetter(idx), header: col.header, value: display(value), message });
+    const block = (col: StrictColumn, idx: number | undefined, value: RawCell, message: string) =>
+      rowErrors.push({ line: row.line, column: idx === undefined ? null : columnLetter(idx), header: col.header, value: display(value), message });
+    /** In approval tiers an unstorable identity value or date blocks; otherwise it is a warning. */
+    const blockOrWarn = (col: StrictColumn, idx: number | undefined, value: RawCell, message: string) =>
+      approval && (IDENTITY_FIELDS.includes(col.field) || col.type === "date")
+        ? block(col, idx, value, message.replace(/; stored blank$/, ""))
+        : warn(col, idx, value, message);
+    const isPrice = (f: StrictField) => f === "input_cost" || f === "selling_cost";
+    const zeroPrice = (col: StrictColumn, idx: number | undefined, value: RawCell, why: string) => {
+      if (col.field === "input_cost") rec.input_cost_cents = 0;
+      else rec.selling_cost_cents = 0;
+      warn(col, idx, value, `${why} Stored as 0; the row is Incomplete until a price is entered.`);
+    };
 
     for (const col of rules.columns) {
       const idx = map.get(col.field);
-      if (idx === undefined) continue; // column absent: the field stays NULL
+      // Provider and Cloud Type are checked together after this loop (blank provider blocks).
+      if (col.type === "provider" || col.type === "cloud_type") continue;
+      if (idx === undefined) {
+        // Column absent: the field stays NULL (approval tiers: a missing identity column already blocks at line 1).
+        if (approval && isPrice(col.field)) zeroPrice(col, undefined, null, `${col.header} column is missing.`);
+        continue;
+      }
       const value: RawCell = idx < row.cells.length ? row.cells[idx] : null;
 
-      // Blank stays NULL. Never 0, never a default, never an error.
-      if (isBlankCell(value)) continue;
+      if (isBlankCell(value)) {
+        // Lenient: blank stays NULL, never 0, never an error.
+        if (approval) {
+          if (IDENTITY_FIELDS.includes(col.field)) block(col, idx, value, `${col.header} is required.`);
+          else if (isPrice(col.field)) zeroPrice(col, idx, value, `${col.header} is blank.`);
+          else if (WARN_IF_BLANK.includes(col.field)) warn(col, idx, value, `${col.header} is blank. The row is still imported.`);
+        }
+        continue;
+      }
 
       switch (col.type) {
         case "text": {
@@ -210,11 +323,11 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
         case "int": {
           const n = parseStrictNumber(value);
           if (n === null || !Number.isInteger(n)) {
-            warn(col, idx, value, "Expected a whole number; stored blank");
+            blockOrWarn(col, idx, value, "Expected a whole number; stored blank");
             break;
           }
           if ((col.min !== undefined && n < col.min) || (col.max !== undefined && n > col.max)) {
-            warn(col, idx, value, `Outside ${col.min ?? "-∞"}–${col.max ?? "∞"}; stored blank`);
+            blockOrWarn(col, idx, value, `Outside ${col.min ?? "-∞"}–${col.max ?? "∞"}; stored blank`);
             break;
           }
           (rec as unknown as Record<string, unknown>)[col.field] = n;
@@ -223,17 +336,23 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
         case "decimal": {
           const n = parseStrictNumber(value);
           if (n === null) {
-            warn(col, idx, value, "Expected a number; stored blank");
+            if (approval && isPrice(col.field)) zeroPrice(col, idx, value, `${col.header} is not a number.`);
+            else warn(col, idx, value, "Expected a number; stored blank");
             break;
           }
           if (col.min !== undefined && n < col.min) {
-            warn(col, idx, value, `Must be ≥ ${col.min}; stored blank`);
+            if (approval && isPrice(col.field)) zeroPrice(col, idx, value, `${col.header} is negative.`);
+            else warn(col, idx, value, `Must be ≥ ${col.min}; stored blank`);
             break;
           }
           const cents = toCents(n);
           if (cents === null) {
-            warn(col, idx, value, "More than 2 decimal places; stored blank");
+            if (approval && isPrice(col.field)) zeroPrice(col, idx, value, `${col.header} has more than 2 decimal places.`);
+            else warn(col, idx, value, "More than 2 decimal places; stored blank");
             break;
+          }
+          if (approval && isPrice(col.field) && cents === 0) {
+            warn(col, idx, value, `${col.header} is 0. The row is Incomplete until a price is entered.`);
           }
           if (col.field === "input_cost") rec.input_cost_cents = cents;
           else if (col.field === "selling_cost") rec.selling_cost_cents = cents;
@@ -244,7 +363,7 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
           if (isExcelDate(value)) iso = value.iso;
           else if (typeof value === "string" && isIsoDate(value.trim())) iso = value.trim();
           if (!iso) {
-            warn(col, idx, value, "Not a real date (use an Excel date or YYYY-MM-DD); stored blank");
+            blockOrWarn(col, idx, value, "Not a real date (use an Excel date or YYYY-MM-DD); stored blank");
             break;
           }
           (rec as unknown as Record<string, unknown>)[col.field] = iso;
@@ -252,7 +371,7 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
         }
         case "enum": {
           const s = typeof value === "string" ? value.trim() : display(value);
-          const allowed = col.field === "cloud_provider" ? rules.allowedProviders : (col.allowed ?? []);
+          const allowed = col.allowed ?? [];
           if (!allowed.includes(s)) {
             warn(col, idx, value, `Not one of: ${allowed.join(", ")}; stored blank`);
             break;
@@ -260,6 +379,49 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
           (rec as unknown as Record<string, unknown>)[col.field] = s;
           break;
         }
+      }
+    }
+
+    // SCRUM-129: the provider decides the row's cloud type. A blank or unknown provider, or a
+    // Cloud Type cell that disagrees, blocks the row. Nothing is defaulted.
+    {
+      const pIdx = map.get("cloud_provider");
+      const tIdx = map.get("cloud_type");
+      const rawProvider: RawCell = pIdx !== undefined && pIdx < row.cells.length ? row.cells[pIdx] : null;
+      const rawType: RawCell = tIdx !== undefined && tIdx < row.cells.length ? row.cells[tIdx] : null;
+      const check = checkProviderRow(display(rawProvider), display(rawType));
+      const providerInFile = display(rawProvider).trim();
+      if (check.ok) {
+        rec.cloud_provider = check.provider;
+        rec.lab_type = check.cloudType;
+        const aliasApplied = providerInFile !== check.provider;
+        if (aliasApplied) providerAliasesApplied += 1;
+        providerRows.push({ line: row.line, providerInFile, storedProvider: check.provider, cloudType: check.cloudType, aliasApplied, blocked: false });
+      } else {
+        providerErrorRows += 1;
+        providerRows.push({ line: row.line, providerInFile, storedProvider: null, cloudType: null, aliasApplied: false, blocked: true });
+        for (const message of check.errors) {
+          const isType = message.startsWith("Cloud Type");
+          const idx = isType ? tIdx : pIdx;
+          rowErrors.push({
+            line: row.line,
+            column: idx === undefined ? null : columnLetter(idx),
+            header: isType ? colFor("cloud_type").header : colFor("cloud_provider").header,
+            value: display(isType ? rawType : rawProvider).trim(),
+            message,
+          });
+        }
+      }
+      if (rec.system_config !== null && rec.lab_type === "public_cloud") {
+        const c = colFor("system_config");
+        warnings.push({
+          line: row.line,
+          column: map.has("system_config") ? columnLetter(map.get("system_config")!) : null,
+          header: c.header,
+          value: rec.system_config,
+          message: "System Config applies to Private cloud rows only. It is not saved on this Public cloud row.",
+        });
+        rec.system_config = null;
       }
     }
 
@@ -304,6 +466,7 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
 
   return {
     rowErrors,
+    providerRows,
     warnings,
     records,
     summary: {
@@ -315,6 +478,11 @@ export function validateStrict(header: string[], rows: RawRow[], opts?: { rules?
       totalSellingCents,
       totalInputCents,
       distinctCustomers: customers.size,
+      privateRows: records.filter((r) => r.lab_type === "private_cloud").length,
+      publicRows: records.filter((r) => r.lab_type === "public_cloud").length,
+      providerErrorRows,
+      providerAliasesApplied,
+      batchKind: batchKindOf(records.map((r) => r.lab_type)),
     },
     ok: rowErrors.length === 0,
   };

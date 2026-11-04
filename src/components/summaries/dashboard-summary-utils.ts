@@ -1,5 +1,9 @@
+import { KPI_FY_START_MONTH } from "@/lib/kpi-period";
+
 export type DashboardPeriodFilter = "all" | `year:${number}` | `month:${number}-${number}`;
-export const FINANCIAL_YEAR_START_MONTH = 10;
+
+// SCRUM-128 C4: the FY start month lives in lib/kpi-period.ts (KPI_PERIOD_RULES, Chief's Q6).
+export const FINANCIAL_YEAR_START_MONTH = KPI_FY_START_MONTH;
 
 export interface YearMonthPoint {
   year: number;

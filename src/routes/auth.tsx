@@ -6,10 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Sign in — MakeMyLabs Transaction Platform" }] }),
+  // N9: "<Page> · MakeMyLabs" like every other tab title.
+  head: () => ({ meta: [{ title: "Sign in · MakeMyLabs" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
     next: typeof s.next === "string" ? s.next : "",
   }),
@@ -47,14 +47,18 @@ function AuthPage() {
     window.location.href = redirectTo();
   }
 
-
   return (
-    <div className="min-h-screen grid place-items-center bg-gradient-to-br from-background to-secondary p-4">
-      <Toaster richColors position="top-right" />
-      <Card className="w-full max-w-md shadow-xl">
+    // §3.6 standalone layout: plain background and the Card primitive's own shadow.
+    <div className="grid min-h-screen place-items-center bg-background p-4">
+      <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="h-9 w-9 rounded-md bg-primary text-primary-foreground grid place-items-center font-bold">M</div>
+          <div className="mb-2 flex items-center gap-2">
+            <div
+              className="grid size-9 place-items-center rounded-md bg-primary font-bold text-primary-foreground"
+              aria-hidden
+            >
+              M
+            </div>
             <div>
               <CardTitle className="text-lg">MakeMyLabs</CardTitle>
               <CardDescription>Internal Transaction Platform</CardDescription>
@@ -71,16 +75,28 @@ function AuthPage() {
           <form onSubmit={signIn} className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="email">Work email</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="password">Password</Label>
-              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
+              <Input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
             </div>
             <Button type="submit" className="w-full" disabled={loading || !!configError}>
               {loading ? "Signing in…" : "Sign in"}
             </Button>
-            <p className="text-xs text-muted-foreground text-center">
+            <p className="text-center text-xs text-muted-foreground">
               Accounts are created by an administrator. Contact your admin for access.
             </p>
           </form>

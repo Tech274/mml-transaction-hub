@@ -1,26 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  LayoutDashboard,
-  FilePlus2,
-  ListTree,
-  Cloud,
-  Server,
-  Users,
-  BarChart3,
-  Settings,
-  LogOut,
-  PlugZap,
-  ScrollText,
-  DatabaseZap,
-  LifeBuoy,
-  Bot,
-  Inbox,
-  Play,
-  History,
-  FlaskConical,
-  Calculator,
-  Layers,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 
 import {
   Sidebar,
@@ -29,113 +8,70 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useAuth, type AppRole } from "@/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { isLeadershipOnlyRoleSet } from "@/lib/leadership-access";
+import {
+  useImportApprovalStatus,
+  type ImportApprovalStatusView,
+} from "@/lib/import-approval-status";
+import {
+  isNavItemActive,
+  navLinkActiveOptions,
+  visibleNavGroups,
+  type NavBadge,
+  type NavGroup,
+} from "@/lib/nav";
+import { primaryRoleLabel } from "@/lib/role-labels";
 
-type NavItem = {
-  to: string;
-  label: string;
-  icon: typeof LayoutDashboard;
-  roles: AppRole[] | null;
-  permission?: string;
-};
+/**
+ * SCRUM-131 import-approval state for the "Import approvals" and "My uploads" items (plan §3.3
+ * row 3, G11): { isApprover, canUpload, pendingCount } from Peter's useImportApprovalStatus(), one
+ * read-only getImportApprovalStatus() query shared with the route guard (polled once a minute for
+ * the badge). Asked for every signed-in user whatever their role, so a leadership-only approver
+ * sees Import approvals. The visibility rule is Peter's lib/import-approver-gate.ts, applied
+ * through lib/nav.ts visibleNavGroups. A failed read hides both items and the badge.
+ */
+function useImportApprovalNav(enabled: boolean): ImportApprovalStatusView {
+  return useImportApprovalStatus(enabled);
+}
 
-const nav: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, roles: null },
-  {
-    to: "/entry",
-    label: "Master ADR Entry",
-    icon: FilePlus2,
-    roles: ["admin", "ops_lead", "ops_user"],
-    permission: "feature_master_adr_entry",
-  },
-  { to: "/transactions", label: "All Transactions", icon: ListTree, roles: null },
-  { to: "/public-cloud", label: "Public Cloud", icon: Cloud, roles: null },
-  { to: "/private-cloud", label: "Private Cloud", icon: Server, roles: null },
-  { to: "/customers", label: "Customers", icon: Users, roles: null },
-  {
-    to: "/reports",
-    label: "Reports",
-    icon: BarChart3,
-    roles: null,
-    permission: "feature_reports_access",
-  },
-  { to: "/tickets", label: "Support Tickets", icon: LifeBuoy, roles: ["admin"] },
-  { to: "/agent-integrations", label: "Agent integrations", icon: PlugZap, roles: null },
-
-  { to: "/sync-status", label: "Sync status", icon: DatabaseZap, roles: ["admin"] },
-  { to: "/mcp-audit", label: "MCP audit log", icon: ScrollText, roles: ["admin"] },
-  { to: "/admin", label: "Admin Settings", icon: Settings, roles: ["admin"] },
-];
-
-const mmlLabNav: NavItem[] = [
-  {
-    to: "/mml-lab/lab-catalog",
-    label: "Lab catalog",
-    icon: FlaskConical,
-    roles: ["admin", "leadership", "finance", "ops_lead", "ops_user", "viewer"],
-    permission: "feature_lab_catalog_view",
-  },
-  {
-    to: "/mml-lab/cost-catalog",
-    label: "Cost catalog",
-    icon: Calculator,
-    roles: ["admin", "leadership", "finance", "ops_lead", "ops_user"],
-    permission: "feature_cost_catalog_view",
-  },
-  {
-    to: "/mml-lab/batches",
-    label: "Batches",
-    icon: Layers,
-    roles: ["admin", "leadership", "finance", "ops_lead", "ops_user", "viewer"],
-    permission: "feature_lab_batches_manage",
-  },
-];
-
-const aiCommandCenterNav: NavItem[] = [
-  { to: "/ai-command-center", label: "AI Command Center", icon: Bot, roles: ["admin"] },
-  { to: "/ai-command-center/agents", label: "Agents", icon: Bot, roles: ["admin"] },
-  { to: "/ai-command-center/inbox", label: "Inbox", icon: Inbox, roles: ["admin"] },
-  { to: "/ai-command-center/run-now", label: "Run now", icon: Play, roles: ["admin"] },
-  { to: "/ai-command-center/audit", label: "Audit", icon: History, roles: ["admin"] },
-];
-
+// SCRUM-128 (plan §3.3-§3.5, C3): the sidebar renders lib/nav.ts with one NavGroup component.
 export function AppSidebar() {
-  const { state, hoverExpanded, setOpen } = useSidebar();
+  const { state, hoverExpanded, setOpen, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
-  const showLabels = state === "expanded" || hoverExpanded;
+  // The mobile sheet always shows labels, whatever the desktop rail preference is (N2).
+  const showLabels = isMobile || state === "expanded" || hoverExpanded;
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const { hasAnyRole, user, roles, signOut } = useAuth();
+  const { user, roles, signOut } = useAuth();
   const { can } = usePermissions();
-  const isLeadershipOnly = isLeadershipOnlyRoleSet(roles);
-  const visibleAiCommandCenterNav = isLeadershipOnly
-    ? []
-    : aiCommandCenterNav.filter((i) => !i.roles || hasAnyRole(i.roles));
-  const visibleMmlLabNav = isLeadershipOnly
-    ? []
-    : mmlLabNav.filter(
-        (i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)),
-      );
-  const visibleWorkspaceNav = nav
-    .filter((i) => (!i.roles || hasAnyRole(i.roles)) && (!i.permission || can(i.permission)))
-    .filter((i) => !isLeadershipOnly || i.to === "/dashboard");
+  const importApproval = useImportApprovalNav(Boolean(user));
+  // Leadership-only: Dashboard, plus Import approvals when on the approver list (any role) and
+  // My uploads for approvers or uploaders.
+  const groups = visibleNavGroups({
+    roles,
+    can,
+    isImportApprover: importApproval.isApprover,
+    canUpload: importApproval.canUpload,
+  });
+  const badgeCount = (badge: NavBadge | undefined): number =>
+    badge === "pending-imports" ? importApproval.pendingCount : 0;
 
   return (
     <Sidebar collapsible="icon" hoverExpandOnRail>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex items-center gap-2 px-2 py-3">
-          <div className="h-8 w-8 rounded-md bg-sidebar-primary text-sidebar-primary-foreground grid place-items-center font-bold">
+          <div className="h-8 w-8 rounded-md bg-sidebar-primary text-sidebar-primary-foreground grid place-items-center font-semibold">
             M
           </div>
           {showLabels && (
@@ -147,115 +83,47 @@ export function AppSidebar() {
         </div>
       </SidebarHeader>
       <SidebarContent>
-        {visibleAiCommandCenterNav.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="group-data-[hover-expanded=true]:mt-0 group-data-[hover-expanded=true]:opacity-100">
-              AI Command Center
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleAiCommandCenterNav.map((item) => {
-                  const active = pathname === item.to || pathname.startsWith(item.to + "/");
-                  return (
-                    <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={active}
-                        className="group-data-[hover-expanded=true]:!h-8 group-data-[hover-expanded=true]:!w-full group-data-[hover-expanded=true]:!p-2"
-                      >
-                        <Link to={item.to}>
-                          <item.icon className="h-4 w-4" />
-                          {showLabels && <span>{item.label}</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-        {visibleMmlLabNav.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="group-data-[hover-expanded=true]:mt-0 group-data-[hover-expanded=true]:opacity-100">
-              MML Lab
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleMmlLabNav.map((item) => {
-                  const active = pathname === item.to || pathname.startsWith(item.to + "/");
-                  return (
-                    <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={active}
-                        className="group-data-[hover-expanded=true]:!h-8 group-data-[hover-expanded=true]:!w-full group-data-[hover-expanded=true]:!p-2"
-                      >
-                        <Link to={item.to}>
-                          <item.icon className="h-4 w-4" />
-                          {showLabels && <span>{item.label}</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-        {visibleWorkspaceNav.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel className="group-data-[hover-expanded=true]:mt-0 group-data-[hover-expanded=true]:opacity-100">
-              Workspace
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {visibleWorkspaceNav.map((item) => {
-                  const active = pathname === item.to || pathname.startsWith(item.to + "/");
-                  return (
-                    <SidebarMenuItem key={item.to}>
-                      <SidebarMenuButton
-                        asChild
-                        isActive={active}
-                        className="group-data-[hover-expanded=true]:!h-8 group-data-[hover-expanded=true]:!w-full group-data-[hover-expanded=true]:!p-2"
-                      >
-                        <Link to={item.to}>
-                          <item.icon className="h-4 w-4" />
-                          {showLabels && <span>{item.label}</span>}
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
+        {groups.map((group) => (
+          <NavGroupBlock
+            key={group.label}
+            group={group}
+            pathname={pathname}
+            showLabels={showLabels}
+            badgeCount={badgeCount}
+            onNavigate={() => {
+              // The mobile sheet closes after a tap (N3).
+              if (isMobile) setOpenMobile(false);
+            }}
+          />
+        ))}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border">
-        <div
-          className={cn("flex items-center gap-2 px-2 py-1", !showLabels && "justify-center")}
-          data-testid="collapse-menu-toggle-row"
-        >
-          <Switch
-            id="collapse-menu-toggle"
-            aria-label="Collapse menu"
-            checked={collapsed}
-            onCheckedChange={(checked) => setOpen(!checked)}
-          />
-          {showLabels && (
-            <Label htmlFor="collapse-menu-toggle" className="text-xs text-sidebar-foreground/70">
-              Collapse menu
-            </Label>
-          )}
-        </div>
+        {/* The collapse switch does nothing for the mobile sheet, so it is hidden there (N4). */}
+        {!isMobile && (
+          <div
+            className={cn("flex items-center gap-2 px-2 py-1", !showLabels && "justify-center")}
+            data-testid="collapse-menu-toggle-row"
+          >
+            <Switch
+              id="collapse-menu-toggle"
+              aria-label="Collapse menu"
+              checked={collapsed}
+              onCheckedChange={(checked) => setOpen(!checked)}
+            />
+            {showLabels && (
+              <Label htmlFor="collapse-menu-toggle" className="text-xs text-sidebar-foreground/70">
+                Collapse menu
+              </Label>
+            )}
+          </div>
+        )}
         {showLabels && user && (
           <div className="px-2 py-2 text-xs">
-            <div className="font-medium truncate">{user.email}</div>
-            <div className="text-sidebar-foreground/60 capitalize">
-              {roles[0]?.replace("_", " ") ?? "no role"}
+            <div className="font-medium truncate" title={user.email ?? undefined}>
+              {user.email}
             </div>
+            <div className="text-sidebar-foreground/60">{primaryRoleLabel(roles)}</div>
           </div>
         )}
         <Button
@@ -263,11 +131,68 @@ export function AppSidebar() {
           size="sm"
           className="justify-start text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           onClick={signOut}
+          aria-label={showLabels ? undefined : "Sign out"}
         >
           <LogOut className="h-4 w-4" />
           {showLabels && <span className="ml-2">Sign out</span>}
         </Button>
       </SidebarFooter>
     </Sidebar>
+  );
+}
+
+function NavGroupBlock({
+  group,
+  pathname,
+  showLabels,
+  badgeCount,
+  onNavigate,
+}: {
+  group: NavGroup;
+  pathname: string;
+  showLabels: boolean;
+  badgeCount: (badge: NavBadge | undefined) => number;
+  onNavigate: () => void;
+}) {
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel className="group-data-[hover-expanded=true]:mt-0 group-data-[hover-expanded=true]:opacity-100">
+        {group.label}
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {group.items.map((item) => {
+            const active = isNavItemActive(pathname, item);
+            const count = badgeCount(item.badge);
+            return (
+              <SidebarMenuItem key={item.to}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={active}
+                  className="group-data-[hover-expanded=true]:!h-8 group-data-[hover-expanded=true]:!w-full group-data-[hover-expanded=true]:!p-2"
+                >
+                  <Link
+                    to={item.to}
+                    activeOptions={navLinkActiveOptions(item)}
+                    aria-current={active ? "page" : undefined}
+                    // Collapsed rail: icons only, so the link needs a name (N12).
+                    aria-label={showLabels ? undefined : item.label}
+                    onClick={onNavigate}
+                  >
+                    <item.icon className="h-4 w-4" />
+                    {showLabels && <span>{item.label}</span>}
+                  </Link>
+                </SidebarMenuButton>
+                {count > 0 && showLabels && (
+                  <SidebarMenuBadge aria-label={`${count} waiting for sign-off`}>
+                    {count}
+                  </SidebarMenuBadge>
+                )}
+              </SidebarMenuItem>
+            );
+          })}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   );
 }

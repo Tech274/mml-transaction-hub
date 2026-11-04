@@ -1,263 +1,322 @@
-import type { ReactNode } from "react";
+// SCRUM-128 C6 (plan P07): the Private cloud page on the shared standard. Data shaping lives in
+// private-cloud-data.ts (moved verbatim; value pins in __tests__/cloud-ai-summaries-data.test.ts).
+// The page description is the AppShell description (routes/_authenticated/private-cloud.tsx).
+import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Bar,
   CartesianGrid,
+  Cell,
   ComposedChart,
+  Line,
   Pie,
   PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
-  Cell,
-  Line,
 } from "recharts";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CheckCircle2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { supabase } from "@/integrations/supabase/client";
-import { fmtCurrency, fmtNumber, MONTH_NAMES } from "@/lib/format";
-import { addNullable } from "@/lib/nullable-sum";
+import { fmtCurrency, fmtNumber } from "@/lib/format";
 import { readAllRows } from "@/lib/read-all";
+import { incompleteNoteProps } from "@/lib/kpi-note";
+import { formatKpiPeriod } from "@/lib/kpi-period";
+import { noteCountForTab, type CompletenessTab } from "@/lib/completeness-tabs";
+import {
+  CHART_AXIS_TICK,
+  CHART_GRID,
+  CHART_HEIGHT,
+  CHART_SERIES,
+  CHART_TOOLTIP,
+  PIE_SLICE_STROKE,
+  chartSeriesColor,
+} from "@/lib/chart-standard";
+import { ErrorState, LoadingState } from "@/components/page-states";
+import { ChartCard } from "@/components/summaries/chart-card";
+import { NoDataYet } from "@/components/summaries/no-data-yet";
+import { CompletenessCard } from "@/components/summaries/completeness-card";
+import { CompletenessTabs } from "@/components/summaries/completeness-tabs";
+import { KPI_INSET_GRID_CLASS, KpiGrid, SummaryKpi } from "@/components/summaries/summary-kpi";
+import { TransactionListCard } from "@/components/summaries/transaction-list-card";
+import { ProviderBadge } from "@/components/cloud/cloud-type-badge";
+import {
+  EXAMPLE_BATCHES,
+  EXAMPLE_TRANSACTIONS,
+  formatBatchStatus,
+  lineCost,
+  privateCloudView,
+  type BatchRow,
+  type TxRow,
+} from "@/components/summaries/private-cloud-data";
 import {
   getSuperadminCaptureModeEnvForClient,
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
 
-type BatchRow = {
-  id: string;
-  batch_code: string;
-  name: string | null;
-  status: string;
-  revenue_total: number | null;
-  estimated_cost_total: number | null;
-  actual_cost_total: number | null;
-  flags: string[] | null;
-  needs_recompute: boolean;
-  updated_at: string;
-};
+const thousands = (value: number) => `${Math.round(value / 1000)}k`;
 
-type TxRow = {
-  id: string;
-  lab_batch_id: string | null;
-  customer_name: string | null;
-  month: number | null;
-  year: number | null;
-  selling_cost: number | null;
-  input_cost: number | null;
-  input_cost_auto: number | null;
-  input_cost_actual_alloc: number | null;
-};
-
-const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
-
-function formatBatchStatus(status: string): string {
-  const map: Record<string, string> = {
-    open: "Open",
-    closed_actual: "Closed",
-    closed_estimate: "Closed (Estimate)",
-    pending: "Pending",
-  };
-  return map[status] ?? status.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-const EXAMPLE_BATCHES: BatchRow[] = [
-  { id: "pb-1", batch_code: "LB-PRIV-0929-A", name: "Azure FinOps Cohort", status: "open", revenue_total: 285000, estimated_cost_total: 169500, actual_cost_total: 162300, flags: ["cost_locked"], needs_recompute: false, updated_at: "2026-09-29T05:28:00Z" },
-  { id: "pb-2", batch_code: "LB-PRIV-0929-B", name: "Cloud Security Bootcamp", status: "closed_actual", revenue_total: 212000, estimated_cost_total: 132400, actual_cost_total: 128000, flags: [], needs_recompute: false, updated_at: "2026-09-28T15:20:00Z" },
-  { id: "pb-3", batch_code: "LB-PRIV-0929-C", name: "Data Platform Residency", status: "open", revenue_total: 196000, estimated_cost_total: 118000, actual_cost_total: 112200, flags: [], needs_recompute: true, updated_at: "2026-09-27T11:45:00Z" },
-];
-
-const EXAMPLE_TRANSACTIONS: TxRow[] = [
-  { id: "t1", lab_batch_id: "pb-1", customer_name: "Cognizant", month: 9, year: 2026, selling_cost: 98000, input_cost: 60000, input_cost_auto: null, input_cost_actual_alloc: 58200 },
-  { id: "t2", lab_batch_id: "pb-1", customer_name: "Infosys", month: 9, year: 2026, selling_cost: 93000, input_cost: 51000, input_cost_auto: null, input_cost_actual_alloc: 47200 },
-  { id: "t3", lab_batch_id: "pb-1", customer_name: "TCS", month: 9, year: 2026, selling_cost: 94000, input_cost: 57500, input_cost_auto: null, input_cost_actual_alloc: 56900 },
-  { id: "t4", lab_batch_id: "pb-2", customer_name: "Wipro", month: 8, year: 2026, selling_cost: 106000, input_cost: 65000, input_cost_auto: null, input_cost_actual_alloc: 64200 },
-  { id: "t5", lab_batch_id: "pb-2", customer_name: "HCL", month: 8, year: 2026, selling_cost: 106000, input_cost: 64000, input_cost_auto: null, input_cost_actual_alloc: 63800 },
-  { id: "t6", lab_batch_id: "pb-3", customer_name: "Accenture", month: 7, year: 2026, selling_cost: 98000, input_cost: 56000, input_cost_auto: null, input_cost_actual_alloc: 55300 },
-  { id: "t7", lab_batch_id: "pb-3", customer_name: "Capgemini", month: 7, year: 2026, selling_cost: 98000, input_cost: 57000, input_cost_auto: null, input_cost_actual_alloc: 56900 },
-];
-
-function lineCost(row: Pick<TxRow, "input_cost_actual_alloc" | "input_cost" | "input_cost_auto">): number {
-  return row.input_cost_actual_alloc ?? row.input_cost ?? row.input_cost_auto ?? 0;
-}
-
-export function PrivateCloudSummary() {
-  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
-  const { data, isLoading, isError, error } = useQuery({
+export function PrivateCloudSummary({
+  tab: tabProp,
+  onTabChange,
+}: { tab?: CompletenessTab; onTabChange?: (tab: CompletenessTab) => void } = {}) {
+  const [tabState, setTabState] = useState<CompletenessTab>("all");
+  const tab = tabProp ?? tabState;
+  const setTab = onTabChange ?? setTabState;
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(
+    getSuperadminCaptureModeEnvForClient(),
+  );
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["private-cloud-summary-v1"],
     queryFn: async () => {
       const batches = isExampleCaptureMode
         ? EXAMPLE_BATCHES
-        : ((await supabase
-            .from("lab_batches")
-            .select(
-              "id,batch_code,name,status,revenue_total,estimated_cost_total,actual_cost_total,flags,needs_recompute,updated_at",
-            )
-            .eq("lab_type", "private_cloud")
-            .order("batch_code")).data ?? []) as BatchRow[];
-      const batchIds = batches.map((batch) => batch.id);
-      const tx = isExampleCaptureMode
+        : (((
+            await supabase
+              .from("lab_batches")
+              .select(
+                "id,batch_code,name,status,revenue_total,estimated_cost_total,actual_cost_total,flags,needs_recompute,updated_at",
+              )
+              .eq("lab_type", "private_cloud")
+              .order("batch_code")
+          ).data ?? []) as BatchRow[]);
+      // SCRUM-129/131 (spec §129.4a, AC6): count ALL private rows (MakeMyLabs, Oracle,
+      // SAP), not only batch-linked ones, so Bulk Upload rows are included.
+      const tx: TxRow[] = isExampleCaptureMode
         ? EXAMPLE_TRANSACTIONS
-        : batchIds.length === 0
-          ? []
-          : await readAllRows(
-              () =>
-                supabase
-                  .from("transactions")
-                  .select(
-                    "id,lab_batch_id,customer_name,month,year,selling_cost,input_cost,input_cost_auto,input_cost_actual_alloc,is_deleted,repository_type",
-                  )
-                  .eq("repository_type", "private_cloud")
-                  .eq("is_deleted", false)
-                  .in("lab_batch_id", batchIds)
-                  .order("id"),
-              "Private cloud summary transactions",
-            );
-      const now = new Date();
-      const nowYear = now.getFullYear();
-      const availableYears = tx
-        .map((row) => row.year)
-        .filter((value): value is number => typeof value === "number");
-      const year = availableYears.includes(nowYear)
-        ? nowYear
-        : (availableYears.sort((a, b) => b - a)[0] ?? nowYear);
-      const revenue = batches.reduce((sum, row) => addNullable(sum, row.revenue_total), 0);
-      const actualCost = batches.reduce((sum, row) => addNullable(sum, row.actual_cost_total), 0);
-      const estimatedCost = batches.reduce((sum, row) => addNullable(sum, row.estimated_cost_total), 0);
-      const profit = revenue - actualCost;
-      const marginPct = revenue > 0 ? (profit / revenue) * 100 : 0;
-
-      const byMonth = Array.from({ length: 12 }, (_, idx) => {
-        const month = idx + 1;
-        const monthRows = tx.filter((row) => row.year === year && row.month === month);
-        const monthRevenue = monthRows.reduce((sum, row) => addNullable(sum, row.selling_cost), 0);
-        const monthCost = monthRows.reduce((sum, row) => addNullable(sum, lineCost(row)), 0);
-        const monthMargin = monthRevenue > 0 ? ((monthRevenue - monthCost) / monthRevenue) * 100 : 0;
-        return {
-          month: MONTH_NAMES[idx].slice(0, 3),
-          monthLabel: `${MONTH_NAMES[idx].slice(0, 3)} ${String(year).slice(2)}`,
-          revenue: monthRevenue,
-          cost: monthCost,
-          marginPct: Number(monthMargin.toFixed(1)),
-        };
-      });
-
-      const statusMap = new Map<string, number>();
-      for (const batch of batches) {
-        const label = formatBatchStatus(batch.status);
-        statusMap.set(label, (statusMap.get(label) ?? 0) + 1);
-      }
-
-      const byBatchLineActual = new Map<string, number>();
-      for (const row of tx) {
-        if (!row.lab_batch_id) continue;
-        byBatchLineActual.set(
-          row.lab_batch_id,
-          addNullable(byBatchLineActual.get(row.lab_batch_id) ?? 0, row.input_cost_actual_alloc),
-        );
-      }
-      const reconciliation = batches.map((batch) => {
-        const lineActual = byBatchLineActual.get(batch.id) ?? 0;
-        const batchActual = Number(batch.actual_cost_total ?? 0);
-        const batchEstimate = Number(batch.estimated_cost_total ?? 0);
-        const diff = Math.abs(lineActual - batchActual);
-        return {
-          ...batch,
-          lineActual,
-          reconciled: diff < 0.01,
-          batchActual,
-          batchEstimate,
-        };
-      });
-
-      const customerRevenue = new Map<string, number>();
-      for (const row of tx) {
-        const customer = row.customer_name ?? "Unknown";
-        customerRevenue.set(customer, addNullable(customerRevenue.get(customer) ?? 0, row.selling_cost));
-      }
-      const topCustomers = [...customerRevenue.entries()]
-        .map(([name, value]) => ({ name, value }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5);
-
-      const locked = batches.filter((batch) => (batch.flags ?? []).some((flag) => flag.toLowerCase().includes("lock"))).length;
-      const recomputePending = batches.filter((batch) => batch.needs_recompute).length;
-
-      return {
-        batches,
-        tx,
-        year,
-        revenue,
-        actualCost,
-        estimatedCost,
-        profit,
-        marginPct,
-        byMonth,
-        statusSplit: [...statusMap.entries()].map(([name, value]) => ({ name, value })),
-        reconciliation,
-        topCustomers,
-        locked,
-        recomputePending,
-      };
+        : await readAllRows(
+            () =>
+              supabase
+                .from("transactions")
+                .select(
+                  "id,lab_batch_id,potential_id,lab_name,cloud_provider,total_users,customer_name,month,year,selling_cost,input_cost,input_cost_auto,input_cost_actual_alloc,is_deleted,repository_type",
+                )
+                .eq("repository_type", "private_cloud")
+                .eq("is_deleted", false)
+                .order("id"),
+            "Private cloud summary transactions",
+          );
+      return { batches, tx };
     },
   });
 
-  if (isLoading) {
+  const allTx = data?.tx;
+  const batchesRaw = data?.batches;
+  // Periods from the one rules table (lib/kpi-period.ts); transaction rows are filtered to the
+  // period the label states. Batch tiles are batch-level (no month on a batch): their rule is
+  // all-time today; if Q6 gives them a window, filter the batches query by it.
+  const page = useMemo(
+    () => (allTx && batchesRaw ? privateCloudView(allTx, batchesRaw, tab) : null),
+    [allTx, batchesRaw, tab],
+  );
+
+  if (isLoading) return <LoadingState thing="private cloud summary" />;
+  if (isError || !data || !page) {
     return (
-      <Card>
-        <CardContent className="py-8 text-sm text-muted-foreground">Loading private cloud summary…</CardContent>
-      </Card>
+      <ErrorState thing="private cloud summary" error={error} onRetry={() => void refetch()} />
     );
   }
-  if (isError || !data) {
-    return (
-      <Alert variant="destructive">
-        <AlertTriangle className="h-4 w-4" />
-        <AlertTitle>Could not load Private cloud summary</AlertTitle>
-        <AlertDescription>{error instanceof Error ? error.message : "Unknown error"}</AlertDescription>
-      </Alert>
-    );
-  }
-  const hasMonthlyData = data.byMonth.some((row) => row.revenue > 0 || row.cost > 0 || row.marginPct > 0);
-  const hasStatusSplit = data.statusSplit.length > 0;
-  const hasReconciliation = data.reconciliation.length > 0;
-  const hasTopCustomers = data.topCustomers.length > 0;
-  const monthSeries = data.byMonth.filter((row) => row.revenue > 0 || row.cost > 0);
-  const statusTotal = data.statusSplit.reduce((sum, row) => sum + row.value, 0);
+  const {
+    view,
+    cardSplit,
+    tabCounts,
+    totalsPeriod,
+    completenessPeriod,
+    batchesPeriod,
+    batchStatePeriod,
+  } = page;
+  const hasReconciliation = view.reconciliation.length > 0;
+  const monthSeries = view.byMonth.filter((row) => row.revenue > 0 || row.cost > 0);
+  const statusTotal = view.statusSplit.reduce((sum, row) => sum + row.value, 0);
+  const inc = view.completeness.incomplete;
+  const noteCount = noteCountForTab(tab, inc.count);
+  const totalsLabel = formatKpiPeriod(totalsPeriod);
+  const batchesLabel = formatKpiPeriod(batchesPeriod);
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-base font-semibold">Private cloud summary</h2>
-        <p className="text-xs text-muted-foreground">Batches, reconciliation and customer performance.</p>
-      </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-8">
-        <SummaryKpi label="Batches" value={fmtNumber(data.batches.length)} subline={`FY ${data.year}`} />
-        <SummaryKpi label="Revenue" value={fmtCurrency(data.revenue)} subline={`Profit ${fmtCurrency(data.profit)}`} />
-        <SummaryKpi label="Actual cost" value={fmtCurrency(data.actualCost)} subline={`Estimated ${fmtCurrency(data.estimatedCost)}`} />
-        <SummaryKpi label="Margin" value={`${data.marginPct.toFixed(1)}%`} subline={`Cost locks ${fmtNumber(data.locked)}`} />
-        <SummaryKpi label="Recompute pending" value={fmtNumber(data.recomputePending)} subline="Batches needing refresh" />
-        <SummaryKpi label="Top customer" value={data.topCustomers[0]?.name ?? "—"} subline={data.topCustomers[0] ? fmtCurrency(data.topCustomers[0].value) : "No data"} />
-        <SummaryKpi label="Status entries" value={fmtNumber(statusTotal)} subline="Open and closed batches" />
-        <SummaryKpi label="Reconciliation" value={hasReconciliation ? "Tracked" : "No data"} subline={`${fmtNumber(data.reconciliation.filter((batch) => batch.reconciled).length)} reconciled`} />
-      </div>
+      <CompletenessCard
+        complete={cardSplit.complete}
+        incomplete={cardSplit.incomplete}
+        period={completenessPeriod}
+        onViewIncomplete={() => setTab("incomplete")}
+      />
+      <CompletenessTabs value={tab} onChange={setTab} counts={tabCounts} />
+      <KpiGrid>
+        <SummaryKpi
+          period={totalsPeriod}
+          label="Private cloud transactions"
+          value={fmtNumber(view.tx.length)}
+          subline={`${fmtNumber(view.inBatches)} in batches`}
+          {...incompleteNoteProps(noteCount, null)}
+        />
+        <SummaryKpi
+          period={totalsPeriod}
+          label="Revenue"
+          value={fmtCurrency(view.txRevenue)}
+          subline="All private cloud transactions"
+          {...incompleteNoteProps(noteCount, view.incompleteRevenue)}
+        />
+        <SummaryKpi
+          period={totalsPeriod}
+          label="Input cost"
+          value={fmtCurrency(view.txCost)}
+          subline={`Profit ${fmtCurrency(view.txRevenue - view.txCost)}`}
+          {...incompleteNoteProps(noteCount, view.incompleteCost)}
+        />
+        <SummaryKpi
+          period={totalsPeriod}
+          label="Users"
+          value={fmtNumber(view.txUsers)}
+          subline="Across private cloud transactions"
+          note={
+            inc.count > 0
+              ? `${fmtNumber(inc.count)} incomplete · ${fmtNumber(view.incompleteUsers)} users`
+              : null
+          }
+          noteTitle={
+            inc.count > 0
+              ? `Includes ${fmtNumber(inc.count)} incomplete ${inc.count === 1 ? "row" : "rows"} · ${fmtNumber(view.incompleteUsers)} users`
+              : null
+          }
+        />
+        <SummaryKpi
+          period={totalsPeriod}
+          label="Top customer"
+          value={view.topCustomers[0]?.name ?? "—"}
+          subline={view.topCustomers[0] ? fmtCurrency(view.topCustomers[0].value) : "No data"}
+        />
+      </KpiGrid>
+
+      <Card className="min-w-0" data-testid="lab-batches-card">
+        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1.5">
+            <CardTitle className="text-sm">Lab batches</CardTitle>
+            <CardDescription>
+              Private cloud batches (lab_batches). Batch totals come from the batch, not from the
+              transaction totals above, and are not filtered by the tabs.
+            </CardDescription>
+          </div>
+          <Link to="/mml-lab/batches" className="shrink-0 text-xs text-primary hover:underline">
+            View all →
+          </Link>
+        </CardHeader>
+        <CardContent className={KPI_INSET_GRID_CLASS}>
+          <SummaryKpi
+            period={batchesPeriod}
+            variant="inset"
+            label="Batches"
+            value={fmtNumber(view.batches.length)}
+            subline={`Status entries ${fmtNumber(statusTotal)}`}
+          />
+          <SummaryKpi
+            period={batchesPeriod}
+            variant="inset"
+            label="Batch revenue"
+            value={fmtCurrency(view.revenue)}
+            subline={`Batch profit ${fmtCurrency(view.profit)}`}
+          />
+          <SummaryKpi
+            period={batchesPeriod}
+            variant="inset"
+            label="Batch actual cost"
+            value={fmtCurrency(view.actualCost)}
+            subline={`Estimated ${fmtCurrency(view.estimatedCost)}`}
+          />
+          <SummaryKpi
+            period={batchesPeriod}
+            variant="inset"
+            label="Batch margin"
+            value={`${view.marginPct.toFixed(1)}%`}
+            subline={`Cost locks ${fmtNumber(view.locked)}`}
+          />
+          <SummaryKpi
+            period={batchStatePeriod}
+            variant="inset"
+            label="Recompute pending"
+            value={fmtNumber(view.recomputePending)}
+            subline="Batches needing refresh"
+          />
+          <SummaryKpi
+            period={batchesPeriod}
+            variant="inset"
+            label="Reconciliation"
+            value={hasReconciliation ? "Tracked" : "No data"}
+            subline={`${fmtNumber(view.reconciliation.filter((batch) => batch.reconciled).length)} reconciled`}
+          />
+        </CardContent>
+      </Card>
+
+      <ChartCard title="Private cloud by provider" description={totalsLabel}>
+        {view.providerSplit.length > 0 ? (
+          <ul className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            {view.providerSplit.map((p) => (
+              <li
+                key={p.name}
+                className="flex min-w-0 items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
+              >
+                <ProviderBadge
+                  value={p.name === "No provider" ? null : p.name}
+                  className="shrink-0"
+                />
+                <span className="truncate text-xs text-muted-foreground tabular-nums">
+                  {fmtNumber(p.rows)} rows · {fmtCurrency(p.revenue)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <NoDataYet compact />
+        )}
+      </ChartCard>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <ChartCard title="Revenue and margin by month">
-          {hasMonthlyData && monthSeries.length > 0 ? (
-            <ResponsiveContainer width="100%" height={250}>
+        <ChartCard
+          title="Revenue and margin by month"
+          description={formatKpiPeriod({ kind: "year", year: view.year, basis: "calendar" })}
+        >
+          {monthSeries.length > 0 ? (
+            <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
               <ComposedChart data={monthSeries}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                <XAxis dataKey="monthLabel" fontSize={12} />
-                <YAxis yAxisId="money" fontSize={12} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
-                <YAxis yAxisId="margin" orientation="right" fontSize={12} tickFormatter={(value) => `${value}%`} />
-                <Tooltip formatter={(value: number, name) => (String(name).includes("%") ? `${value}%` : fmtCurrency(value))} />
-                <Bar yAxisId="money" dataKey="revenue" name="Revenue" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-                <Line yAxisId="money" dataKey="cost" name="Cost" stroke="var(--chart-2)" strokeWidth={2} />
-                <Line yAxisId="margin" dataKey="marginPct" name="Margin %" stroke="var(--chart-3)" strokeWidth={2} />
+                <CartesianGrid {...CHART_GRID} />
+                <XAxis dataKey="monthLabel" tick={CHART_AXIS_TICK} />
+                <YAxis yAxisId="money" tick={CHART_AXIS_TICK} tickFormatter={thousands} />
+                <YAxis
+                  yAxisId="margin"
+                  orientation="right"
+                  tick={CHART_AXIS_TICK}
+                  tickFormatter={(value) => `${value}%`}
+                />
+                <Tooltip
+                  {...CHART_TOOLTIP}
+                  formatter={(value: number, name) =>
+                    String(name).includes("%") ? `${value}%` : fmtCurrency(value)
+                  }
+                />
+                <Bar
+                  yAxisId="money"
+                  dataKey="revenue"
+                  name="Revenue"
+                  fill={CHART_SERIES[0]}
+                  radius={[4, 4, 0, 0]}
+                />
+                <Line
+                  yAxisId="money"
+                  dataKey="cost"
+                  name="Input cost"
+                  stroke={CHART_SERIES[1]}
+                  strokeWidth={2}
+                />
+                <Line
+                  yAxisId="margin"
+                  dataKey="marginPct"
+                  name="Margin %"
+                  stroke={CHART_SERIES[2]}
+                  strokeWidth={2}
+                />
               </ComposedChart>
             </ResponsiveContainer>
           ) : (
@@ -265,17 +324,30 @@ export function PrivateCloudSummary() {
           )}
         </ChartCard>
 
-        <ChartCard title="Batch status">
-          {hasStatusSplit ? (
-            <ResponsiveContainer width="100%" height={250}>
+        <ChartCard title="Batch status" description={batchesLabel}>
+          {view.statusSplit.length > 0 ? (
+            <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
               <PieChart>
-                <Pie data={data.statusSplit} dataKey="value" nameKey="name" outerRadius={90} innerRadius={58}>
-                  {data.statusSplit.map((_, idx) => (
-                    <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
+                <Pie
+                  data={view.statusSplit}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={90}
+                  innerRadius={58}
+                  {...PIE_SLICE_STROKE}
+                >
+                  {view.statusSplit.map((slice, idx) => (
+                    <Cell key={slice.name} fill={chartSeriesColor(idx)} />
                   ))}
                 </Pie>
-                <Tooltip />
-                <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-sm font-semibold">
+                <Tooltip {...CHART_TOOLTIP} />
+                <text
+                  x="50%"
+                  y="50%"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="fill-foreground text-sm font-semibold"
+                >
                   {fmtNumber(statusTotal)}
                 </text>
               </PieChart>
@@ -287,127 +359,105 @@ export function PrivateCloudSummary() {
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Reconciled costs (actual vs estimate) · {data.year}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {hasReconciliation ? (
-              data.reconciliation.map((batch) => (
-                <div key={batch.id} className="rounded-md border border-border px-3 py-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="text-sm font-medium">
+        {/* SCRUM-128 C6: the title said "· {year}", but reconciliation covers every batch with all
+            its lines (no year filter); the period is now the card description. */}
+        <ChartCard title="Reconciled costs (actual vs estimate)" description={batchesLabel}>
+          {hasReconciliation ? (
+            <ul className="space-y-2">
+              {view.reconciliation.map((batch) => (
+                <li key={batch.id} className="rounded-md border border-border px-3 py-2">
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <div
+                      className="min-w-0 truncate text-sm font-medium"
+                      title={`${batch.batch_code}${batch.name ? ` · ${batch.name}` : ""}`}
+                    >
                       {batch.batch_code} {batch.name ? `· ${batch.name}` : ""}
                     </div>
                     {batch.reconciled ? (
-                      <Badge variant="default" className="gap-1">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Reconciled ✓
+                      <Badge variant="success" className="shrink-0 gap-1">
+                        <CheckCircle2 className="size-3.5" aria-hidden /> Reconciled
                       </Badge>
                     ) : (
-                      <Badge variant="secondary">Review needed</Badge>
+                      <Badge variant="warning" className="shrink-0">
+                        Review needed
+                      </Badge>
                     )}
                   </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 text-xs text-muted-foreground tabular-nums">
                     Σ line actual costs = {fmtCurrency(batch.lineActual)} · batch actual cost ={" "}
                     {fmtCurrency(batch.batchActual)} · estimate = {fmtCurrency(batch.batchEstimate)}
                   </div>
-                </div>
-              ))
-            ) : (
-              <NoDataYet compact />
-            )}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm">Top customers by revenue</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {hasTopCustomers ? (
-              data.topCustomers.map((customer) => (
-                <Link
-                  key={customer.name}
-                  to="/customers"
-                  search={{ q: customer.name, status: "all" }}
-                  className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/30"
-                >
-                  <span className="text-sm font-medium">{customer.name}</span>
-                  <Badge variant="outline">{fmtCurrency(customer.value)}</Badge>
-                </Link>
-              ))
-            ) : (
-              <NoDataYet compact />
-            )}
-          </CardContent>
-        </Card>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <NoDataYet compact />
+          )}
+        </ChartCard>
+        <ChartCard title="Top customers by revenue" description={totalsLabel}>
+          {view.topCustomers.length > 0 ? (
+            <ul className="space-y-2">
+              {view.topCustomers.map((customer) => (
+                <li key={customer.name}>
+                  <Link
+                    to="/customers"
+                    search={{ q: customer.name, status: "all" }}
+                    className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+                  >
+                    <span className="min-w-0 truncate text-sm font-medium" title={customer.name}>
+                      {customer.name}
+                    </span>
+                    <Badge variant="outline" className="shrink-0 tabular-nums">
+                      {fmtCurrency(customer.value)}
+                    </Badge>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <NoDataYet compact />
+          )}
+        </ChartCard>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Recent batches</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {data.batches.slice(0, 8).map((batch) => (
-            <Link
-              key={batch.id}
-              to="/mml-lab/batches"
-              className="block rounded-md border border-border px-3 py-2 hover:bg-muted/30"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-sm font-medium">{batch.batch_code}</div>
-                  <Badge variant="outline">{formatBatchStatus(batch.status)}</Badge>
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                Revenue {fmtCurrency(batch.revenue_total)} · Actual cost {fmtCurrency(batch.actual_cost_total)} ·
-                Updated {new Date(batch.updated_at).toLocaleString()}
-              </div>
-            </Link>
-          ))}
-        </CardContent>
-      </Card>
+      <TransactionListCard title="Private cloud transactions" rows={view.tx} costOf={lineCost} />
+
+      <ChartCard
+        title="Recent batches"
+        description="First 8 by batch code"
+        action={
+          <Link to="/mml-lab/batches" className="text-xs text-primary hover:underline">
+            View all →
+          </Link>
+        }
+      >
+        {view.batches.length > 0 ? (
+          <ul className="space-y-2">
+            {view.batches.slice(0, 8).map((batch) => (
+              <li key={batch.id}>
+                <Link
+                  to="/mml-lab/batches"
+                  className="block rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+                >
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <div className="min-w-0 truncate text-sm font-medium">{batch.batch_code}</div>
+                    <Badge variant="outline" className="shrink-0">
+                      {formatBatchStatus(batch.status)}
+                    </Badge>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground tabular-nums">
+                    Revenue {fmtCurrency(batch.revenue_total)} · Actual cost{" "}
+                    {fmtCurrency(batch.actual_cost_total)} · Updated{" "}
+                    {new Date(batch.updated_at).toLocaleString()}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <NoDataYet compact />
+        )}
+      </ChartCard>
     </div>
-  );
-}
-
-function NoDataYet({ compact = false }: { compact?: boolean }) {
-  return (
-    <div
-      className={`grid w-full place-items-center rounded-md border border-dashed border-border text-sm text-muted-foreground ${
-        compact ? "min-h-[96px]" : "min-h-[250px]"
-      }`}
-    >
-      No data yet
-    </div>
-  );
-}
-
-function SummaryKpi({
-  label,
-  value,
-  subline,
-}: {
-  label: string;
-  value: string;
-  subline?: string;
-}) {
-  return (
-    <Card>
-      <CardContent className="pt-5">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="mt-1 text-xl font-semibold">{value}</div>
-        {subline && <div className="mt-1 text-xs text-muted-foreground">{subline}</div>}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ChartCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
   );
 }

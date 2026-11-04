@@ -1,16 +1,22 @@
-"""E2E: line_of_business is restricted to VILT | Standalone | Integrated.
+"""E2E: line_of_business is limited to VILT | Standalone | Integrated.
 
-Covers three assertions in a single Playwright run:
-  1. Downloadable templates (public + private) and their sample rows only
-     ever emit VILT / Standalone / Integrated in the line_of_business column.
-  2. Uploading a CSV with an invalid line_of_business value ("Training") is
-     rejected with a per-row + per-column error that names the field, the
-     bad value, and the allowed set.
-  3. The database-layer constraint rejects any direct insert into
-     `transactions` with a bad line_of_business (verifying the API/server
-     enforcement, not just the client).
+SCRUM-128 (C2, plan Q4): the legacy importer and its "Download Public/Private Cloud Template"
+buttons were deleted with the SCRUM-44 flag. This script now drives the strict importer
+(components/strict-import.tsx) and checks its rules as they stand after the 28 Sep 2026 owner
+direction ("nothing on upload is a strict rule"):
 
-Requires an authenticated ops/admin session via LOVABLE_BROWSER_SUPABASE_*.
+  1. The "Template" download is header-only (no sample rows, so it can never emit a bad
+     line_of_business) and has a "Line of Business" column; the allowed set in
+     src/lib/bulk-template.ts is exactly VILT / Standalone / Integrated.
+  2. Uploading a row with line_of_business "Training" keeps the row, lists a warning that names
+     the column, the bad value and the allowed set, and says the value is stored blank. The row
+     is NOT rejected (unit test: src/lib/strict-import/__tests__/validate.test.ts). Nothing is
+     imported: the script never presses Import.
+  3. The database constraint still rejects a direct insert into `transactions` with a bad
+     line_of_business (server enforcement, not just the client).
+
+Requires an authenticated ops/admin session via LOVABLE_BROWSER_SUPABASE_* and a local dev
+server on :8080. Synthetic data only.
 """
 import asyncio, json, os, re
 from pathlib import Path
@@ -20,13 +26,6 @@ ROOT = Path(__file__).parent / "screenshots" / "bulk-import-lob"
 ROOT.mkdir(parents=True, exist_ok=True)
 
 ALLOWED = {"VILT", "Standalone", "Integrated"}
-
-BAD_CSV = (
-    "potential_id,month,year,customer_name,lab_name,line_of_business,"
-    "start_date,end_date,total_users,input_cost,selling_cost,cloud_provider\n"
-    "POT-LOB-001,1,2026,Acme Corp,AWS Lab,Training,"
-    "2026-01-01,2026-01-31,10,1000.00,1500.00,AWS\n"
-)
 
 
 async def restore(context, page):
@@ -45,27 +44,11 @@ async def restore(context, page):
         )
 
 
-def assert_lob_column_allowed(csv_text: str, label: str):
-    lines = [l for l in csv_text.splitlines() if l.strip()]
-    assert len(lines) >= 2, f"{label}: template is empty"
-    header = [h.strip() for h in lines[0].split(",")]
-    assert "line_of_business" in header, f"{label}: header missing line_of_business"
-    idx = header.index("line_of_business")
-    for i, row in enumerate(lines[1:], start=2):
-        cols = [c.strip() for c in row.split(",")]
-        val = cols[idx] if idx < len(cols) else ""
-        assert val in ALLOWED, (
-            f"{label}: row {i} has disallowed line_of_business={val!r}; "
-            f"allowed={sorted(ALLOWED)}"
-        )
-    print(f"OK — {label} uses only {sorted(ALLOWED)}")
-
-
-async def download_template(page, button_text_re: str) -> str:
+async def download_strict_template(page) -> str:
     async with page.expect_download() as dl_info:
-        await page.get_by_role("button", name=re.compile(button_text_re, re.I)).click()
+        await page.get_by_role("button", name=re.compile(r"^\s*Template\s*$", re.I)).click()
     download = await dl_info.value
-    dest = ROOT / (await download.suggested_filename())
+    dest = ROOT / download.suggested_filename
     await download.save_as(str(dest))
     return dest.read_text()
 
@@ -80,47 +63,44 @@ async def main():
         page = await context.new_page()
         await restore(context, page)
 
-        # ---------- 1) Public + Private templates ----------
+        # ---------- 1) Template ----------
         await page.goto("http://localhost:8080/entry", wait_until="domcontentloaded")
-        await page.get_by_role("tab", name="Bulk Import").click()
-        await page.wait_for_selector("button:has-text('Download')", timeout=10000)
+        await page.get_by_role("tab", name=re.compile(r"Bulk import", re.I)).click()
+        await page.wait_for_selector("button:has-text('Template')", timeout=10000)
 
-        # Public cloud template
-        public_csv = await download_template(page, r"Download Public Cloud Template")
-        assert_lob_column_allowed(public_csv, "public template")
-
-        # Switch to private cloud, download that template too
-        await page.get_by_role("button", name=re.compile(r"Private", re.I)).first.click()
-        private_csv = await download_template(page, r"Download Private Cloud Template")
-        assert_lob_column_allowed(private_csv, "private template")
-
-        # ---------- 2) Client-side + rendered error UI ----------
-        # Switch back to public, upload bad CSV
-        await page.get_by_role("button", name=re.compile(r"Public", re.I)).first.click()
-        bad_path = ROOT / "bad-lob.csv"
-        bad_path.write_text(BAD_CSV)
-        await page.set_input_files('input[type="file"]', str(bad_path))
-        await page.wait_for_selector('[data-testid="row-errors-2"]', timeout=8000)
-
-        # The cell for line_of_business on row 2 must be flagged invalid.
-        cell = page.locator('[data-testid="invalid-cell-2-line_of_business"]')
-        assert await cell.count() == 1, "line_of_business cell must be highlighted invalid"
-
-        # The error chip must exist AND surface the allowed-values hint.
-        err = page.locator('[data-testid="row-error-2-line_of_business"]')
-        err_text = (await err.inner_text()).lower()
-        for token in ["line_of_business", "vilt", "standalone", "integrated"]:
-            assert token in err_text, f"error UI missing token {token!r}: {err_text!r}"
-
-        hint = page.locator('[data-testid="lob-allowed-hint-2"]')
-        assert await hint.count() == 1, "LOB allowed-values hint should be visible"
-        await page.screenshot(path=str(ROOT / "1_error_ui.png"))
-
-        # Import button should be disabled (no valid rows) OR importing must not
-        # produce a successful run — verify by checking the invalid count toast/label.
-        assert await page.locator('button:has-text("Import")').is_disabled(), (
-            "Import must be disabled when the only row has an invalid line_of_business"
+        csv_text = await download_strict_template(page)
+        lines = [l for l in csv_text.splitlines() if l.strip()]
+        assert len(lines) == 1, "strict template must be header-only (no sample rows)"
+        header = [h.strip() for h in lines[0].split(",")]
+        assert "Line of Business" in header, f"template header missing Line of Business: {header}"
+        allowed = await page.evaluate(
+            """async () => { const m = await import('/src/lib/bulk-template.ts');
+               return [...m.LINE_OF_BUSINESS_OPTIONS]; }"""
         )
+        assert set(allowed) == ALLOWED, f"allowed LOB drifted: {allowed}"
+        print(f"OK — template is header-only; allowed LOB = {sorted(ALLOWED)}")
+
+        # ---------- 2) Bad LOB: kept, stored blank, warned ----------
+        values = {h: "" for h in header}
+        values.update({
+            "Potential ID": "POT-LOB-001", "Month": "1", "Year": "2026",
+            "Customer Name": "Example Customer", "Lab Name": "Example Lab",
+            "Line of Business": "Training", "Start Date": "2026-01-01", "End Date": "2026-01-31",
+            "Total Users": "10", "Input Cost": "1000", "Selling Cost": "1500", "Cloud Provider": "AWS",
+        })
+        bad_path = ROOT / "bad-lob.csv"
+        bad_path.write_text(",".join(header) + "\n" + ",".join(values[h] for h in header) + "\n")
+        await page.set_input_files('input[type="file"]', str(bad_path))
+
+        warning_row = page.get_by_role("row").filter(has_text="Line of Business").filter(has_text="Training")
+        await warning_row.first.wait_for(timeout=15000)
+        row_text = (await warning_row.first.inner_text()).lower()
+        for token in ["training", "vilt", "standalone", "integrated", "stored blank"]:
+            assert token in row_text, f"warning row missing {token!r}: {row_text!r}"
+        assert await page.get_by_role("button", name=re.compile(r"^Import 1 rows?$", re.I)).count() == 1, (
+            "the row must be kept (lenient import): expected an 'Import 1 rows' button"
+        )
+        await page.screenshot(path=str(ROOT / "1_warning_ui.png"))
 
         # ---------- 3) DB-layer enforcement ----------
         db_result = await page.evaluate(
@@ -128,8 +108,8 @@ async def main():
               const { supabase } = await import('/src/integrations/supabase/client.ts');
               const { error } = await supabase.from('transactions').insert({
                 potential_id: 'POT-LOB-DBCHECK-' + Date.now(),
-                customer_name: 'Acme Corp',
-                lab_name: 'AWS Lab',
+                customer_name: 'Example Customer',
+                lab_name: 'Example Lab',
                 lab_type: 'public_cloud',
                 cloud_provider: 'AWS',
                 line_of_business: 'Training',
@@ -152,7 +132,7 @@ async def main():
             or "constraint" in msg
         ), f"expected constraint violation, got: {db_result['error']}"
 
-        print("OK — templates, error UI, and DB constraint all enforce VILT/Standalone/Integrated")
+        print("OK — template, lenient preview warning, and DB constraint all hold for line_of_business")
         await browser.close()
 
 

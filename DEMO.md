@@ -21,9 +21,9 @@ The script starts local Supabase, applies the repo migrations with psql (one
 transaction per file), loads `supabase/seed-demo.sql`, writes `.env.local`
 (gitignored), and starts the app at http://127.0.0.1:8080.
 
-It also sets `VITE_SCRUM44_UI_REVIEW_ENABLED=true` in `.env.local` so the
-SCRUM-44 review UI (azure theme + public/private cloud screen refresh) is on
-for local demo runs.
+The SCRUM-44 UI flag (`VITE_SCRUM44_UI_REVIEW_ENABLED`) was retired in
+SCRUM-128: the azure theme and the refreshed screens are the only UI, so dev
+and production render the same pages and no flag is needed.
 
 ## Local migrations required for the demo scope
 
@@ -52,7 +52,6 @@ the dev-only capture mode (compiled out of production):
 
 ```bash
 VITE_SUPERADMIN_CAPTURE_MODE=true \
-VITE_SCRUM44_UI_REVIEW_ENABLED=true \
 npm run dev -- --host 127.0.0.1 --port 4173
 ```
 

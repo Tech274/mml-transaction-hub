@@ -11,7 +11,7 @@ describe("transaction cost lock safeguards", () => {
     customer_name: "",
     lab_name: "",
     lab_type: "public_cloud" as const,
-    cloud_provider: "",
+    cloud_provider: "AWS", // SCRUM-129: provider is required
     system_config: "",
     line_of_business: "",
     start_date: "",

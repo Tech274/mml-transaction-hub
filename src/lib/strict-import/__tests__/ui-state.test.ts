@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canCommit, duplicateFileMessage, formatCents, needsAcknowledgement, strictTemplateCsv, strictTemplateFilename } from "../ui-state";
+import { canCommit, canSubmitForApproval, duplicateFileMessage, formatCents, needsAcknowledgement, strictTemplateCsv, strictTemplateFilename } from "../ui-state";
 import { parseCsvText } from "../parse";
 import { matchHeaders } from "../validate";
 import type { PreviewResult } from "../service";
@@ -9,8 +9,10 @@ const preview = (over: Partial<PreviewResult> = {}): PreviewResult => ({
   templateStatus: "PENDING_VIVEK_CONFIRMATION",
   fileSha256: "a".repeat(64),
   sheetName: null,
-  summary: { rowsInFile: 1, blankRowsIgnored: 0, rowsToImport: 1, errorCount: 0, warningCount: 0, totalSellingCents: 100, totalInputCents: 50, distinctCustomers: 1 },
+  summary: { rowsInFile: 1, blankRowsIgnored: 0, rowsToImport: 1, errorCount: 0, warningCount: 0, totalSellingCents: 100, totalInputCents: 50, distinctCustomers: 1,
+    privateRows: 0, publicRows: 1, providerErrorRows: 0, providerAliasesApplied: 0, batchKind: "public_cloud" },
   rowErrors: [],
+  providerRows: [],
   warnings: [],
   customers: { newCustomers: ["Beta Test Ltd"], matchedWithDifferentSpelling: [], inFileVariants: [] },
   priorImport: null,
@@ -30,12 +32,16 @@ describe("strict import screen state", () => {
     expect(needsAcknowledgement(variants)).toBe(false);
     expect(canCommit(variants, false)).toBe(true);
   });
-  it("a repeated file needs one Import anyway confirmation", () => {
+  it("SCRUM-131: a repeated file is a warning (approved default), not a block", () => {
     const prior = { id: "batch-1", importedOn: "2026-09-01" };
     const p = preview({ priorImport: prior });
     expect(duplicateFileMessage(prior)).toBe("This exact file was already imported on 2026-09-01 (batch batch-1)");
-    expect(canCommit(p, false)).toBe(false);
-    expect(canCommit(p, true)).toBe(true);
+    expect(canCommit(p, false)).toBe(true);
+    expect(canSubmitForApproval(p)).toBe(true);
+  });
+  it("SCRUM-131: any blocker or canSubmit=false disables submit", () => {
+    expect(canSubmitForApproval(preview({ canSubmit: false }))).toBe(false);
+    expect(canSubmitForApproval(preview({ rowErrors: [{ line: 2, column: "G", header: "Start Date", value: "03-04-2026", message: "ambiguous" }] }))).toBe(false);
   });
   it("any server blocker disables commit", () => {
     expect(canCommit(preview({ blockers: ["x"] }), true)).toBe(false);

@@ -68,16 +68,13 @@ async def run_combo(page, provider: str, lob: str) -> list[str]:
         if r["cloud_provider"] == provider and r["line_of_business"] == lob
     )
 
-    # Read on-screen Revenue KPI
-    revenue_kpi = page.locator("div", has_text="Revenue").filter(
-        has=page.locator("div.text-lg")).first
-    # Simpler: read all KPI cards by their label
-    kpi_text = await page.locator(".text-lg.font-semibold").first.inner_text()
+    # Read on-screen Revenue KPI (the first SummaryKpi tile; SCRUM-128 C7 test hook)
+    kpi_text = await page.locator("[data-testid=kpi-value]").first.inner_text()
     if digits(kpi_text) != expected_revenue:
         problems.append(f"[{provider}/{lob}] KPI Revenue={digits(kpi_text)}, expected {expected_revenue}")
 
-    # Switch to Revenue Forecast tab
-    await page.get_by_role("tab", name="Revenue Forecast").click()
+    # Switch to Revenue forecast tab
+    await page.get_by_role("tab", name="Revenue forecast").click()
     await page.wait_for_timeout(200)
     panel = page.locator('[role=tabpanel][data-state=active]')
 
@@ -116,8 +113,8 @@ async def run_combo(page, provider: str, lob: str) -> list[str]:
         if month_key not in blob:
             problems.append(f"[{provider}/{lob}] monthly key {month_key!r} missing from xlsx")
 
-    # Back to the Cloud Cost tab for the next combo
-    await page.get_by_role("tab", name="Cloud Cost").click()
+    # Back to the Cloud cost tab for the next combo
+    await page.get_by_role("tab", name="Cloud cost").click()
     return problems
 
 

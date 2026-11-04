@@ -7,7 +7,7 @@ import { HEADER, row } from "./fixtures";
 const rec = (line: number, customer: string): StrictRecord => ({
   line, potential_id: "PID-TEST-1", month: 3, year: 2026, customer_name: customer, lab_name: "Synthetic Lab",
   line_of_business: "VILT", start_date: "2026-03-01", end_date: "2026-03-31", total_users: 5,
-  input_cost_cents: 100000, selling_cost_cents: 150050, cloud_provider: "AWS",
+  input_cost_cents: 100000, selling_cost_cents: 150050, cloud_provider: "AWS", lab_type: "public_cloud", system_config: null,
 });
 
 describe("feature flag", () => {
@@ -80,8 +80,26 @@ describe("commitBlockers", () => {
     expect(extra.ok).toBe(true);
     expect(extra.warnings.some((w) => w.message === 'Unknown column "Notes" is ignored.')).toBe(true);
     expect(commitBlockers(extra, open)).toEqual([]);
-    const soft = validateStrict(HEADER, [row(2, { Month: "nope", "Cloud Provider": "OpenAI" })]);
+    const soft = validateStrict(HEADER, [row(2, { Month: "nope" })]);
     expect(commitBlockers(soft, open)).toEqual([]);
+  });
+  it("SCRUM-129: a blank or unknown provider blocks the commit and names the rule", () => {
+    const bad = validateStrict(HEADER, [row(2, { "Cloud Provider": "OpenAI" }), row(3, { "Cloud Provider": "" }), row(4)]);
+    const reasons = commitBlockers(bad, open);
+    expect(reasons).toEqual([
+      "The file has 2 error(s). Fix them and upload again.",
+      "2 row(s) have a blank or not-allowed Cloud Provider (or a conflicting Cloud Type). Use MakeMyLabs, Oracle or SAP (Private cloud) or AWS, Azure or GCP (Public cloud).",
+    ]);
+  });
+  it("SCRUM-129: buildRpcRows refuses a record without a provider type, or with a mismatched one", () => {
+    expect(() => buildRpcRows([{ ...rec(2, "A"), cloud_provider: null, lab_type: null }])).toThrow(/Line 2/);
+    expect(() => buildRpcRows([{ ...rec(3, "A"), cloud_provider: "Oracle", lab_type: "public_cloud" }])).toThrow(/Line 3/);
+    expect(buildRpcRows([{ ...rec(4, "A"), cloud_provider: "SAP", lab_type: "private_cloud", system_config: "16GB" }])[0]).toMatchObject({
+      cloud_provider: "SAP",
+      lab_type: "private_cloud",
+      system_config: "16GB",
+    });
+    expect(buildRpcRows([{ ...rec(5, "A"), system_config: "16GB" }])[0].system_config).toBeNull();
   });
   it("asks for Import anyway on a repeated file, and allows it once confirmed", () => {
     const prior = { id: "batch-9", importedOn: "2026-09-15" };

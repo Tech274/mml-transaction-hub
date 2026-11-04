@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { CloudTypeBadge, ProviderBadge } from "@/components/cloud/cloud-type-badge";
 import {
   Sheet,
   SheetContent,
@@ -9,6 +10,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { fmtCurrency, fmtDate, fmtDateTime, fmtNumber, MONTH_NAMES } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
+import { IncompleteBadge } from "@/components/status-badges";
+import { incompleteReasons, isIncompleteTransaction } from "@/lib/transaction-completeness";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useAuth } from "@/lib/auth-context";
@@ -69,7 +72,7 @@ export function TransactionDetailDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl overflow-hidden flex flex-col">
+      <SheetContent className="flex w-full flex-col overflow-hidden sm:max-w-2xl">
         <SheetHeader>
           <SheetTitle>{tx?.potential_id ?? "Transaction"}</SheetTitle>
           <SheetDescription>{tx?.lab_name}</SheetDescription>
@@ -78,10 +81,10 @@ export function TransactionDetailDrawer({
           {tx && (
             <div className="space-y-6 mt-2 pb-6">
               <div className="flex flex-wrap gap-2">
-                <Badge variant={tx.repository_type === "public_cloud" ? "default" : "secondary"}>
-                  {tx.repository_type === "public_cloud" ? "Public Cloud" : "Private Cloud"}
-                </Badge>
-                <Badge variant="outline">{tx.cloud_provider}</Badge>
+                {/* SCRUM-129: badge follows the stored type; provider shown separately. */}
+                <CloudTypeBadge value={tx.repository_type} />
+                <ProviderBadge value={tx.cloud_provider} />
+                {isIncompleteTransaction(tx) && <IncompleteBadge reasons={incompleteReasons(tx)} />}
                 <Badge variant="outline">{tx.line_of_business}</Badge>
               </div>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
@@ -167,7 +170,7 @@ export function TransactionDetailDrawer({
                   {activity.map((a) => (
                     <div key={a.id} className="text-xs border-l-2 border-border pl-3 py-1">
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px]">
+                        <Badge variant="outline" className="text-xs">
                           {a.action}
                         </Badge>
                         <span className="text-muted-foreground">{fmtDateTime(a.changed_at)}</span>
@@ -197,7 +200,7 @@ export function TransactionDetailDrawer({
 function DL({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div className="font-medium">{value}</div>
     </div>
   );

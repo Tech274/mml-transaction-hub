@@ -62,7 +62,7 @@ async def restore_session(page, jobs):
 
 async def open_jobs_tab(page) -> bool:
     await page.goto(f"{BASE}/admin", wait_until="networkidle")
-    tab = page.get_by_role("tab", name="Export Jobs")
+    tab = page.get_by_role("tab", name="Export jobs")
     if await tab.count() == 0:
         print("Export Jobs tab not visible — skipping.")
         return False

@@ -1,11 +1,27 @@
-"""E2E: downloadable template + server validator + DB constraint stay in sync."""
+"""E2E: the Bulk import template and the strict import server stay on one template version.
+
+SCRUM-128 (C2, plan Q4): the legacy importer and its "Download Public/Private Cloud Template"
+buttons were deleted with the SCRUM-44 flag. This script now drives the strict importer
+(components/strict-import.tsx), which has one template for both cloud types:
+
+  1. The "Template" button on Master ADR entry > Bulk import downloads
+     strict-import-template-<version>.csv.
+  2. The file is header-only and its headers equal STRICT_COLUMNS
+     (src/lib/strict-import/template.ts), in order.
+  3. The version in the file name equals STRICT_TEMPLATE_VERSION, and the server preview of a
+     one-row file built from that template reports the same version (preview only: nothing is
+     imported).
+
+Requires an authenticated ops/admin session via LOVABLE_BROWSER_SUPABASE_* and a local dev
+server on :8080. Synthetic data only.
+"""
 import asyncio, json, os, re
 from pathlib import Path
 from playwright.async_api import async_playwright
 
 ROOT = Path(__file__).parent / "screenshots" / "bulk-import-template-sync"
 ROOT.mkdir(parents=True, exist_ok=True)
-ALLOWED = {"VILT", "Standalone", "Integrated"}
+FILENAME_RE = re.compile(r"^strict-import-template-(.+)\.csv$")
 
 
 async def restore(context, page):
@@ -21,28 +37,14 @@ async def restore(context, page):
         await page.evaluate(f"window.localStorage.setItem({json.dumps(sk)}, {json.dumps(sj)})")
 
 
-async def download_template(page, name_re):
+async def download_strict_template(page):
     async with page.expect_download() as dl:
-        await page.get_by_role("button", name=re.compile(name_re, re.I)).click()
+        await page.get_by_role("button", name=re.compile(r"^\s*Template\s*$", re.I)).click()
     d = await dl.value
-    dest = ROOT / (await d.suggested_filename())
+    name = d.suggested_filename
+    dest = ROOT / name
     await d.save_as(str(dest))
-    return dest.read_text()
-
-
-def parse_template(csv_text):
-    version, body = None, []
-    for l in csv_text.splitlines():
-        s = l.strip()
-        if not s: continue
-        if s.startswith("#"):
-            m = re.match(r"^#\s*template_version:\s*(.+)$", s)
-            if m: version = m.group(1).strip()
-            continue
-        body.append(l)
-    header = [h.strip() for h in body[0].split(",")]
-    rows = [[c.strip() for c in r.split(",")] for r in body[1:]]
-    return version, header, rows
+    return name, dest.read_text()
 
 
 async def main():
@@ -52,44 +54,43 @@ async def main():
         page = await ctx.new_page()
         await restore(ctx, page)
         await page.goto("http://localhost:8080/entry", wait_until="domcontentloaded")
-        await page.get_by_role("tab", name="Bulk Import").click()
+        await page.get_by_role("tab", name=re.compile(r"Bulk import", re.I)).click()
 
-        pub = await download_template(page, r"Download Public Cloud Template")
-        pub_v, pub_h, pub_rows = parse_template(pub)
-        assert pub_v, "public template missing # template_version marker"
-        lob_i = pub_h.index("line_of_business")
-        for i, row in enumerate(pub_rows, start=2):
-            assert row[lob_i] in ALLOWED, f"public row {i} bad LOB {row[lob_i]!r}"
+        name, text = await download_strict_template(page)
+        m = FILENAME_RE.match(name)
+        assert m, f"unexpected template file name {name!r}"
+        file_version = m.group(1)
 
-        await page.get_by_role("button", name=re.compile(r"Private", re.I)).first.click()
-        priv = await download_template(page, r"Download Private Cloud Template")
-        priv_v, priv_h, _ = parse_template(priv)
-        assert priv_v == pub_v, f"template version drift {pub_v} vs {priv_v}"
+        lines = [l for l in text.splitlines() if l.strip()]
+        assert len(lines) == 1, f"template must be header-only, got {len(lines)} lines"
+        header = [h.strip() for h in lines[0].split(",")]
 
-        schema = await page.evaluate(
-            """async () => { const m = await import('/src/lib/bulk-import.functions.ts');
-               return await m.getTemplateSchema(); }"""
+        module = await page.evaluate(
+            """async () => { const m = await import('/src/lib/strict-import/template.ts');
+               return { version: m.STRICT_TEMPLATE_VERSION, headers: m.STRICT_COLUMNS.map((c) => c.header) }; }"""
         )
-        print("server schema:", json.dumps(schema, indent=2))
-        assert schema["version"] == pub_v
-        assert set(schema["line_of_business"]["allowed"]) == ALLOWED
-        assert list(schema["headers"]["public_cloud"]) == pub_h
-        assert list(schema["headers"]["private_cloud"]) == priv_h
+        print("strict template module:", json.dumps(module, indent=2))
+        assert header == module["headers"], f"template headers drifted: {header} vs {module['headers']}"
+        assert file_version == module["version"], f"file name version {file_version} vs {module['version']}"
 
-        good = await page.evaluate(
-            """async (v) => { const m = await import('/src/lib/bulk-import.functions.ts');
-               return await m.validateBulkImportRows({ data: { kind: 'public_cloud', rows: [], client_template_version: v } }); }""",
-            pub_v,
-        )
-        assert good["version_matches"] is True, good
-        stale = await page.evaluate(
-            """async () => { const m = await import('/src/lib/bulk-import.functions.ts');
-               return await m.validateBulkImportRows({ data: { kind: 'public_cloud', rows: [], client_template_version: '0.0.0-stale' } }); }"""
-        )
-        assert stale["version_matches"] is False
-        assert stale["template_version"] == pub_v
+        # Server side: preview a one-row file built from the downloaded header. Preview only.
+        values = {h: "" for h in header}
+        values.update({
+            "Potential ID": "POT-E2E-0001", "Month": "1", "Year": "2026",
+            "Customer Name": "Example Customer", "Lab Name": "Example Lab",
+            "Line of Business": "VILT", "Start Date": "2026-01-01", "End Date": "2026-01-31",
+            "Total Users": "10", "Input Cost": "1000", "Selling Cost": "1500", "Cloud Provider": "AWS",
+        })
+        one_row = ROOT / "one-row.csv"
+        one_row.write_text(",".join(header) + "\n" + ",".join(values[h] for h in header) + "\n")
+        await page.set_input_files('input[type="file"]', str(one_row))
+        # The version badge appears only in the server preview header ("Preview <version>").
+        badge = page.get_by_text(module["version"], exact=True)
+        await badge.first.wait_for(timeout=15000)
+        assert await badge.count() >= 1, "server preview does not report the template version"
+        await page.screenshot(path=str(ROOT / "preview.png"))
 
-        print(f"OK — template + server + validator all pinned to {pub_v}")
+        print(f"OK — template file, template module and server preview all pinned to {file_version}")
         await browser.close()
 
 

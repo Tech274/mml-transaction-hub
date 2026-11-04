@@ -1,30 +1,71 @@
+// SCRUM-128 C7 (plan P08): Customers on the shared standard: FilterBar, SortableHead,
+// TableStateRow (loading / error / empty), TablePagination, success/warning tokens, dialog widths.
+// The numbers live in lib/customers-list.ts (moved verbatim, pinned in its test).
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { readAllRows } from "@/lib/read-all";
 import { AppShell } from "@/components/app-shell";
+import { pageHead, pageShell } from "@/lib/nav";
 import { Card } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { fmtCurrency, fmtNumber } from "@/lib/format";
-import { addNullable } from "@/lib/nullable-sum";
+import {
+  customerExportRow,
+  customerTotals,
+  filterCustomers,
+  sortCustomers,
+  type CustomerRow,
+  type CustomerSortKey,
+  type CustomerStatusFilter,
+} from "@/lib/customers-list";
+import { FilterActions, FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
+import { SortableHead, TablePagination, TableStateRow } from "@/components/data-table-parts";
+import { cn } from "@/lib/utils";
 import { exportToExcel } from "@/lib/export-xlsx";
 import { buildExcelBlobAsync, downloadBlob, type ExportProgress } from "@/lib/export-xlsx-async";
 import { startJob, updateJob, finishJob, registerRetryHandler } from "@/lib/export-jobs";
 import { Progress } from "@/components/ui/progress";
-import { Download, Search, Pencil, ArrowUpDown } from "lucide-react";
+import { Download, Pencil } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useServerFn } from "@tanstack/react-start";
 import { createCustomerFn, updateCustomerFn, setCustomerActiveFn } from "@/lib/customers.functions";
 import { CustomersExampleView } from "@/components/customers-example-view";
@@ -33,35 +74,54 @@ import {
   isSuperadminCaptureModeEnabled,
 } from "@/lib/superadmin-capture-mode";
 
-type SortKey = "customer_name" | "account_manager_name" | "count" | "users" | "revenue" | "profit" | "margin";
+type SortKey = CustomerSortKey;
 const PAGE_SIZE = 25;
 const ASYNC_EXPORT_THRESHOLD = 200; // rows above this use the async progress flow
 
-type CustomersSearch = { am?: string; status?: "active" | "inactive" | "all"; q?: string; range?: 3 | 6 | 12 };
+type CustomersSearch = {
+  am?: string;
+  status?: "active" | "inactive" | "all";
+  q?: string;
+  range?: 3 | 6 | 12;
+};
 
 export const Route = createFileRoute("/_authenticated/customers")({
+  head: () => pageHead("/customers"),
   validateSearch: (s: Record<string, unknown>): CustomersSearch => {
     const rangeNum = Number(s.range);
     return {
       am: typeof s.am === "string" ? s.am : undefined,
-      status: s.status === "active" || s.status === "inactive" || s.status === "all" ? s.status : undefined,
+      status:
+        s.status === "active" || s.status === "inactive" || s.status === "all"
+          ? s.status
+          : undefined,
       q: typeof s.q === "string" ? s.q : undefined,
-      range: rangeNum === 3 || rangeNum === 6 || rangeNum === 12 ? (rangeNum as 3 | 6 | 12) : undefined,
+      range:
+        rangeNum === 3 || rangeNum === 6 || rangeNum === 12 ? (rangeNum as 3 | 6 | 12) : undefined,
     };
   },
   component: CustomersPage,
 });
 
+// SCRUM-128 C7: hooks must not run after an early return, so capture mode and the live page are
+// two components (was one component returning early before its hooks).
 function CustomersPage() {
-  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(
+    getSuperadminCaptureModeEnvForClient(),
+  );
   if (isExampleCaptureMode) {
     return (
-      <AppShell title="Customers">
+      <AppShell {...pageShell("/customers")}>
         <CustomersExampleView />
       </AppShell>
     );
   }
+  return <CustomersLivePage />;
+}
 
+const COLUMN_COUNT = 10;
+
+function CustomersLivePage() {
   const { user, hasAnyRole } = useAuth();
   const { can } = usePermissions();
   const searchParams = Route.useSearch();
@@ -70,7 +130,9 @@ function CustomersPage() {
   const qc = useQueryClient();
   const [search, setSearch] = useState(searchParams.q ?? "");
   const [amFilter, setAmFilter] = useState<string>(searchParams.am ?? "__all");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">(searchParams.status ?? "all");
+  const [statusFilter, setStatusFilter] = useState<CustomerStatusFilter>(
+    searchParams.status ?? "all",
+  );
   const [editing, setEditing] = useState<CustomerRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("customer_name");
@@ -87,7 +149,12 @@ function CustomersPage() {
     if (searchParams.q !== undefined) setSearch(searchParams.q);
   }, [searchParams.am, searchParams.status, searchParams.q]);
 
-  const { data: rows = [] } = useQuery({
+  const {
+    data: rows = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["customers-summary"],
     queryFn: async () => {
       // SCRUM-70: all rows, not just the first 1,000; errors are shown instead of empty totals.
@@ -95,7 +162,9 @@ function CustomersPage() {
         () =>
           supabase
             .from("customers")
-            .select("id, customer_name, is_active, account_manager_name, contact_email, contact_phone, industry, notes, created_at, deactivation_reason")
+            .select(
+              "id, customer_name, is_active, account_manager_name, contact_email, contact_phone, industry, notes, created_at, deactivation_reason",
+            )
             .order("customer_name")
             .order("id"),
         "Customers",
@@ -109,22 +178,7 @@ function CustomersPage() {
             .order("id"),
         "Customer transactions",
       );
-      const map = new Map<string, { count: number; users: number; revenue: number; cost: number }>();
-      for (const t of tx ?? []) {
-        if (!t.customer_id) continue;
-        const e = map.get(t.customer_id) ?? { count: 0, users: 0, revenue: 0, cost: 0 };
-        e.count += 1;
-        e.users = addNullable(e.users, t.total_users);
-        e.revenue = addNullable(e.revenue, t.selling_cost);
-        e.cost = addNullable(e.cost, t.input_cost);
-        map.set(t.customer_id, e);
-      }
-      return (customers ?? []).map((c) => {
-        const m = map.get(c.id) ?? { count: 0, users: 0, revenue: 0, cost: 0 };
-        const profit = m.revenue - m.cost;
-        const margin = m.revenue > 0 ? (profit / m.revenue) * 100 : 0;
-        return { ...c, ...m, profit, margin };
-      });
+      return customerTotals(customers, tx);
     },
   });
 
@@ -146,66 +200,37 @@ function CustomersPage() {
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }, [rows, accountManagers]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const range = searchParams.range;
-    let cutoff: Date | null = null;
-    if (range) {
-      cutoff = new Date();
-      cutoff.setMonth(cutoff.getMonth() - range);
-      cutoff.setHours(0, 0, 0, 0);
-    }
-    return rows.filter((r) => {
-      if (statusFilter === "active" && !r.is_active) return false;
-      if (statusFilter === "inactive" && r.is_active) return false;
-      if (amFilter !== "__all") {
-        if (amFilter === "__none") { if (r.account_manager_name) return false; }
-        else if ((r.account_manager_name ?? "") !== amFilter) return false;
-      }
-      if (cutoff) {
-        if (!r.created_at || new Date(r.created_at) < cutoff) return false;
-      }
-      if (!q) return true;
-      return (
-        r.customer_name.toLowerCase().includes(q) ||
-        (r.account_manager_name ?? "").toLowerCase().includes(q) ||
-        (r.industry ?? "").toLowerCase().includes(q) ||
-        (r.contact_email ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [rows, search, amFilter, statusFilter, searchParams.range]);
+  const filtered = useMemo(
+    () => filterCustomers(rows, { search, amFilter, statusFilter, range: searchParams.range }),
+    [rows, search, amFilter, statusFilter, searchParams.range],
+  );
 
-  const sorted = useMemo(() => {
-    const arr = [...filtered];
-    arr.sort((a, b) => {
-      const av: any = (a as any)[sortKey] ?? (typeof (a as any)[sortKey] === "number" ? 0 : "");
-      const bv: any = (b as any)[sortKey] ?? (typeof (b as any)[sortKey] === "number" ? 0 : "");
-      if (typeof av === "number" && typeof bv === "number") return sortDir === "asc" ? av - bv : bv - av;
-      return sortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
-    });
-    return arr;
-  }, [filtered, sortKey, sortDir]);
+  const sorted = useMemo(
+    () => sortCustomers(filtered, sortKey, sortDir),
+    [filtered, sortKey, sortDir],
+  );
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
   const paginated = sorted.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  useEffect(() => { setPage(1); }, [search, amFilter, statusFilter, sortKey, sortDir]);
+  useEffect(() => {
+    setPage(1);
+  }, [search, amFilter, statusFilter, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir(sortDir === "asc" ? "desc" : "asc");
-    else { setSortKey(key); setSortDir(key === "customer_name" || key === "account_manager_name" ? "asc" : "desc"); }
+    else {
+      setSortKey(key);
+      setSortDir(key === "customer_name" || key === "account_manager_name" ? "asc" : "desc");
+    }
   }
 
-  function SortHeader({ k, label, className }: { k: SortKey; label: string; className?: string }) {
-    return (
-      <TableHead className={className}>
-        <button className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => toggleSort(k)}>
-          {label}<ArrowUpDown className="h-3 w-3 opacity-60" />
-        </button>
-      </TableHead>
-    );
-  }
+  const sortProps = (k: SortKey) => ({
+    active: sortKey === k,
+    direction: sortDir,
+    onSort: () => toggleSort(k),
+  });
 
   async function toggle(id: string, current: boolean) {
     if (current) {
@@ -219,7 +244,9 @@ function CustomersPage() {
       toast.success("Customer activated");
       qc.invalidateQueries({ queryKey: ["customers-summary"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
-    } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed");
+    }
   }
 
   function doExport(set: CustomerRow[], scope: string) {
@@ -237,23 +264,16 @@ function CustomersPage() {
     });
   }
 
-  function toExportRow(r: CustomerRow) {
-    return {
-      Customer: r.customer_name,
-      "Account Manager": r.account_manager_name ?? "",
-      Industry: r.industry ?? "",
-      "Contact Email": r.contact_email ?? "",
-      "Contact Phone": r.contact_phone ?? "",
-      Status: r.is_active ? "Active" : "Inactive",
-      Transactions: r.count, "Total Users": r.users,
-      "Total Revenue": r.revenue, "Total Input Cost": r.cost,
-      "Total Profit": r.profit, "Margin %": Number(r.margin.toFixed(2)),
-    };
-  }
+  const toExportRow = customerExportRow;
 
   function exportFilters(scope: string) {
     return {
-      scope, search, accountManager: amFilter, status: statusFilter, sortBy: sortKey, sortDir,
+      scope,
+      search,
+      accountManager: amFilter,
+      status: statusFilter,
+      sortBy: sortKey,
+      sortDir,
       ...(scope === "current-page" ? { page: currentPage, pageSize: PAGE_SIZE } : {}),
     };
   }
@@ -274,103 +294,151 @@ function CustomersPage() {
         setAsyncExport({ open: true, scope: s });
       }),
     );
-    return () => { for (const u of unregs) u(); };
+    return () => {
+      for (const u of unregs) u();
+    };
   }, []);
 
   return (
-    <AppShell title="Customers">
-      <Card className="p-4 mb-4">
-        <div className="flex flex-col md:flex-row md:items-center gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search customers, account manager, industry…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <div className="w-full md:w-64">
-            <Select value={amFilter} onValueChange={setAmFilter}>
-              <SelectTrigger><SelectValue placeholder="All account managers" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all">All account managers</SelectItem>
-                <SelectItem value="__none">— Unassigned —</SelectItem>
-                {amOptions.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-full md:w-40">
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="active">Active only</SelectItem>
-                <SelectItem value="inactive">Inactive only</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <AppShell {...pageShell("/customers")}>
+      <FilterBar>
+        <div className="w-full md:min-w-64 md:flex-1">
+          <FilterSearch
+            value={search}
+            onChange={setSearch}
+            placeholder="Search customers, account manager, industry…"
+            label="Search customers"
+          />
+        </div>
+        <FilterSelect
+          label="Account manager"
+          width="md"
+          value={amFilter}
+          onValueChange={setAmFilter}
+          allLabel="All account managers"
+          allValue="__all"
+          options={[
+            { value: "__none", label: "— Unassigned —" },
+            ...amOptions.map((n) => ({ value: n, label: n })),
+          ]}
+        />
+        <FilterSelect
+          label="Status"
+          value={statusFilter}
+          onValueChange={(v) => setStatusFilter(v as CustomerStatusFilter)}
+          allLabel="All statuses"
+          options={[
+            { value: "active", label: "Active only" },
+            { value: "inactive", label: "Inactive only" },
+          ]}
+        />
+        <FilterActions>
           {can("feature_excel_export") && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm"><Download className="h-4 w-4 mr-1" />Export</Button>
+                <Button size="sm">
+                  <Download className="mr-1 size-4" aria-hidden />
+                  Export
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuLabel>Excel export</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => doExport(sorted, "all-filtered")}>All filtered ({sorted.length})</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => doExport(paginated, "current-page")}>Current page ({paginated.length})</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => doExport(rows, "all")}>All customers ({rows.length})</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => doExport(sorted, "all-filtered")}>
+                  All filtered ({sorted.length})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => doExport(paginated, "current-page")}>
+                  Current page ({paginated.length})
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => doExport(rows, "all")}>
+                  All customers ({rows.length})
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}
           {canEdit && (
             <Button size="sm" onClick={() => setAdding(true)}>
-              <Plus className="h-4 w-4 mr-1" />Add Customer
+              <Plus className="mr-1 size-4" aria-hidden />
+              Add customer
             </Button>
           )}
-        </div>
-      </Card>
+        </FilterActions>
+      </FilterBar>
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <SortHeader k="customer_name" label="Customer" />
-              <SortHeader k="account_manager_name" label="Account Manager" />
+              <SortableHead label="Customer" {...sortProps("customer_name")} />
+              <SortableHead label="Account manager" {...sortProps("account_manager_name")} />
               <TableHead>Contact</TableHead>
               <TableHead>Status</TableHead>
-              <SortHeader k="count" label="Transactions" className="text-right" />
-              <SortHeader k="users" label="Total Users" className="text-right" />
-              <SortHeader k="revenue" label="Total Revenue" className="text-right" />
-              <TableHead className="text-right">Input Cost</TableHead>
-              <SortHeader k="profit" label="Profit" className="text-right" />
-              <SortHeader k="margin" label="Margin" className="text-right" />
-              {canToggle && <TableHead></TableHead>}
+              <SortableHead label="Transactions" className="text-right" {...sortProps("count")} />
+              <SortableHead label="Total users" className="text-right" {...sortProps("users")} />
+              <SortableHead
+                label="Total revenue"
+                className="text-right"
+                {...sortProps("revenue")}
+              />
+              <TableHead className="text-right">Input cost</TableHead>
+              <SortableHead label="Profit" className="text-right" {...sortProps("profit")} />
+              <SortableHead label="Margin" className="text-right" {...sortProps("margin")} />
+              {canToggle && (
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
+            {isLoading && (
+              <TableStateRow colSpan={COLUMN_COUNT + 1}>Loading customers…</TableStateRow>
+            )}
+            {!isLoading && error && (
+              <TableStateRow colSpan={COLUMN_COUNT + 1} onRetry={() => void refetch()}>
+                Could not load customers: {error instanceof Error ? error.message : "Unknown error"}
+              </TableStateRow>
+            )}
             {paginated.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="font-medium">
                   <div>{r.customer_name}</div>
                   {r.industry && <div className="text-xs text-muted-foreground">{r.industry}</div>}
                 </TableCell>
-                <TableCell className="text-sm">{r.account_manager_name || <span className="text-muted-foreground">—</span>}</TableCell>
+                <TableCell className="text-sm">
+                  {r.account_manager_name || <span className="text-muted-foreground">—</span>}
+                </TableCell>
                 <TableCell className="text-xs">
                   {r.contact_email && <div>{r.contact_email}</div>}
-                  {r.contact_phone && <div className="text-muted-foreground">{r.contact_phone}</div>}
-                  {!r.contact_email && !r.contact_phone && <span className="text-muted-foreground">—</span>}
+                  {r.contact_phone && (
+                    <div className="text-muted-foreground">{r.contact_phone}</div>
+                  )}
+                  {!r.contact_email && !r.contact_phone && (
+                    <span className="text-muted-foreground">—</span>
+                  )}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={r.is_active ? "default" : "secondary"}>{r.is_active ? "Active" : "Inactive"}</Badge>
+                  <Badge variant={r.is_active ? "success" : "secondary"}>
+                    {r.is_active ? "Active" : "Inactive"}
+                  </Badge>
                 </TableCell>
-                <TableCell className="text-right">{fmtNumber(r.count)}</TableCell>
-                <TableCell className="text-right">{fmtNumber(r.users)}</TableCell>
-                <TableCell className="text-right">{fmtCurrency(r.revenue)}</TableCell>
-                <TableCell className="text-right">{fmtCurrency(r.cost)}</TableCell>
-                <TableCell className={`text-right ${r.profit < 0 ? "text-destructive" : ""}`}>{fmtCurrency(r.profit)}</TableCell>
-                <TableCell className="text-right tabular-nums">{r.revenue > 0 ? `${r.margin.toFixed(1)}%` : "—"}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmtNumber(r.count)}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmtNumber(r.users)}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmtCurrency(r.revenue)}</TableCell>
+                <TableCell className="text-right tabular-nums">{fmtCurrency(r.cost)}</TableCell>
+                <TableCell
+                  className={cn("text-right tabular-nums", r.profit < 0 && "text-destructive")}
+                >
+                  {fmtCurrency(r.profit)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {r.revenue > 0 ? `${r.margin.toFixed(1)}%` : "—"}
+                </TableCell>
                 {canToggle && (
-                  <TableCell className="text-right whitespace-nowrap">
+                  <TableCell className="whitespace-nowrap text-right">
                     {canEdit && (
                       <Button size="sm" variant="ghost" onClick={() => setEditing(r)}>
-                        <Pencil className="h-3.5 w-3.5 mr-1" />Edit
+                        <Pencil className="mr-1 size-3.5" aria-hidden />
+                        Edit
                       </Button>
                     )}
                     <Button size="sm" variant="ghost" onClick={() => toggle(r.id, r.is_active)}>
@@ -380,22 +448,22 @@ function CustomersPage() {
                 )}
               </TableRow>
             ))}
-            {paginated.length === 0 && (
-              <TableRow><TableCell colSpan={10} className="text-center py-10 text-muted-foreground">No customers found.</TableCell></TableRow>
+            {!isLoading && !error && paginated.length === 0 && (
+              <TableStateRow colSpan={COLUMN_COUNT + 1}>No customers found.</TableStateRow>
             )}
           </TableBody>
         </Table>
-        </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t text-sm">
-          <div className="text-muted-foreground">
-            {sorted.length === 0 ? "0 results" :
-              `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, sorted.length)} of ${sorted.length}`}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Previous</Button>
-            <span className="text-muted-foreground">Page {currentPage} of {totalPages}</span>
-            <Button size="sm" variant="outline" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Next</Button>
-          </div>
+        <div className="border-t border-border px-4 py-3">
+          <TablePagination
+            page={currentPage}
+            pageCount={totalPages}
+            onPageChange={setPage}
+            summary={
+              sorted.length === 0
+                ? "0 results"
+                : `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, sorted.length)} of ${sorted.length} · Page ${currentPage} of ${totalPages}`
+            }
+          />
         </div>
       </Card>
       <EditCustomerDialog
@@ -436,7 +504,9 @@ function CustomersPage() {
             qc.invalidateQueries({ queryKey: ["customers-summary"] });
             qc.invalidateQueries({ queryKey: ["customers"] });
             setDeactivating(null);
-          } catch (e: any) { toast.error(e?.message ?? "Failed"); }
+          } catch (e: any) {
+            toast.error(e?.message ?? "Failed");
+          }
         }}
       />
     </AppShell>
@@ -444,10 +514,18 @@ function CustomersPage() {
 }
 
 function AsyncExportDialog({
-  open, onClose, rows, filename, meta, scope, generatedBy,
+  open,
+  onClose,
+  rows,
+  filename,
+  meta,
+  scope,
+  generatedBy,
 }: {
-  open: boolean; onClose: () => void;
-  rows: Record<string, unknown>[]; filename: string;
+  open: boolean;
+  onClose: () => void;
+  rows: Record<string, unknown>[];
+  filename: string;
   meta: { generatedBy: string; filters?: Record<string, unknown> };
   scope: string;
   generatedBy: string;
@@ -460,25 +538,44 @@ function AsyncExportDialog({
   const [cancelled, setCancelled] = useState(false);
 
   useEffect(() => {
-    if (!open) { setProgress(null); setBlob(null); setError(null); return; }
+    if (!open) {
+      setProgress(null);
+      setBlob(null);
+      setError(null);
+      return;
+    }
     let stopped = false;
     const ac = new AbortController();
     setController(ac);
     setCancelled(false);
     const jobId = startJob({
-      filename, scope, total: rows.length, user: generatedBy,
+      filename,
+      scope,
+      total: rows.length,
+      user: generatedBy,
     });
     let attempts = 1;
     (async () => {
       try {
-        setError(null); setBlob(null); setProgress(null);
-        const b = await buildExcelBlobAsync(rows, meta, (p) => {
-          if (stopped) return;
-          setProgress(p);
-          if (p.attempt && p.attempt > attempts) attempts = p.attempt;
-          updateJob(jobId, { processed: p.processed, total: p.total, attempts });
-        }, 500, ac.signal);
-        if (!stopped) { setBlob(b); finishJob(jobId, "done"); }
+        setError(null);
+        setBlob(null);
+        setProgress(null);
+        const b = await buildExcelBlobAsync(
+          rows,
+          meta,
+          (p) => {
+            if (stopped) return;
+            setProgress(p);
+            if (p.attempt && p.attempt > attempts) attempts = p.attempt;
+            updateJob(jobId, { processed: p.processed, total: p.total, attempts });
+          },
+          500,
+          ac.signal,
+        );
+        if (!stopped) {
+          setBlob(b);
+          finishJob(jobId, "done");
+        }
       } catch (e: any) {
         if (stopped) return;
         if (e?.name === "ExportCancelledError" || ac.signal.aborted) {
@@ -491,22 +588,36 @@ function AsyncExportDialog({
         }
       }
     })();
-    return () => { stopped = true; };
+    return () => {
+      stopped = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, runId]);
 
-  const pct = progress && progress.total > 0
-    ? Math.round((progress.processed / progress.total) * 100)
-    : (progress?.phase === "writing" ? 95 : progress?.phase === "done" ? 100 : 5);
+  const pct =
+    progress && progress.total > 0
+      ? Math.round((progress.processed / progress.total) * 100)
+      : progress?.phase === "writing"
+        ? 95
+        : progress?.phase === "done"
+          ? 100
+          : 5;
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>Preparing Excel export</DialogTitle></DialogHeader>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Preparing Excel export</DialogTitle>
+        </DialogHeader>
         <div className="space-y-3">
           <div className="text-sm text-muted-foreground">
             {cancelled ? (
-              <div className="text-amber-600 font-medium">Export cancelled.</div>
+              <div className="text-warning font-medium">Export cancelled.</div>
             ) : error ? (
               <div className="space-y-1">
                 <div className="text-destructive font-medium">Export failed</div>
@@ -516,38 +627,68 @@ function AsyncExportDialog({
               <>
                 {progress?.message ?? "Starting…"}
                 {progress?.attempt && progress.attempt > 1 && (
-                  <span className="ml-1 text-xs text-amber-600">(attempt {progress.attempt})</span>
+                  <span className="ml-1 text-xs text-warning">(attempt {progress.attempt})</span>
                 )}
               </>
             )}
           </div>
           <Progress value={pct} />
           <div className="text-xs text-muted-foreground">
-            {progress ? `${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()} rows` : ""}
+            {progress
+              ? `${progress.processed.toLocaleString()} / ${progress.total.toLocaleString()} rows`
+              : ""}
           </div>
         </div>
         <DialogFooter>
           {!blob && !error && !cancelled && (
-            <Button variant="outline" onClick={() => { controller?.abort(); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                controller?.abort();
+              }}
+            >
               Cancel export
             </Button>
           )}
           {cancelled && (
             <>
-              <Button variant="outline" onClick={onClose}>Close</Button>
-              <Button onClick={() => { setCancelled(false); setRunId((n) => n + 1); }}>Restart</Button>
+              <Button variant="outline" onClick={onClose}>
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setCancelled(false);
+                  setRunId((n) => n + 1);
+                }}
+              >
+                Restart
+              </Button>
             </>
           )}
-          {error && <>
-            <Button variant="outline" onClick={onClose}>Close</Button>
-            <Button onClick={() => setRunId((n) => n + 1)}>Retry</Button>
-          </>}
-          {blob && <>
-            <Button variant="outline" onClick={onClose}>Close</Button>
-            <Button onClick={() => { downloadBlob(blob, filename); onClose(); }}>
-              <Download className="h-4 w-4 mr-1" />Download
-            </Button>
-          </>}
+          {error && (
+            <>
+              <Button variant="outline" onClick={onClose}>
+                Close
+              </Button>
+              <Button onClick={() => setRunId((n) => n + 1)}>Retry</Button>
+            </>
+          )}
+          {blob && (
+            <>
+              <Button variant="outline" onClick={onClose}>
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  downloadBlob(blob, filename);
+                  onClose();
+                }}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Download
+              </Button>
+            </>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -555,22 +696,45 @@ function AsyncExportDialog({
 }
 
 function DeactivateReasonDialog({
-  customer, onClose, onConfirm,
-}: { customer: CustomerRow | null; onClose: () => void; onConfirm: (reason: string) => Promise<void> }) {
+  customer,
+  onClose,
+  onConfirm,
+}: {
+  customer: CustomerRow | null;
+  onClose: () => void;
+  onConfirm: (reason: string) => Promise<void>;
+}) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (customer) { setReason(""); setBusy(false); } }, [customer]);
+  useEffect(() => {
+    if (customer) {
+      setReason("");
+      setBusy(false);
+    }
+  }, [customer]);
 
   async function confirm() {
     const r = reason.trim();
-    if (!r) { toast.error("Please enter a reason."); return; }
+    if (!r) {
+      toast.error("Please enter a reason.");
+      return;
+    }
     setBusy(true);
-    try { await onConfirm(r); } finally { setBusy(false); }
+    try {
+      await onConfirm(r);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <Dialog open={!!customer} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-md">
+    <Dialog
+      open={!!customer}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Deactivate {customer?.customer_name}</DialogTitle>
         </DialogHeader>
@@ -587,7 +751,9 @@ function DeactivateReasonDialog({
           </p>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button variant="outline" onClick={onClose} disabled={busy}>
+            Cancel
+          </Button>
           <Button variant="destructive" onClick={confirm} disabled={busy || !reason.trim()}>
             {busy ? "Deactivating…" : "Deactivate"}
           </Button>
@@ -598,18 +764,26 @@ function DeactivateReasonDialog({
 }
 
 function AccountManagerPicker({
-  valueId, valueName, onChange,
-}: { valueId: string | null; valueName: string | null; onChange: (v: { id: string | null; name: string | null }) => void }) {
+  valueId,
+  valueName,
+  onChange,
+}: {
+  valueId: string | null;
+  valueName: string | null;
+  onChange: (v: { id: string | null; name: string | null }) => void;
+}) {
   const { data: managers = [] } = useQuery({
     queryKey: ["account-managers"],
     queryFn: async () => {
       const { data } = await supabase
-        .from("account_managers").select("id, name, is_active").order("name");
+        .from("account_managers")
+        .select("id, name, is_active")
+        .order("name");
       return data ?? [];
     },
   });
   const active = managers.filter((m: any) => m.is_active);
-  const selected = valueId ?? (active.find((m: any) => m.name === valueName)?.id ?? "");
+  const selected = valueId ?? active.find((m: any) => m.name === valueName)?.id ?? "";
   return (
     <Select
       value={selected || "__none"}
@@ -619,18 +793,30 @@ function AccountManagerPicker({
         onChange({ id: v, name: m?.name ?? null });
       }}
     >
-      <SelectTrigger><SelectValue placeholder="Select account manager" /></SelectTrigger>
+      <SelectTrigger>
+        <SelectValue placeholder="Select account manager" />
+      </SelectTrigger>
       <SelectContent>
         <SelectItem value="__none">— None —</SelectItem>
-        {active.map((m: any) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+        {active.map((m: any) => (
+          <SelectItem key={m.id} value={m.id}>
+            {m.name}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
 }
 
 function AddCustomerDialog({
-  open, onClose, onSaved,
-}: { open: boolean; onClose: () => void; onSaved: () => void }) {
+  open,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [form, setForm] = useState({
     customer_name: "",
     account_manager_id: null as string | null,
@@ -645,22 +831,32 @@ function AddCustomerDialog({
 
   useEffect(() => {
     if (open) {
-      setForm({ customer_name: "", account_manager_id: null, account_manager_name: "", contact_email: "", contact_phone: "", industry: "", notes: "" });
+      setForm({
+        customer_name: "",
+        account_manager_id: null,
+        account_manager_name: "",
+        contact_email: "",
+        contact_phone: "",
+        industry: "",
+        notes: "",
+      });
     }
   }, [open]);
 
   async function save() {
     setSaving(true);
     try {
-      await create({ data: {
-        customer_name: form.customer_name,
-        account_manager_id: form.account_manager_id,
-        account_manager_name: form.account_manager_name,
-        contact_email: form.contact_email,
-        contact_phone: form.contact_phone,
-        industry: form.industry,
-        notes: form.notes,
-      } });
+      await create({
+        data: {
+          customer_name: form.customer_name,
+          account_manager_id: form.account_manager_id,
+          account_manager_name: form.account_manager_name,
+          contact_email: form.contact_email,
+          contact_phone: form.contact_phone,
+          industry: form.industry,
+          notes: form.notes,
+        },
+      });
       toast.success("Customer added");
       onSaved();
     } catch (e: any) {
@@ -671,70 +867,87 @@ function AddCustomerDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Add customer</DialogTitle></DialogHeader>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add customer</DialogTitle>
+        </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="md:col-span-2 space-y-1.5">
             <Label>Customer name *</Label>
-            <Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
+            <Input
+              value={form.customer_name}
+              onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
+            />
           </div>
           <div className="md:col-span-2 space-y-1.5">
             <Label>Account Manager</Label>
             <AccountManagerPicker
               valueId={form.account_manager_id}
               valueName={form.account_manager_name || null}
-              onChange={(v) => setForm({ ...form, account_manager_id: v.id, account_manager_name: v.name ?? "" })}
+              onChange={(v) =>
+                setForm({ ...form, account_manager_id: v.id, account_manager_name: v.name ?? "" })
+              }
             />
           </div>
           <div className="space-y-1.5">
             <Label>Industry</Label>
-            <Input value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
+            <Input
+              value={form.industry}
+              onChange={(e) => setForm({ ...form, industry: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Contact email</Label>
-            <Input type="email" value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} />
+            <Input
+              type="email"
+              value={form.contact_email}
+              onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Contact phone</Label>
-            <Input value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} />
+            <Input
+              value={form.contact_phone}
+              onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
+            />
           </div>
           <div className="md:col-span-2 space-y-1.5">
             <Label>Notes</Label>
-            <Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            <Textarea
+              rows={3}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Add"}</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Add"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-type CustomerRow = {
-  id: string;
-  customer_name: string;
-  is_active: boolean;
-  account_manager_name: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
-  industry: string | null;
-  notes: string | null;
-  created_at?: string | null;
-  deactivation_reason?: string | null;
-  count: number;
-  users: number;
-  revenue: number;
-  cost: number;
-  profit: number;
-  margin: number;
-};
-
 function EditCustomerDialog({
-  customer, onClose, onSaved,
-}: { customer: CustomerRow | null; onClose: () => void; onSaved: () => void }) {
+  customer,
+  onClose,
+  onSaved,
+}: {
+  customer: CustomerRow | null;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
   const [form, setForm] = useState({
     customer_name: "",
     account_manager_id: null as string | null,
@@ -765,16 +978,18 @@ function EditCustomerDialog({
     if (!customer) return;
     setSaving(true);
     try {
-      await update({ data: {
-        id: customer.id,
-        customer_name: form.customer_name,
-        account_manager_id: form.account_manager_id,
-        account_manager_name: form.account_manager_name,
-        contact_email: form.contact_email,
-        contact_phone: form.contact_phone,
-        industry: form.industry,
-        notes: form.notes,
-      } });
+      await update({
+        data: {
+          id: customer.id,
+          customer_name: form.customer_name,
+          account_manager_id: form.account_manager_id,
+          account_manager_name: form.account_manager_name,
+          contact_email: form.contact_email,
+          contact_phone: form.contact_phone,
+          industry: form.industry,
+          notes: form.notes,
+        },
+      });
       toast.success("Customer details saved");
       onSaved();
     } catch (e: any) {
@@ -785,42 +1000,72 @@ function EditCustomerDialog({
   }
 
   return (
-    <Dialog open={!!customer} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Edit customer details</DialogTitle></DialogHeader>
+    <Dialog
+      open={!!customer}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit customer details</DialogTitle>
+        </DialogHeader>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <div className="md:col-span-2 space-y-1.5">
             <Label>Customer name *</Label>
-            <Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
+            <Input
+              value={form.customer_name}
+              onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
+            />
           </div>
           <div className="md:col-span-2 space-y-1.5">
             <Label>Account Manager</Label>
             <AccountManagerPicker
               valueId={form.account_manager_id}
               valueName={form.account_manager_name || null}
-              onChange={(v) => setForm({ ...form, account_manager_id: v.id, account_manager_name: v.name ?? "" })}
+              onChange={(v) =>
+                setForm({ ...form, account_manager_id: v.id, account_manager_name: v.name ?? "" })
+              }
             />
           </div>
           <div className="space-y-1.5">
             <Label>Industry</Label>
-            <Input value={form.industry} onChange={(e) => setForm({ ...form, industry: e.target.value })} />
+            <Input
+              value={form.industry}
+              onChange={(e) => setForm({ ...form, industry: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Contact email</Label>
-            <Input type="email" value={form.contact_email} onChange={(e) => setForm({ ...form, contact_email: e.target.value })} />
+            <Input
+              type="email"
+              value={form.contact_email}
+              onChange={(e) => setForm({ ...form, contact_email: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
             <Label>Contact phone</Label>
-            <Input value={form.contact_phone} onChange={(e) => setForm({ ...form, contact_phone: e.target.value })} />
+            <Input
+              value={form.contact_phone}
+              onChange={(e) => setForm({ ...form, contact_phone: e.target.value })}
+            />
           </div>
           <div className="md:col-span-2 space-y-1.5">
             <Label>Notes</Label>
-            <Textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            <Textarea
+              rows={3}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
           </div>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>{saving ? "Saving…" : "Save"}</Button>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

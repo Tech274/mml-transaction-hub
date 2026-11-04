@@ -47,19 +47,3 @@ export function enrichPgConstraintError(
   }
   return { message: raw };
 }
-
-/** Public schema descriptor returned to the client + used by the server fn. */
-export function getBulkTemplateSchema() {
-  return {
-    version: TEMPLATE_VERSION,
-    line_of_business: {
-      allowed: LINE_OF_BUSINESS_OPTIONS,
-      case_sensitive: true,
-      trim: false,
-    },
-    headers: {
-      public_cloud: PUBLIC_HEADERS,
-      private_cloud: PRIVATE_HEADERS,
-    },
-  } as const;
-}

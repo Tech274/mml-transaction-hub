@@ -15,6 +15,7 @@ import {
   ticketWriteFailureMessage,
   writesExternally,
 } from "@/lib/ai-cc-policy";
+import { adrProviderFields } from "@/lib/ai-cc-adr-provider";
 
 /* ---------------------------------------------------------------------------
  * Types
@@ -384,7 +385,7 @@ Cloud Labs Support — MakeMyLabs`;
   ];
 }
 
-function costAdrBrain(req: LabRequest): Proposal[] {
+export function costAdrBrain(req: LabRequest): Proposal[] {
   const r = req.requisition as Record<string, any>;
   const input_cost = Number(r.input_cost ?? 0);
   const selling_cost = Number(r.selling_cost ?? 0);
@@ -392,7 +393,8 @@ function costAdrBrain(req: LabRequest): Proposal[] {
   const start = String(r.start_date ?? "");
   const month = start ? Number(start.slice(5, 7)) : new Date().getUTCMonth() + 1;
   const year = start ? Number(start.slice(0, 4)) : new Date().getUTCFullYear();
-  const lab_type = String(r.lab_type ?? "public_cloud");
+  // SCRUM-129: the provider decides the cloud type; nothing is defaulted (see ai-cc-adr-provider.ts).
+  const providerFields = adrProviderFields(r);
 
   const fieldMap = {
     potential_id: `POT-${req.request_code.replace(/^LR-/, "")}`,
@@ -400,9 +402,9 @@ function costAdrBrain(req: LabRequest): Proposal[] {
     year,
     customer_name: req.customer_name,
     lab_name: req.lab_name,
-    lab_type,
-    cloud_provider: lab_type === "private_cloud" ? "MakeMyLabs Private Cloud" : String(r.cloud_provider ?? "AWS"),
-    system_config: lab_type === "private_cloud" ? String(r.system_config ?? "16GB 4vCPUs") : null,
+    lab_type: providerFields.lab_type,
+    cloud_provider: providerFields.cloud_provider,
+    system_config: providerFields.system_config,
     line_of_business: String(r.line_of_business ?? "Integrated"),
     start_date: start,
     end_date: String(r.end_date ?? ""),
@@ -415,16 +417,18 @@ function costAdrBrain(req: LabRequest): Proposal[] {
     {
       agent_key: "cost_adr",
       item_type: "adr_field_map",
-      title: `Master ADR field map — ${req.lab_name} (${req.request_code})`,
+      title: `Master ADR field map — ${req.lab_name} (${req.request_code})${providerFields.provider_ok ? "" : " — needs Cloud Provider"}`,
       summary: `${req.customer_name} · ${fieldMap.total_users} users · input ${inr(input_cost)} · selling ${inr(selling_cost)} · margin ${margin.toFixed(1)}%`,
       payload: {
         request_code: req.request_code,
         lab_request_id: req.id,
         margin_pct: Number(margin.toFixed(2)),
         field_map: fieldMap,
+        provider_ok: providerFields.provider_ok,
         extraction_notes: [
           `Trigger: lab request ${req.request_code} reached status CONFIRMED.`,
           `Costs taken from the requisition (${String(r.currency ?? "INR")}).`,
+          ...providerFields.notes,
           "No transaction is written — a human must save the Master ADR entry.",
         ],
         components: r.components ?? [],

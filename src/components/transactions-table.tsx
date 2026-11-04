@@ -1,14 +1,13 @@
+// SCRUM-128 C7 (plan P05): the All transactions list on the shared standard: one FilterBar
+// (search, selects, actions, page summary), TableStateRow, TablePagination, IncompleteBadge next
+// to the customer. The dead showPublicCloudInsights / compactFilters / KpiTile code (C2 → C7) is
+// gone. The numbers live in lib/transactions-list.ts (moved verbatim, pinned in its test).
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -18,25 +17,44 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { TransactionDetailDrawer } from "./transaction-detail-drawer";
 import { fmtCurrency, fmtDate, fmtDateTime, fmtNumber, MONTH_NAMES, YEARS } from "@/lib/format";
 import { effectiveCost } from "@/lib/cost-calculator";
-import { addNullable } from "@/lib/nullable-sum";
 import { exportToExcel } from "@/lib/export-xlsx";
-import { Download, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { usePermissions } from "@/lib/permissions";
-import { Badge } from "@/components/ui/badge";
+import { ProviderSelectItems } from "@/components/cloud/provider-select-items";
+import { CloudTypeBadge } from "@/components/cloud/cloud-type-badge";
+import { IncompleteBadge } from "@/components/status-badges";
+import {
+  FilterActions,
+  FilterBar,
+  FilterSearch,
+  FilterSelect,
+  FilterSummary,
+} from "@/components/filter-bar";
+import { TablePagination, TableStateRow } from "@/components/data-table-parts";
 import { highlight, tokenize } from "@/lib/highlight";
 import {
-  isTransactionComplete,
+  applyCompletenessQuery,
+  incompleteReasons,
+  isIncompleteTransaction,
   transactionListPlan,
   sortTransactionRows,
   type CompletenessFilter,
 } from "@/lib/transaction-completeness";
+import {
+  transactionExportName,
+  transactionExportRow,
+  transactionPageSummary,
+  transactionRowProfit,
+  type RepoFilter,
+} from "@/lib/transactions-list";
+import { cn } from "@/lib/utils";
 
-export type RepoFilter = "all" | "public_cloud" | "private_cloud";
+export type { RepoFilter };
 
 interface Filters {
   search: string;
@@ -73,13 +91,17 @@ const SYSTEM_CONFIG_OPTIONS = [
   "32GB 8vCPUs",
 ] as const;
 
+const MONTH_OPTIONS = MONTH_NAMES.map((m, i) => ({ value: String(i + 1), label: m }));
+const YEAR_OPTIONS = YEARS.map((y) => ({ value: String(y), label: String(y) }));
+const SYSTEM_CONFIG_SELECT_OPTIONS = SYSTEM_CONFIG_OPTIONS.map((c) => ({ value: c, label: c }));
+
 export function TransactionsTable({
   repoFilter = "all",
   showProviderFilter = true,
   initialFilters,
   pageSize = 25,
-  compactFilters = false,
-  showPublicCloudInsights = false,
+  completeness: completenessProp,
+  onCompletenessChange,
 }: {
   repoFilter?: RepoFilter;
   showProviderFilter?: boolean;
@@ -92,8 +114,9 @@ export function TransactionsTable({
     systemConfig?: string;
   };
   pageSize?: number;
-  compactFilters?: boolean;
-  showPublicCloudInsights?: boolean;
+  /** SCRUM-131: controlled by the route's ?completeness= (same param as the cloud views). */
+  completeness?: CompletenessFilter;
+  onCompletenessChange?: (filter: CompletenessFilter) => void;
 }) {
   const [filters, setFilters] = useState<Filters>({
     ...initial,
@@ -108,7 +131,11 @@ export function TransactionsTable({
   const [page, setPage] = useState(0);
   const [openId, setOpenId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("recent");
-  const [completeness, setCompleteness] = useState<CompletenessFilter>("all");
+  // SCRUM-131 (Eng QC fix 4): Complete/Incomplete uses isIncompleteTransaction only (never the
+  // DB is_complete column); the filter lives in the URL when the route passes it.
+  const [completenessState, setCompletenessState] = useState<CompletenessFilter>("all");
+  const completeness = completenessProp ?? completenessState;
+  const setCompleteness = onCompletenessChange ?? setCompletenessState;
   const { user, isAdmin } = useAuth();
   const [hybridOnly, setHybridOnly] = useState(false);
   const { data: hybridIds = [] } = useQuery({
@@ -149,7 +176,7 @@ export function TransactionsTable({
     },
   });
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: [
       "transactions",
       repoFilter,
@@ -202,10 +229,15 @@ export function TransactionsTable({
         return next;
       };
       let listQuery = applyShared(supabase.from("transactions").select("*", { count: "exact" }));
-      if (plan.isComplete != null) listQuery = listQuery.eq("is_complete", plan.isComplete);
-      const countQuery = applyShared(
-        supabase.from("transactions").select("id", { count: "exact", head: true }),
-      ).eq("is_complete", false);
+      // Same rule as isIncompleteTransaction, applied in the query before pagination.
+      listQuery = applyCompletenessQuery(
+        listQuery,
+        plan.isComplete == null ? null : plan.isComplete ? "complete" : "incomplete",
+      );
+      const countQuery = applyCompletenessQuery(
+        applyShared(supabase.from("transactions").select("id", { count: "exact", head: true })),
+        "incomplete",
+      );
       if (fuzzy) {
         const [{ data, error }, countResult] = await Promise.all([listQuery, countQuery]);
         if (error) throw error;
@@ -247,115 +279,15 @@ export function TransactionsTable({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const searchTokens = useMemo(() => tokenize(filters.search), [filters.search]);
   const isFuzzy = searchTokens.length > 0;
-  const tableColSpan = 13 + (showProviderFilter ? 1 : 0) + (isFuzzy ? 1 : 0);
-  const compactControlClass = compactFilters ? "h-8 text-xs" : "";
+  const tableColSpan = 14 + (showProviderFilter ? 1 : 0) + (isFuzzy ? 1 : 0);
 
-  const publicCloudInsights = useMemo(() => {
-    const toOptionalNumber = (value: unknown): number | null => {
-      if (typeof value === "number" && Number.isFinite(value)) return value;
-      if (typeof value === "string" && value.trim() !== "") {
-        const parsed = Number(value);
-        return Number.isFinite(parsed) ? parsed : null;
-      }
-      return null;
-    };
-
-    return rows.reduce(
-      (acc, row) => {
-        const map = row as Record<string, unknown>;
-        const creditAllocated = toOptionalNumber(map.public_credit_allocated);
-        const actualConsumption = toOptionalNumber(map.public_actual_consumption);
-        const unusedCredit =
-          toOptionalNumber(map.public_unused_credit) ??
-          (creditAllocated != null && actualConsumption != null
-            ? Math.max(creditAllocated - actualConsumption, 0)
-            : null);
-        const serviceMargin =
-          toOptionalNumber(map.public_service_margin) ??
-          (row.selling_cost != null && creditAllocated != null
-            ? Number(row.selling_cost) - creditAllocated
-            : null);
-        const totalMarginActual =
-          toOptionalNumber(map.public_total_margin_actual) ??
-          (row.selling_cost != null && actualConsumption != null
-            ? Number(row.selling_cost) - actualConsumption
-            : null);
-
-        if (creditAllocated != null || actualConsumption != null) {
-          acc.linesWithPublicUsage += 1;
-        }
-        acc.creditAllocated = addNullable(acc.creditAllocated, creditAllocated);
-        acc.actualConsumption = addNullable(acc.actualConsumption, actualConsumption);
-        acc.unusedCredit = addNullable(acc.unusedCredit, unusedCredit);
-        acc.serviceMargin = addNullable(acc.serviceMargin, serviceMargin);
-        acc.totalActualMargin = addNullable(acc.totalActualMargin, totalMarginActual);
-        return acc;
-      },
-      {
-        linesWithPublicUsage: 0,
-        creditAllocated: 0,
-        actualConsumption: 0,
-        unusedCredit: 0,
-        serviceMargin: 0,
-        totalActualMargin: 0,
-      },
-    );
-  }, [rows]);
-
-  const summary = useMemo(
-    () => ({
-      users: rows.reduce((s, r) => addNullable(s, r.total_users), 0),
-      revenue: rows.reduce((s, r) => addNullable(s, r.selling_cost), 0),
-      cost: rows.reduce((s, r) => addNullable(s, r.input_cost), 0),
-      profit: rows.reduce(
-        (s, r) => s + addNullable(0, r.selling_cost) - addNullable(0, r.input_cost),
-        0,
-      ),
-    }),
-    [rows],
-  );
+  const summary = useMemo(() => transactionPageSummary(rows), [rows]);
 
   function exportCurrent() {
     const exportRows = isFuzzy ? allRows : rows;
     exportToExcel(
-      repoFilter === "public_cloud"
-        ? "public-cloud"
-        : repoFilter === "private_cloud"
-          ? "private-cloud"
-          : "all-transactions",
-      exportRows.map((r) => ({
-        "Potential ID": r.potential_id,
-        Month: r.month ? MONTH_NAMES[r.month - 1] : "",
-        Year: r.year,
-        Customer: r.customer_name,
-        "Lab Name": r.lab_name,
-        Repository: r.repository_type,
-        "Cloud Provider": r.cloud_provider,
-        ...(repoFilter !== "public_cloud" ? { "System Config": r.system_config ?? "" } : {}),
-        "Line of Business": r.line_of_business,
-        "Start Date": r.start_date,
-        "End Date": r.end_date,
-        "Total Users": r.total_users,
-        "Input Cost": r.input_cost,
-        "Selling Cost": r.selling_cost,
-        Profit:
-          r.selling_cost == null && r.input_cost == null
-            ? null
-            : addNullable(0, r.selling_cost) - addNullable(0, r.input_cost),
-        "Margin %":
-          r.selling_cost != null && Number(r.selling_cost) > 0
-            ? Number(
-                (
-                  ((Number(r.selling_cost) - addNullable(0, r.input_cost)) /
-                    Number(r.selling_cost)) *
-                  100
-                ).toFixed(2),
-              )
-            : null,
-        ...(isFuzzy ? { "Relevance Score": Number((scoreMap?.get(r.id) ?? 0).toFixed(4)) } : {}),
-        "Created At": r.created_at,
-        "Updated At": r.updated_at,
-      })),
+      transactionExportName(repoFilter),
+      exportRows.map((r) => transactionExportRow(r, repoFilter, isFuzzy, scoreMap?.get(r.id) ?? 0)),
       {
         generatedBy: user?.email ?? "—",
         filters: { repository: repoFilter, sortMode, completeness, ...filters },
@@ -363,22 +295,141 @@ export function TransactionsTable({
     );
   }
 
+  const setFilter = (patch: Partial<Filters>) => {
+    setFilters({ ...filters, ...patch });
+    setPage(0);
+  };
+
   return (
     <div className="space-y-4">
-      <Card className="p-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          <div className="col-span-2 lg:col-span-2 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+      <FilterBar
+        summary={
+          <FilterSummary
+            items={[
+              { label: "Records", value: fmtNumber(total) },
+              { label: "Incomplete", value: fmtNumber(incompleteCount) },
+              { label: "Page users", value: fmtNumber(summary.users) },
+              { label: "Page revenue", value: fmtCurrency(summary.revenue) },
+              { label: "Page cost", value: fmtCurrency(summary.cost) },
+              { label: "Page profit", value: fmtCurrency(summary.profit) },
+            ]}
+          />
+        }
+      >
+        <div className="w-full md:w-72">
+          <FilterSearch
+            value={filters.search}
+            onChange={(search) => setFilter({ search })}
+            placeholder="Fuzzy search: ID, customer, lab, provider, LOB…"
+            label="Search transactions"
+          />
+        </div>
+        <FilterSelect
+          label="Month"
+          value={filters.month}
+          onValueChange={(month) => setFilter({ month })}
+          allLabel="All months"
+          options={MONTH_OPTIONS}
+        />
+        <FilterSelect
+          label="Year"
+          value={filters.year}
+          onValueChange={(year) => setFilter({ year })}
+          allLabel="All years"
+          options={YEAR_OPTIONS}
+        />
+        <FilterSelect
+          label="Customer"
+          width="md"
+          value={filters.customer}
+          onValueChange={(customer) => setFilter({ customer })}
+          allLabel="All customers"
+          options={customers.map((c) => ({ value: c.id, label: c.customer_name }))}
+        />
+        <FilterSelect
+          label="LOB"
+          value={filters.lob}
+          onValueChange={(lob) => setFilter({ lob })}
+          allLabel="All LOB"
+          options={lobs.map((l) => ({ value: l, label: l }))}
+        />
+        {showProviderFilter && (
+          <FilterSelect
+            label="Provider"
+            value={filters.provider}
+            onValueChange={(provider) => setFilter({ provider })}
+            allLabel="All providers"
+          >
+            {/* SCRUM-129: the six providers, grouped Private / Public. */}
+            <ProviderSelectItems />
+          </FilterSelect>
+        )}
+        {repoFilter !== "public_cloud" && (
+          <FilterSelect
+            label="System config"
+            value={filters.systemConfig}
+            onValueChange={(systemConfig) => setFilter({ systemConfig })}
+            allLabel="All system configs"
+            options={SYSTEM_CONFIG_SELECT_OPTIONS}
+          />
+        )}
+        <div className="grid w-full grid-cols-2 gap-2 md:w-auto">
+          <div>
+            <Label className="sr-only" htmlFor="tx-start-from">
+              Start date from
+            </Label>
             <Input
-              placeholder="Fuzzy search: ID, customer, lab, provider, LOB…"
-              className="pl-9"
-              value={filters.search}
-              onChange={(e) => {
-                setFilters({ ...filters, search: e.target.value });
-                setPage(0);
-              }}
+              id="tx-start-from"
+              type="date"
+              title="Start date from"
+              value={filters.startFrom}
+              onChange={(e) => setFilter({ startFrom: e.target.value })}
             />
           </div>
+          <div>
+            <Label className="sr-only" htmlFor="tx-start-to">
+              Start date to
+            </Label>
+            <Input
+              id="tx-start-to"
+              type="date"
+              title="Start date to"
+              value={filters.startTo}
+              onChange={(e) => setFilter({ startTo: e.target.value })}
+            />
+          </div>
+        </div>
+        <div data-testid="completeness-filter" className="contents">
+          <FilterSelect
+            label="Status"
+            value={completeness}
+            onValueChange={(v) => {
+              setCompleteness(v as CompletenessFilter);
+              setPage(0);
+            }}
+            options={[
+              { value: "all", label: "All" },
+              { value: "complete", label: "Complete" },
+              { value: "incomplete", label: `Incomplete (${fmtNumber(incompleteCount)})` },
+            ]}
+          />
+        </div>
+        <FilterSelect
+          label="Sort"
+          value={sortMode}
+          onValueChange={(v) => {
+            setSortMode(v as SortMode);
+            setPage(0);
+          }}
+          options={[
+            { value: "recent", label: "Most recent" },
+            // Relevance only applies to a fuzzy search (was a disabled item).
+            ...(isFuzzy || sortMode === "relevance"
+              ? [{ value: "relevance", label: "Relevance score" }]
+              : []),
+          ]}
+        />
+        <FilterActions>
           {isAdmin && (
             <Button
               type="button"
@@ -393,291 +444,90 @@ export function TransactionsTable({
               Hybrid only ({hybridIds.length})
             </Button>
           )}
-          <Select
-            value={filters.month}
-            onValueChange={(v) => {
-              setFilters({ ...filters, month: v });
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setFilters(initial);
               setPage(0);
+              setSortMode("recent");
+              setCompleteness("all");
             }}
           >
-            <SelectTrigger className={compactControlClass}>
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All months</SelectItem>
-              {MONTH_NAMES.map((m, i) => (
-                <SelectItem key={m} value={String(i + 1)}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.year}
-            onValueChange={(v) => {
-              setFilters({ ...filters, year: v });
-              setPage(0);
-            }}
-          >
-            <SelectTrigger className={compactControlClass}>
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All years</SelectItem>
-              {YEARS.map((y) => (
-                <SelectItem key={y} value={String(y)}>
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.customer}
-            onValueChange={(v) => {
-              setFilters({ ...filters, customer: v });
-              setPage(0);
-            }}
-          >
-            <SelectTrigger className={compactControlClass}>
-              <SelectValue placeholder="Customer" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All customers</SelectItem>
-              {customers.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.customer_name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.lob}
-            onValueChange={(v) => {
-              setFilters({ ...filters, lob: v });
-              setPage(0);
-            }}
-          >
-            <SelectTrigger className={compactControlClass}>
-              <SelectValue placeholder="Line of Business" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All LOB</SelectItem>
-              {lobs.map((l) => (
-                <SelectItem key={l} value={l}>
-                  {l}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {showProviderFilter && (
-            <Select
-              value={filters.provider}
-              onValueChange={(v) => {
-                setFilters({ ...filters, provider: v });
-                setPage(0);
-              }}
-            >
-              <SelectTrigger className={compactControlClass}>
-                <SelectValue placeholder="Provider" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All providers</SelectItem>
-                {["AWS", "Azure", "GCP", "MakeMyLabs Private Cloud"].map((p) => (
-                  <SelectItem key={p} value={p}>
-                    {p}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {repoFilter !== "public_cloud" && (
-            <Select
-              value={filters.systemConfig}
-              onValueChange={(v) => {
-                setFilters({ ...filters, systemConfig: v });
-                setPage(0);
-              }}
-            >
-              <SelectTrigger className={compactControlClass}>
-                <SelectValue placeholder="System Config" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All system configs</SelectItem>
-                {SYSTEM_CONFIG_OPTIONS.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          <div className="flex gap-2">
-            <Input
-              type="date"
-              className={compactControlClass}
-              value={filters.startFrom}
-              onChange={(e) => {
-                setFilters({ ...filters, startFrom: e.target.value });
-                setPage(0);
-              }}
-            />
-            <Input
-              type="date"
-              className={compactControlClass}
-              value={filters.startTo}
-              onChange={(e) => {
-                setFilters({ ...filters, startTo: e.target.value });
-                setPage(0);
-              }}
-            />
-          </div>
-        </div>
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border text-sm">
-          <div className="flex flex-wrap gap-4 text-muted-foreground">
-            <span>
-              <strong className="text-foreground">{fmtNumber(total)}</strong> records
-            </span>
-            <span>
-              Page users: <strong className="text-foreground">{fmtNumber(summary.users)}</strong>
-            </span>
-            <span>
-              Page revenue:{" "}
-              <strong className="text-foreground">{fmtCurrency(summary.revenue)}</strong>
-            </span>
-            <span>
-              Page cost: <strong className="text-foreground">{fmtCurrency(summary.cost)}</strong>
-            </span>
-            <span>
-              Page profit:{" "}
-              <strong className={summary.profit < 0 ? "text-destructive" : "text-foreground"}>
-                {fmtCurrency(summary.profit)}
-              </strong>
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Select
-              value={completeness}
-              onValueChange={(v) => {
-                setCompleteness(v as CompletenessFilter);
-                setPage(0);
-              }}
-            >
-              <SelectTrigger className="h-8 w-[200px]" data-testid="completeness-filter">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="complete">Complete</SelectItem>
-                <SelectItem value="incomplete">
-                  Incomplete ({fmtNumber(incompleteCount)})
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={sortMode}
-              onValueChange={(v) => {
-                setSortMode(v as SortMode);
-                setPage(0);
-              }}
-            >
-              <SelectTrigger className="h-8 w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="recent">Sort: Most recent</SelectItem>
-                <SelectItem value="relevance" disabled={!isFuzzy}>
-                  Sort: Relevance score
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setFilters(initial);
-                setPage(0);
-                setSortMode("recent");
-                setCompleteness("all");
-              }}
-            >
-              Reset
+            Reset
+          </Button>
+          {can("feature_excel_export") && (
+            <Button size="sm" onClick={exportCurrent}>
+              <Download className="mr-1 size-4" aria-hidden />
+              Export{isFuzzy ? ` (${allRows.length})` : ""}
             </Button>
-            {can("feature_excel_export") && (
-              <Button size="sm" onClick={exportCurrent}>
-                <Download className="h-4 w-4 mr-1" />
-                Export{isFuzzy ? ` (${allRows.length})` : ""}
-              </Button>
-            )}
-          </div>
-        </div>
-      </Card>
+          )}
+        </FilterActions>
+      </FilterBar>
 
       <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Potential ID</TableHead>
-                <TableHead>Period</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Lab</TableHead>
-                {showProviderFilter && <TableHead>Provider</TableHead>}
-                <TableHead>LOB</TableHead>
-                <TableHead>Start</TableHead>
-                <TableHead>End</TableHead>
-                <TableHead className="text-right">Users</TableHead>
-                <TableHead>Cost source</TableHead>
-                <TableHead className="text-right">Input Cost</TableHead>
-                <TableHead className="text-right">Selling Cost</TableHead>
-                <TableHead className="text-right">Profit</TableHead>
-                {isFuzzy && <TableHead className="text-right">Score</TableHead>}
-                <TableHead>Updated</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading && (
-                <TableRow>
-                  <TableCell colSpan={tableColSpan} className="text-center text-muted-foreground py-10">
-                    Loading…
-                  </TableCell>
-                </TableRow>
-              )}
-              {!isLoading && queryError && (
-                <TableRow>
-                  <TableCell colSpan={tableColSpan} className="text-center text-destructive py-10">
-                    Could not load transactions: {queryError.message}
-                  </TableCell>
-                </TableRow>
-              )}
-              {!isLoading && rows.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={tableColSpan} className="text-center text-muted-foreground py-10">
-                    No transactions match the current filters.
-                  </TableCell>
-                </TableRow>
-              )}
-              {rows.map((r) => (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Potential ID</TableHead>
+              <TableHead>Period</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Cloud type</TableHead>
+              <TableHead>Lab</TableHead>
+              {showProviderFilter && <TableHead>Provider</TableHead>}
+              <TableHead>LOB</TableHead>
+              <TableHead>Start</TableHead>
+              <TableHead>End</TableHead>
+              <TableHead className="text-right">Users</TableHead>
+              <TableHead>Cost source</TableHead>
+              <TableHead className="text-right">Input cost</TableHead>
+              <TableHead className="text-right">Selling cost</TableHead>
+              <TableHead className="text-right">Profit</TableHead>
+              {isFuzzy && <TableHead className="text-right">Score</TableHead>}
+              <TableHead>Updated</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading && (
+              <TableStateRow colSpan={tableColSpan}>Loading transactions…</TableStateRow>
+            )}
+            {!isLoading && queryError && (
+              <TableStateRow colSpan={tableColSpan} onRetry={() => void refetch()}>
+                Could not load transactions: {queryError.message}
+              </TableStateRow>
+            )}
+            {!isLoading && !queryError && rows.length === 0 && (
+              <TableStateRow colSpan={tableColSpan}>
+                No transactions match the current filters.
+              </TableStateRow>
+            )}
+            {rows.map((r) => {
+              const cost = effectiveCost(r);
+              const profit = transactionRowProfit(r);
+              return (
                 <TableRow
                   key={r.id}
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => setOpenId(r.id)}
                 >
-                  <TableCell className="font-medium">
+                  <TableCell className="whitespace-nowrap font-medium">
+                    {highlight(r.potential_id, searchTokens)}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {r.month ? `${MONTH_NAMES[r.month - 1]} ${r.year ?? ""}` : "—"}
+                  </TableCell>
+                  <TableCell>
                     <span className="inline-flex items-center gap-2">
-                      {highlight(r.potential_id, searchTokens)}
-                      {(r.is_complete === false ||
-                        (r.is_complete == null && !isTransactionComplete(r))) && (
-                        <Badge variant="secondary" data-testid="incomplete-badge">
-                          Incomplete
-                        </Badge>
+                      {highlight(r.customer_name, searchTokens)}
+                      {isIncompleteTransaction(r) && (
+                        <IncompleteBadge reasons={incompleteReasons(r)} className="shrink-0" />
                       )}
                     </span>
                   </TableCell>
-                  <TableCell>
-                    {r.month ? `${MONTH_NAMES[r.month - 1]} ${r.year ?? ""}` : "—"}
+                  <TableCell className="whitespace-nowrap">
+                    <CloudTypeBadge value={r.repository_type} />
                   </TableCell>
-                  <TableCell>{highlight(r.customer_name, searchTokens)}</TableCell>
-                  <TableCell className="max-w-[240px] truncate">
+                  <TableCell className="max-w-60 truncate" title={r.lab_name ?? undefined}>
                     {highlight(r.lab_name, searchTokens)}
                   </TableCell>
                   {showProviderFilter && (
@@ -686,62 +536,50 @@ export function TransactionsTable({
                     </TableCell>
                   )}
                   <TableCell>{highlight(r.line_of_business, searchTokens)}</TableCell>
-                  <TableCell>{fmtDate(r.start_date)}</TableCell>
-                  <TableCell>{fmtDate(r.end_date)}</TableCell>
-                  <TableCell className="text-right">{fmtNumber(r.total_users)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtDate(r.start_date)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtDate(r.end_date)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtNumber(r.total_users)}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline" data-testid="cost-source">
-                      {effectiveCost(r).basis === "auto_avg"
-                        ? "Auto (avg)"
-                        : effectiveCost(r).basis}
+                      {cost.basis === "auto_avg" ? "Auto (avg)" : cost.basis}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
-                    {fmtCurrency(effectiveCost(r).amount ?? r.input_cost)}
+                  <TableCell className="text-right tabular-nums">
+                    {fmtCurrency(cost.amount ?? r.input_cost)}
                   </TableCell>
-                  <TableCell className="text-right">{fmtCurrency(r.selling_cost)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtCurrency(r.selling_cost)}
+                  </TableCell>
                   <TableCell
-                    className={`text-right ${addNullable(0, r.selling_cost) - addNullable(0, r.input_cost) < 0 ? "text-destructive" : ""}`}
+                    className={cn(
+                      "text-right tabular-nums",
+                      profit != null && profit < 0 && "text-destructive",
+                    )}
                   >
-                    {r.selling_cost == null && r.input_cost == null
-                      ? "—"
-                      : fmtCurrency(addNullable(0, r.selling_cost) - addNullable(0, r.input_cost))}
+                    {profit == null ? "—" : fmtCurrency(profit)}
                   </TableCell>
                   {isFuzzy && (
-                    <TableCell className="text-right tabular-nums text-xs text-muted-foreground">
+                    <TableCell className="text-right text-xs tabular-nums text-muted-foreground">
                       {(scoreMap?.get(r.id) ?? 0).toFixed(2)}
                     </TableCell>
                   )}
-                  <TableCell className="text-xs text-muted-foreground">
+                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
                     {fmtDateTime(r.updated_at)}
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-        <div className="flex items-center justify-between px-4 py-3 border-t border-border text-sm">
-          <div className="text-muted-foreground">
-            Page {page + 1} of {totalPages}
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page === 0}
-              onClick={() => setPage(page - 1)}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page + 1 >= totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+              );
+            })}
+          </TableBody>
+        </Table>
+        <div className="border-t border-border px-4 py-3">
+          <TablePagination
+            page={page + 1}
+            pageCount={totalPages}
+            onPageChange={(next) => setPage(next - 1)}
+            summary={`Page ${page + 1} of ${totalPages}`}
+          />
         </div>
       </Card>
 
@@ -750,51 +588,6 @@ export function TransactionsTable({
         open={!!openId}
         onOpenChange={(b) => !b && setOpenId(null)}
       />
-
-      {showPublicCloudInsights && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="mb-4">
-              <h3 className="text-sm font-semibold">KPI insights (current page)</h3>
-              <p className="text-xs text-muted-foreground">
-                Public cloud margin = service margin + unused credit.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <KpiTile label="Transactions shown" value={fmtNumber(rows.length)} />
-              <KpiTile label="Credit allocated" value={fmtCurrency(publicCloudInsights.creditAllocated)} />
-              <KpiTile
-                label="Actual consumption"
-                value={fmtCurrency(publicCloudInsights.actualConsumption)}
-              />
-              <KpiTile label="Unused credit" value={fmtCurrency(publicCloudInsights.unusedCredit)} />
-              <KpiTile
-                label="Actual margin"
-                value={fmtCurrency(publicCloudInsights.totalActualMargin)}
-                muted={`Service margin ${fmtCurrency(publicCloudInsights.serviceMargin)} · ${fmtNumber(publicCloudInsights.linesWithPublicUsage)} usage-tagged`}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-function KpiTile({
-  label,
-  value,
-  muted,
-}: {
-  label: string;
-  value: string;
-  muted?: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-3">
-      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-1 text-lg font-semibold">{value}</div>
-      {muted && <div className="mt-1 text-[11px] text-muted-foreground">{muted}</div>}
     </div>
   );
 }

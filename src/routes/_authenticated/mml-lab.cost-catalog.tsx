@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
+import { pageHead, pageShell } from "@/lib/nav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,8 +21,10 @@ import { requireRouteRoles } from "@/lib/route-guard";
 import { customVmQuote, type RateMap } from "@/lib/cost-calculator";
 import { fmtCurrency } from "@/lib/format";
 import { toast } from "sonner";
+import { TableStateRow } from "@/components/data-table-parts";
 
 export const Route = createFileRoute("/_authenticated/mml-lab/cost-catalog")({
+  head: () => pageHead("/mml-lab/cost-catalog"),
   beforeLoad: requireRouteRoles("/mml-lab/cost-catalog"),
   component: CostCatalogPage,
 });
@@ -38,6 +41,15 @@ type Tier = {
   is_active: boolean;
   updated_at: string;
 };
+
+/** Calculator field labels (§4.3 sentence case; were the raw keys). */
+const CALC_LABEL = {
+  vcpu: "vCPU",
+  ramGb: "RAM (GB)",
+  storageGb: "Storage (GB)",
+  days: "Days",
+  vms: "VMs",
+} as const;
 
 const RATE_LABEL: Record<string, string> = {
   vcpu_per_day: "Per vCPU / day",
@@ -71,7 +83,12 @@ function CostCatalogPage() {
     internal: "",
   });
 
-  const { data: tiers = [] } = useQuery({
+  const {
+    data: tiers = [],
+    isLoading: tiersLoading,
+    isError: tiersError,
+    refetch: refetchTiers,
+  } = useQuery({
     queryKey: ["vm-tiers"],
     queryFn: async () => {
       const { data, error } = await supabase.from("vm_tiers").select("*").order("sort_order");
@@ -230,14 +247,16 @@ function CostCatalogPage() {
   const shown = tiers.filter((t) => t.is_active || isAdmin);
 
   return (
-    <AppShell title="Cost catalog">
+    <AppShell {...pageShell("/mml-lab/cost-catalog")}>
       <div className="space-y-4">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Fixed VM tiers</CardTitle>
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0">
+            <CardTitle className="text-sm">Fixed VM tiers</CardTitle>
             {isAdmin && (
               <Button
+                size="sm"
                 variant={editing ? "default" : "outline"}
+                aria-pressed={editing}
                 data-testid="edit-prices"
                 onClick={() => {
                   setEditing((v) => !v);
@@ -268,28 +287,49 @@ function CostCatalogPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Tier</TableHead>
-                  <TableHead>vCPU</TableHead>
-                  <TableHead>RAM GB</TableHead>
-                  <TableHead>Storage GB</TableHead>
-                  <TableHead>Selling / day</TableHead>
-                  <TableHead>Internal cost / day</TableHead>
-                  {isAdmin && editing && <TableHead></TableHead>}
+                  <TableHead className="text-right">vCPU</TableHead>
+                  <TableHead className="text-right">RAM GB</TableHead>
+                  <TableHead className="text-right">Storage GB</TableHead>
+                  <TableHead className="text-right">Selling / day</TableHead>
+                  <TableHead className="text-right">Internal cost / day</TableHead>
+                  {isAdmin && editing && (
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {tiersLoading ? (
+                  <TableStateRow colSpan={isAdmin && editing ? 7 : 6}>Loading tiers…</TableStateRow>
+                ) : tiersError ? (
+                  <TableStateRow
+                    colSpan={isAdmin && editing ? 7 : 6}
+                    onRetry={() => refetchTiers()}
+                  >
+                    Could not load the VM tiers.
+                  </TableStateRow>
+                ) : (
+                  shown.length === 0 && (
+                    <TableStateRow colSpan={isAdmin && editing ? 7 : 6}>
+                      No VM tiers yet.
+                    </TableStateRow>
+                  )
+                )}
                 {shown.map((t) => (
                   <TableRow key={t.id} data-testid={`tier-${t.code}`}>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {t.code}
-                      {!t.is_active && " (inactive)"}
+                      {!t.is_active && <span className="text-muted-foreground"> (inactive)</span>}
                     </TableCell>
-                    <TableCell>{t.vcpu}</TableCell>
-                    <TableCell>{t.ram_gb}</TableCell>
-                    <TableCell>{t.storage_gb ?? "—"}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-right tabular-nums">{t.vcpu}</TableCell>
+                    <TableCell className="text-right tabular-nums">{t.ram_gb}</TableCell>
+                    <TableCell className="text-right tabular-nums">{t.storage_gb ?? "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">
                       {editing && isAdmin ? (
                         <Input
-                          className="w-28"
+                          className="ml-auto w-28 text-right tabular-nums"
+                          aria-label={`${t.code} selling price per day`}
                           value={draftTiers[t.id]?.selling ?? ""}
                           onChange={(e) =>
                             setDraftTiers({
@@ -304,10 +344,11 @@ function CostCatalogPage() {
                         fmtCurrency(t.selling_price_per_day)
                       )}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">
                       {editing && isAdmin ? (
                         <Input
-                          className="w-28"
+                          className="ml-auto w-28 text-right tabular-nums"
+                          aria-label={`${t.code} internal cost per day`}
                           value={draftTiers[t.id]?.internal ?? ""}
                           onChange={(e) =>
                             setDraftTiers({
@@ -340,14 +381,19 @@ function CostCatalogPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Custom calculator</CardTitle>
+            <CardTitle className="text-sm">Custom calculator</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
               {(["vcpu", "ramGb", "storageGb", "days", "vms"] as const).map((k) => (
-                <div key={k}>
-                  <Label className="text-xs">{k}</Label>
+                <div key={k} className="space-y-1">
+                  <Label htmlFor={`calc-${k}`} className="text-xs">
+                    {CALC_LABEL[k]}
+                  </Label>
                   <Input
+                    id={`calc-${k}`}
+                    inputMode="numeric"
+                    className="tabular-nums"
                     data-testid={`calc-${k}`}
                     value={calc[k]}
                     onChange={(e) => setCalc({ ...calc, [k]: e.target.value })}
@@ -355,7 +401,7 @@ function CostCatalogPage() {
                 </div>
               ))}
             </div>
-            <div data-testid="calc-result" className="text-sm">
+            <div data-testid="calc-result" className="text-sm tabular-nums">
               {quote.ok ? (
                 <div className="space-y-1">
                   <div>Cost per VM per day: {fmtCurrency(quote.perVmPerDay)}</div>
@@ -371,22 +417,23 @@ function CostCatalogPage() {
                   )}
                 </div>
               ) : (
-                <p>{quote.error}</p>
+                <p className="text-xs text-destructive">{quote.error}</p>
               )}
             </div>
-            <div className="text-xs text-muted-foreground space-y-1">
+            <div className="space-y-1 text-xs text-muted-foreground">
               {rates.map((r) => (
-                <div key={r.key} className="flex items-center gap-2">
-                  <span className="w-64">{RATE_LABEL[r.key] ?? r.key}</span>
+                <div key={r.key} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="min-w-0 sm:w-64">{RATE_LABEL[r.key] ?? r.key}</span>
                   {editing && isAdmin ? (
                     <Input
-                      className="w-28"
+                      className="w-28 tabular-nums"
+                      aria-label={RATE_LABEL[r.key] ?? r.key}
                       data-testid={`rate-${r.key}`}
                       value={draftRates[r.key] ?? ""}
                       onChange={(e) => setDraftRates({ ...draftRates, [r.key]: e.target.value })}
                     />
                   ) : (
-                    <span>
+                    <span className="tabular-nums">
                       {r.value == null ? "Not set" : String(r.value)}{" "}
                       {r.key.endsWith("_pct") ? "%" : "INR"}
                     </span>
@@ -400,11 +447,12 @@ function CostCatalogPage() {
         {isAdmin && editing && (
           <Card>
             <CardHeader>
-              <CardTitle>Save price changes</CardTitle>
+              <CardTitle className="text-sm">Save price changes</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Label>Reason</Label>
+              <Label htmlFor="rate-reason">Reason</Label>
               <Input
+                id="rate-reason"
                 data-testid="rate-reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
@@ -413,29 +461,34 @@ function CostCatalogPage() {
               <Button data-testid="save-prices" onClick={saveEdits}>
                 Save
               </Button>
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-2 pt-2">
+              <div className="grid grid-cols-2 gap-2 pt-2 md:grid-cols-6">
                 <Input
                   placeholder="Code"
+                  aria-label="New tier code"
                   value={newTier.code}
                   onChange={(e) => setNewTier({ ...newTier, code: e.target.value })}
                 />
                 <Input
                   placeholder="vCPU"
+                  aria-label="New tier vCPU"
                   value={newTier.vcpu}
                   onChange={(e) => setNewTier({ ...newTier, vcpu: e.target.value })}
                 />
                 <Input
                   placeholder="RAM"
+                  aria-label="New tier RAM GB"
                   value={newTier.ram}
                   onChange={(e) => setNewTier({ ...newTier, ram: e.target.value })}
                 />
                 <Input
                   placeholder="Storage"
+                  aria-label="New tier storage GB"
                   value={newTier.storage}
                   onChange={(e) => setNewTier({ ...newTier, storage: e.target.value })}
                 />
                 <Input
                   placeholder="Selling"
+                  aria-label="New tier selling price per day"
                   value={newTier.selling}
                   onChange={(e) => setNewTier({ ...newTier, selling: e.target.value })}
                 />
@@ -450,12 +503,12 @@ function CostCatalogPage() {
         {isAdmin && (
           <Card>
             <CardHeader>
-              <CardTitle>Change history</CardTitle>
+              <CardTitle className="text-sm">Change history</CardTitle>
             </CardHeader>
-            <CardContent className="text-xs space-y-1">
+            <CardContent className="space-y-1 text-xs">
               {history.length === 0 && <p className="text-muted-foreground">No changes yet.</p>}
               {history.map((h) => (
-                <div key={h.id}>
+                <div key={h.id} className="break-words">
                   {h.row_key} · {h.field_name}: {h.old_value ?? "NULL"} → {h.new_value ?? "NULL"} ·{" "}
                   {h.reason ?? "—"}
                 </div>

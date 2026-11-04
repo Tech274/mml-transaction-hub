@@ -96,9 +96,9 @@ async def main() -> int:
             return 0
 
         for tab, name in [
-            ("Cloud Cost", "1_cloud_cost"),
-            ("Customer Profitability", "2_customer"),
-            ("Margin Analysis", "3_margin"),
+            ("Cloud cost", "1_cloud_cost"),
+            ("Customer profitability", "2_customer"),
+            ("Margin analysis", "3_margin"),
         ]:
             failures += await drill_from_active_tab(page, tab, name)
 

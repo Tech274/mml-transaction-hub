@@ -9,49 +9,51 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as McpRouteImport } from './routes/mcp'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authenticated/transactions'
-import { Route as AuthenticatedTicketsRouteImport } from './routes/_authenticated/tickets'
-import { Route as AuthenticatedSyncStatusRouteImport } from './routes/_authenticated/sync-status'
-import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
-import { Route as AuthenticatedPublicCloudRouteImport } from './routes/_authenticated/public-cloud'
-import { Route as AuthenticatedPrivateCloudRouteImport } from './routes/_authenticated/private-cloud'
-import { Route as AuthenticatedMcpAuditRouteImport } from './routes/_authenticated/mcp-audit'
-import { Route as AuthenticatedEntryRouteImport } from './routes/_authenticated/entry'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
-import { Route as AuthenticatedAiCommandCenterRouteImport } from './routes/_authenticated/ai-command-center'
-import { Route as AuthenticatedAgentIntegrationsRouteImport } from './routes/_authenticated/agent-integrations'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as McpRouteImport } from './routes/mcp'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
-import { Route as AuthenticatedAiCommandCenterIndexRouteImport } from './routes/_authenticated/ai-command-center.index'
-import { Route as ApiPublicBulkTemplateVersionRouteImport } from './routes/api/public/bulk-template-version'
-import { Route as AuthenticatedMmlLabLabCatalogRouteImport } from './routes/_authenticated/mml-lab.lab-catalog'
-import { Route as AuthenticatedMmlLabCostCatalogRouteImport } from './routes/_authenticated/mml-lab.cost-catalog'
-import { Route as AuthenticatedMmlLabBatchesRouteImport } from './routes/_authenticated/mml-lab.batches'
-import { Route as AuthenticatedAiCommandCenterRunNowRouteImport } from './routes/_authenticated/ai-command-center.run-now'
-import { Route as AuthenticatedAiCommandCenterInboxRouteImport } from './routes/_authenticated/ai-command-center.inbox'
-import { Route as AuthenticatedAiCommandCenterAuditRouteImport } from './routes/_authenticated/ai-command-center.audit'
-import { Route as AuthenticatedAiCommandCenterAgentsRouteImport } from './routes/_authenticated/ai-command-center.agents'
-import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAgentIntegrationsRouteImport } from './routes/_authenticated/agent-integrations'
+import { Route as AuthenticatedAiCommandCenterRouteImport } from './routes/_authenticated/ai-command-center'
+import { Route as AuthenticatedCustomersRouteImport } from './routes/_authenticated/customers'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedEntryRouteImport } from './routes/_authenticated/entry'
+import { Route as AuthenticatedMcpAuditRouteImport } from './routes/_authenticated/mcp-audit'
+import { Route as AuthenticatedMyUploadsRouteImport } from './routes/_authenticated/my-uploads'
+import { Route as AuthenticatedPrivateCloudRouteImport } from './routes/_authenticated/private-cloud'
+import { Route as AuthenticatedPublicCloudRouteImport } from './routes/_authenticated/public-cloud'
+import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
+import { Route as AuthenticatedSyncStatusRouteImport } from './routes/_authenticated/sync-status'
+import { Route as AuthenticatedTicketsRouteImport } from './routes/_authenticated/tickets'
+import { Route as AuthenticatedTransactionsRouteImport } from './routes/_authenticated/transactions'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
-import { Route as ApiPublicHooksMcpSyncRouteImport } from './routes/api/public/hooks/mcp-sync'
-import { Route as ApiPublicHooksFreshdeskSyncRouteImport } from './routes/api/public/hooks/freshdesk-sync'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as AuthenticatedAiCommandCenterIndexRouteImport } from './routes/_authenticated/ai-command-center.index'
+import { Route as AuthenticatedAiCommandCenterAgentsRouteImport } from './routes/_authenticated/ai-command-center.agents'
+import { Route as AuthenticatedAiCommandCenterAuditRouteImport } from './routes/_authenticated/ai-command-center.audit'
+import { Route as AuthenticatedAiCommandCenterInboxRouteImport } from './routes/_authenticated/ai-command-center.inbox'
+import { Route as AuthenticatedAiCommandCenterRunNowRouteImport } from './routes/_authenticated/ai-command-center.run-now'
+import { Route as AuthenticatedMmlLabBatchesRouteImport } from './routes/_authenticated/mml-lab.batches'
+import { Route as AuthenticatedMmlLabCostCatalogRouteImport } from './routes/_authenticated/mml-lab.cost-catalog'
+import { Route as AuthenticatedMmlLabLabCatalogRouteImport } from './routes/_authenticated/mml-lab.lab-catalog'
+import { Route as AuthenticatedImportApprovalsIndexRouteImport } from './routes/_authenticated/import-approvals.index'
+import { Route as AuthenticatedImportApprovalsStageIdRouteImport } from './routes/_authenticated/import-approvals.$stageId'
+import { Route as ApiPublicBulkTemplateVersionRouteImport } from './routes/api/public/bulk-template-version'
 import { Route as ApiPublicHooksBulkImportCleanupRouteImport } from './routes/api/public/hooks/bulk-import-cleanup'
+import { Route as ApiPublicHooksFreshdeskSyncRouteImport } from './routes/api/public/hooks/freshdesk-sync'
+import { Route as ApiPublicHooksMcpSyncRouteImport } from './routes/api/public/hooks/mcp-sync'
 
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const McpRoute = McpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -59,56 +61,48 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedTransactionsRoute =
-  AuthenticatedTransactionsRouteImport.update({
-    id: '/transactions',
-    path: '/transactions',
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAgentIntegrationsRoute =
+  AuthenticatedAgentIntegrationsRouteImport.update({
+    id: '/agent-integrations',
+    path: '/agent-integrations',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedTicketsRoute = AuthenticatedTicketsRouteImport.update({
-  id: '/tickets',
-  path: '/tickets',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedSyncStatusRoute = AuthenticatedSyncStatusRouteImport.update({
-  id: '/sync-status',
-  path: '/sync-status',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedPublicCloudRoute =
-  AuthenticatedPublicCloudRouteImport.update({
-    id: '/public-cloud',
-    path: '/public-cloud',
+const AuthenticatedAiCommandCenterRoute =
+  AuthenticatedAiCommandCenterRouteImport.update({
+    id: '/ai-command-center',
+    path: '/ai-command-center',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedPrivateCloudRoute =
-  AuthenticatedPrivateCloudRouteImport.update({
-    id: '/private-cloud',
-    path: '/private-cloud',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedMcpAuditRoute = AuthenticatedMcpAuditRouteImport.update({
-  id: '/mcp-audit',
-  path: '/mcp-audit',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedEntryRoute = AuthenticatedEntryRouteImport.update({
-  id: '/entry',
-  path: '/entry',
+const AuthenticatedCustomersRoute = AuthenticatedCustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -116,38 +110,63 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedCustomersRoute = AuthenticatedCustomersRouteImport.update({
-  id: '/customers',
-  path: '/customers',
+const AuthenticatedEntryRoute = AuthenticatedEntryRouteImport.update({
+  id: '/entry',
+  path: '/entry',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAiCommandCenterRoute =
-  AuthenticatedAiCommandCenterRouteImport.update({
-    id: '/ai-command-center',
-    path: '/ai-command-center',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedAgentIntegrationsRoute =
-  AuthenticatedAgentIntegrationsRouteImport.update({
-    id: '/agent-integrations',
-    path: '/agent-integrations',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const AuthenticatedMcpAuditRoute = AuthenticatedMcpAuditRouteImport.update({
+  id: '/mcp-audit',
+  path: '/mcp-audit',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const Char91DotwellKnownChar93OauthProtectedResourceRoute =
-  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
-    id: '/.well-known/oauth-protected-resource',
-    path: '/.well-known/oauth-protected-resource',
-    getParentRoute: () => rootRouteImport,
+const AuthenticatedMyUploadsRoute = AuthenticatedMyUploadsRouteImport.update({
+  id: '/my-uploads',
+  path: '/my-uploads',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPrivateCloudRoute =
+  AuthenticatedPrivateCloudRouteImport.update({
+    id: '/private-cloud',
+    path: '/private-cloud',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const Char91DotmcpChar93ListToolsRoute =
-  Char91DotmcpChar93ListToolsRouteImport.update({
-    id: '/.mcp/list-tools',
-    path: '/.mcp/list-tools',
+const AuthenticatedPublicCloudRoute =
+  AuthenticatedPublicCloudRouteImport.update({
+    id: '/public-cloud',
+    path: '/public-cloud',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSyncStatusRoute = AuthenticatedSyncStatusRouteImport.update({
+  id: '/sync-status',
+  path: '/sync-status',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTicketsRoute = AuthenticatedTicketsRouteImport.update({
+  id: '/tickets',
+  path: '/tickets',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTransactionsRoute =
+  AuthenticatedTransactionsRouteImport.update({
+    id: '/transactions',
+    path: '/transactions',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
 const AuthenticatedAiCommandCenterIndexRoute =
@@ -156,40 +175,10 @@ const AuthenticatedAiCommandCenterIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedAiCommandCenterRoute,
   } as any)
-const ApiPublicBulkTemplateVersionRoute =
-  ApiPublicBulkTemplateVersionRouteImport.update({
-    id: '/api/public/bulk-template-version',
-    path: '/api/public/bulk-template-version',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const AuthenticatedMmlLabLabCatalogRoute =
-  AuthenticatedMmlLabLabCatalogRouteImport.update({
-    id: '/mml-lab/lab-catalog',
-    path: '/mml-lab/lab-catalog',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedMmlLabCostCatalogRoute =
-  AuthenticatedMmlLabCostCatalogRouteImport.update({
-    id: '/mml-lab/cost-catalog',
-    path: '/mml-lab/cost-catalog',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedMmlLabBatchesRoute =
-  AuthenticatedMmlLabBatchesRouteImport.update({
-    id: '/mml-lab/batches',
-    path: '/mml-lab/batches',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedAiCommandCenterRunNowRoute =
-  AuthenticatedAiCommandCenterRunNowRouteImport.update({
-    id: '/run-now',
-    path: '/run-now',
-    getParentRoute: () => AuthenticatedAiCommandCenterRoute,
-  } as any)
-const AuthenticatedAiCommandCenterInboxRoute =
-  AuthenticatedAiCommandCenterInboxRouteImport.update({
-    id: '/inbox',
-    path: '/inbox',
+const AuthenticatedAiCommandCenterAgentsRoute =
+  AuthenticatedAiCommandCenterAgentsRouteImport.update({
+    id: '/agents',
+    path: '/agents',
     getParentRoute: () => AuthenticatedAiCommandCenterRoute,
   } as any)
 const AuthenticatedAiCommandCenterAuditRoute =
@@ -198,32 +187,52 @@ const AuthenticatedAiCommandCenterAuditRoute =
     path: '/audit',
     getParentRoute: () => AuthenticatedAiCommandCenterRoute,
   } as any)
-const AuthenticatedAiCommandCenterAgentsRoute =
-  AuthenticatedAiCommandCenterAgentsRouteImport.update({
-    id: '/agents',
-    path: '/agents',
+const AuthenticatedAiCommandCenterInboxRoute =
+  AuthenticatedAiCommandCenterInboxRouteImport.update({
+    id: '/inbox',
+    path: '/inbox',
     getParentRoute: () => AuthenticatedAiCommandCenterRoute,
   } as any)
-const Char91DotmcpChar93InvokeToolToolRoute =
-  Char91DotmcpChar93InvokeToolToolRouteImport.update({
-    id: '/.mcp/invoke-tool/$tool',
-    path: '/.mcp/invoke-tool/$tool',
-    getParentRoute: () => rootRouteImport,
+const AuthenticatedAiCommandCenterRunNowRoute =
+  AuthenticatedAiCommandCenterRunNowRouteImport.update({
+    id: '/run-now',
+    path: '/run-now',
+    getParentRoute: () => AuthenticatedAiCommandCenterRoute,
   } as any)
-const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
-  id: '/.lovable/oauth/consent',
-  path: '/.lovable/oauth/consent',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicHooksMcpSyncRoute = ApiPublicHooksMcpSyncRouteImport.update({
-  id: '/api/public/hooks/mcp-sync',
-  path: '/api/public/hooks/mcp-sync',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiPublicHooksFreshdeskSyncRoute =
-  ApiPublicHooksFreshdeskSyncRouteImport.update({
-    id: '/api/public/hooks/freshdesk-sync',
-    path: '/api/public/hooks/freshdesk-sync',
+const AuthenticatedMmlLabBatchesRoute =
+  AuthenticatedMmlLabBatchesRouteImport.update({
+    id: '/mml-lab/batches',
+    path: '/mml-lab/batches',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMmlLabCostCatalogRoute =
+  AuthenticatedMmlLabCostCatalogRouteImport.update({
+    id: '/mml-lab/cost-catalog',
+    path: '/mml-lab/cost-catalog',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMmlLabLabCatalogRoute =
+  AuthenticatedMmlLabLabCatalogRouteImport.update({
+    id: '/mml-lab/lab-catalog',
+    path: '/mml-lab/lab-catalog',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedImportApprovalsIndexRoute =
+  AuthenticatedImportApprovalsIndexRouteImport.update({
+    id: '/import-approvals/',
+    path: '/import-approvals/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedImportApprovalsStageIdRoute =
+  AuthenticatedImportApprovalsStageIdRouteImport.update({
+    id: '/import-approvals/$stageId',
+    path: '/import-approvals/$stageId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiPublicBulkTemplateVersionRoute =
+  ApiPublicBulkTemplateVersionRouteImport.update({
+    id: '/api/public/bulk-template-version',
+    path: '/api/public/bulk-template-version',
     getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksBulkImportCleanupRoute =
@@ -232,6 +241,17 @@ const ApiPublicHooksBulkImportCleanupRoute =
     path: '/api/public/hooks/bulk-import-cleanup',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksFreshdeskSyncRoute =
+  ApiPublicHooksFreshdeskSyncRouteImport.update({
+    id: '/api/public/hooks/freshdesk-sync',
+    path: '/api/public/hooks/freshdesk-sync',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksMcpSyncRoute = ApiPublicHooksMcpSyncRouteImport.update({
+  id: '/api/public/hooks/mcp-sync',
+  path: '/api/public/hooks/mcp-sync',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -247,6 +267,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/entry': typeof AuthenticatedEntryRoute
   '/mcp-audit': typeof AuthenticatedMcpAuditRoute
+  '/my-uploads': typeof AuthenticatedMyUploadsRoute
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -262,6 +283,8 @@ export interface FileRoutesByFullPath {
   '/mml-lab/batches': typeof AuthenticatedMmlLabBatchesRoute
   '/mml-lab/cost-catalog': typeof AuthenticatedMmlLabCostCatalogRoute
   '/mml-lab/lab-catalog': typeof AuthenticatedMmlLabLabCatalogRoute
+  '/import-approvals/': typeof AuthenticatedImportApprovalsIndexRoute
+  '/import-approvals/$stageId': typeof AuthenticatedImportApprovalsStageIdRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/ai-command-center/': typeof AuthenticatedAiCommandCenterIndexRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
@@ -281,6 +304,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/entry': typeof AuthenticatedEntryRoute
   '/mcp-audit': typeof AuthenticatedMcpAuditRoute
+  '/my-uploads': typeof AuthenticatedMyUploadsRoute
   '/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/reports': typeof AuthenticatedReportsRoute
@@ -296,6 +320,8 @@ export interface FileRoutesByTo {
   '/mml-lab/batches': typeof AuthenticatedMmlLabBatchesRoute
   '/mml-lab/cost-catalog': typeof AuthenticatedMmlLabCostCatalogRoute
   '/mml-lab/lab-catalog': typeof AuthenticatedMmlLabLabCatalogRoute
+  '/import-approvals': typeof AuthenticatedImportApprovalsIndexRoute
+  '/import-approvals/$stageId': typeof AuthenticatedImportApprovalsStageIdRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/ai-command-center': typeof AuthenticatedAiCommandCenterIndexRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
@@ -318,6 +344,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/entry': typeof AuthenticatedEntryRoute
   '/_authenticated/mcp-audit': typeof AuthenticatedMcpAuditRoute
+  '/_authenticated/my-uploads': typeof AuthenticatedMyUploadsRoute
   '/_authenticated/private-cloud': typeof AuthenticatedPrivateCloudRoute
   '/_authenticated/public-cloud': typeof AuthenticatedPublicCloudRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
@@ -333,6 +360,8 @@ export interface FileRoutesById {
   '/_authenticated/mml-lab/batches': typeof AuthenticatedMmlLabBatchesRoute
   '/_authenticated/mml-lab/cost-catalog': typeof AuthenticatedMmlLabCostCatalogRoute
   '/_authenticated/mml-lab/lab-catalog': typeof AuthenticatedMmlLabLabCatalogRoute
+  '/_authenticated/import-approvals/': typeof AuthenticatedImportApprovalsIndexRoute
+  '/_authenticated/import-approvals/$stageId': typeof AuthenticatedImportApprovalsStageIdRoute
   '/api/public/bulk-template-version': typeof ApiPublicBulkTemplateVersionRoute
   '/_authenticated/ai-command-center/': typeof AuthenticatedAiCommandCenterIndexRoute
   '/api/public/hooks/bulk-import-cleanup': typeof ApiPublicHooksBulkImportCleanupRoute
@@ -355,6 +384,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/entry'
     | '/mcp-audit'
+    | '/my-uploads'
     | '/private-cloud'
     | '/public-cloud'
     | '/reports'
@@ -370,6 +400,8 @@ export interface FileRouteTypes {
     | '/mml-lab/batches'
     | '/mml-lab/cost-catalog'
     | '/mml-lab/lab-catalog'
+    | '/import-approvals/'
+    | '/import-approvals/$stageId'
     | '/api/public/bulk-template-version'
     | '/ai-command-center/'
     | '/api/public/hooks/bulk-import-cleanup'
@@ -389,6 +421,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/entry'
     | '/mcp-audit'
+    | '/my-uploads'
     | '/private-cloud'
     | '/public-cloud'
     | '/reports'
@@ -404,6 +437,8 @@ export interface FileRouteTypes {
     | '/mml-lab/batches'
     | '/mml-lab/cost-catalog'
     | '/mml-lab/lab-catalog'
+    | '/import-approvals'
+    | '/import-approvals/$stageId'
     | '/api/public/bulk-template-version'
     | '/ai-command-center'
     | '/api/public/hooks/bulk-import-cleanup'
@@ -425,6 +460,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/entry'
     | '/_authenticated/mcp-audit'
+    | '/_authenticated/my-uploads'
     | '/_authenticated/private-cloud'
     | '/_authenticated/public-cloud'
     | '/_authenticated/reports'
@@ -440,6 +476,8 @@ export interface FileRouteTypes {
     | '/_authenticated/mml-lab/batches'
     | '/_authenticated/mml-lab/cost-catalog'
     | '/_authenticated/mml-lab/lab-catalog'
+    | '/_authenticated/import-approvals/'
+    | '/_authenticated/import-approvals/$stageId'
     | '/api/public/bulk-template-version'
     | '/_authenticated/ai-command-center/'
     | '/api/public/hooks/bulk-import-cleanup'
@@ -465,25 +503,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mcp': {
-      id: '/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof McpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -493,109 +517,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/transactions': {
-      id: '/_authenticated/transactions'
-      path: '/transactions'
-      fullPath: '/transactions'
-      preLoaderRoute: typeof AuthenticatedTransactionsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/tickets': {
-      id: '/_authenticated/tickets'
-      path: '/tickets'
-      fullPath: '/tickets'
-      preLoaderRoute: typeof AuthenticatedTicketsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/sync-status': {
-      id: '/_authenticated/sync-status'
-      path: '/sync-status'
-      fullPath: '/sync-status'
-      preLoaderRoute: typeof AuthenticatedSyncStatusRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/reports': {
-      id: '/_authenticated/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof AuthenticatedReportsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/public-cloud': {
-      id: '/_authenticated/public-cloud'
-      path: '/public-cloud'
-      fullPath: '/public-cloud'
-      preLoaderRoute: typeof AuthenticatedPublicCloudRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/private-cloud': {
-      id: '/_authenticated/private-cloud'
-      path: '/private-cloud'
-      fullPath: '/private-cloud'
-      preLoaderRoute: typeof AuthenticatedPrivateCloudRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/mcp-audit': {
-      id: '/_authenticated/mcp-audit'
-      path: '/mcp-audit'
-      fullPath: '/mcp-audit'
-      preLoaderRoute: typeof AuthenticatedMcpAuditRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/entry': {
-      id: '/_authenticated/entry'
-      path: '/entry'
-      fullPath: '/entry'
-      preLoaderRoute: typeof AuthenticatedEntryRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/customers': {
-      id: '/_authenticated/customers'
-      path: '/customers'
-      fullPath: '/customers'
-      preLoaderRoute: typeof AuthenticatedCustomersRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ai-command-center': {
-      id: '/_authenticated/ai-command-center'
-      path: '/ai-command-center'
-      fullPath: '/ai-command-center'
-      preLoaderRoute: typeof AuthenticatedAiCommandCenterRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/agent-integrations': {
-      id: '/_authenticated/agent-integrations'
-      path: '/agent-integrations'
-      fullPath: '/agent-integrations'
-      preLoaderRoute: typeof AuthenticatedAgentIntegrationsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/.well-known/oauth-protected-resource': {
-      id: '/.well-known/oauth-protected-resource'
-      path: '/.well-known/oauth-protected-resource'
-      fullPath: '/.well-known/oauth-protected-resource'
-      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -605,60 +545,130 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/agent-integrations': {
+      id: '/_authenticated/agent-integrations'
+      path: '/agent-integrations'
+      fullPath: '/agent-integrations'
+      preLoaderRoute: typeof AuthenticatedAgentIntegrationsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ai-command-center': {
+      id: '/_authenticated/ai-command-center'
+      path: '/ai-command-center'
+      fullPath: '/ai-command-center'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/customers': {
+      id: '/_authenticated/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof AuthenticatedCustomersRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/entry': {
+      id: '/_authenticated/entry'
+      path: '/entry'
+      fullPath: '/entry'
+      preLoaderRoute: typeof AuthenticatedEntryRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/mcp-audit': {
+      id: '/_authenticated/mcp-audit'
+      path: '/mcp-audit'
+      fullPath: '/mcp-audit'
+      preLoaderRoute: typeof AuthenticatedMcpAuditRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/my-uploads': {
+      id: '/_authenticated/my-uploads'
+      path: '/my-uploads'
+      fullPath: '/my-uploads'
+      preLoaderRoute: typeof AuthenticatedMyUploadsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/private-cloud': {
+      id: '/_authenticated/private-cloud'
+      path: '/private-cloud'
+      fullPath: '/private-cloud'
+      preLoaderRoute: typeof AuthenticatedPrivateCloudRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/public-cloud': {
+      id: '/_authenticated/public-cloud'
+      path: '/public-cloud'
+      fullPath: '/public-cloud'
+      preLoaderRoute: typeof AuthenticatedPublicCloudRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/reports': {
+      id: '/_authenticated/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof AuthenticatedReportsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/sync-status': {
+      id: '/_authenticated/sync-status'
+      path: '/sync-status'
+      fullPath: '/sync-status'
+      preLoaderRoute: typeof AuthenticatedSyncStatusRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tickets': {
+      id: '/_authenticated/tickets'
+      path: '/tickets'
+      fullPath: '/tickets'
+      preLoaderRoute: typeof AuthenticatedTicketsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/transactions': {
+      id: '/_authenticated/transactions'
+      path: '/transactions'
+      fullPath: '/transactions'
+      preLoaderRoute: typeof AuthenticatedTransactionsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/.lovable/oauth/consent': {
+      id: '/.lovable/oauth/consent'
+      path: '/.lovable/oauth/consent'
+      fullPath: '/.lovable/oauth/consent'
+      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/ai-command-center/': {
       id: '/_authenticated/ai-command-center/'
       path: '/'
       fullPath: '/ai-command-center/'
       preLoaderRoute: typeof AuthenticatedAiCommandCenterIndexRouteImport
-      parentRoute: typeof AuthenticatedAiCommandCenterRoute
-    }
-    '/api/public/bulk-template-version': {
-      id: '/api/public/bulk-template-version'
-      path: '/api/public/bulk-template-version'
-      fullPath: '/api/public/bulk-template-version'
-      preLoaderRoute: typeof ApiPublicBulkTemplateVersionRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/mml-lab/lab-catalog': {
-      id: '/_authenticated/mml-lab/lab-catalog'
-      path: '/mml-lab/lab-catalog'
-      fullPath: '/mml-lab/lab-catalog'
-      preLoaderRoute: typeof AuthenticatedMmlLabLabCatalogRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/mml-lab/cost-catalog': {
-      id: '/_authenticated/mml-lab/cost-catalog'
-      path: '/mml-lab/cost-catalog'
-      fullPath: '/mml-lab/cost-catalog'
-      preLoaderRoute: typeof AuthenticatedMmlLabCostCatalogRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/mml-lab/batches': {
-      id: '/_authenticated/mml-lab/batches'
-      path: '/mml-lab/batches'
-      fullPath: '/mml-lab/batches'
-      preLoaderRoute: typeof AuthenticatedMmlLabBatchesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/ai-command-center/run-now': {
-      id: '/_authenticated/ai-command-center/run-now'
-      path: '/run-now'
-      fullPath: '/ai-command-center/run-now'
-      preLoaderRoute: typeof AuthenticatedAiCommandCenterRunNowRouteImport
-      parentRoute: typeof AuthenticatedAiCommandCenterRoute
-    }
-    '/_authenticated/ai-command-center/inbox': {
-      id: '/_authenticated/ai-command-center/inbox'
-      path: '/inbox'
-      fullPath: '/ai-command-center/inbox'
-      preLoaderRoute: typeof AuthenticatedAiCommandCenterInboxRouteImport
-      parentRoute: typeof AuthenticatedAiCommandCenterRoute
-    }
-    '/_authenticated/ai-command-center/audit': {
-      id: '/_authenticated/ai-command-center/audit'
-      path: '/audit'
-      fullPath: '/ai-command-center/audit'
-      preLoaderRoute: typeof AuthenticatedAiCommandCenterAuditRouteImport
       parentRoute: typeof AuthenticatedAiCommandCenterRoute
     }
     '/_authenticated/ai-command-center/agents': {
@@ -668,25 +678,74 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAiCommandCenterAgentsRouteImport
       parentRoute: typeof AuthenticatedAiCommandCenterRoute
     }
-    '/.mcp/invoke-tool/$tool': {
-      id: '/.mcp/invoke-tool/$tool'
-      path: '/.mcp/invoke-tool/$tool'
-      fullPath: '/.mcp/invoke-tool/$tool'
-      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+    '/_authenticated/ai-command-center/audit': {
+      id: '/_authenticated/ai-command-center/audit'
+      path: '/audit'
+      fullPath: '/ai-command-center/audit'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterAuditRouteImport
+      parentRoute: typeof AuthenticatedAiCommandCenterRoute
+    }
+    '/_authenticated/ai-command-center/inbox': {
+      id: '/_authenticated/ai-command-center/inbox'
+      path: '/inbox'
+      fullPath: '/ai-command-center/inbox'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterInboxRouteImport
+      parentRoute: typeof AuthenticatedAiCommandCenterRoute
+    }
+    '/_authenticated/ai-command-center/run-now': {
+      id: '/_authenticated/ai-command-center/run-now'
+      path: '/run-now'
+      fullPath: '/ai-command-center/run-now'
+      preLoaderRoute: typeof AuthenticatedAiCommandCenterRunNowRouteImport
+      parentRoute: typeof AuthenticatedAiCommandCenterRoute
+    }
+    '/_authenticated/mml-lab/batches': {
+      id: '/_authenticated/mml-lab/batches'
+      path: '/mml-lab/batches'
+      fullPath: '/mml-lab/batches'
+      preLoaderRoute: typeof AuthenticatedMmlLabBatchesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/mml-lab/cost-catalog': {
+      id: '/_authenticated/mml-lab/cost-catalog'
+      path: '/mml-lab/cost-catalog'
+      fullPath: '/mml-lab/cost-catalog'
+      preLoaderRoute: typeof AuthenticatedMmlLabCostCatalogRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/mml-lab/lab-catalog': {
+      id: '/_authenticated/mml-lab/lab-catalog'
+      path: '/mml-lab/lab-catalog'
+      fullPath: '/mml-lab/lab-catalog'
+      preLoaderRoute: typeof AuthenticatedMmlLabLabCatalogRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/import-approvals/': {
+      id: '/_authenticated/import-approvals/'
+      path: '/import-approvals'
+      fullPath: '/import-approvals/'
+      preLoaderRoute: typeof AuthenticatedImportApprovalsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/import-approvals/$stageId': {
+      id: '/_authenticated/import-approvals/$stageId'
+      path: '/import-approvals/$stageId'
+      fullPath: '/import-approvals/$stageId'
+      preLoaderRoute: typeof AuthenticatedImportApprovalsStageIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/bulk-template-version': {
+      id: '/api/public/bulk-template-version'
+      path: '/api/public/bulk-template-version'
+      fullPath: '/api/public/bulk-template-version'
+      preLoaderRoute: typeof ApiPublicBulkTemplateVersionRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/.lovable/oauth/consent': {
-      id: '/.lovable/oauth/consent'
-      path: '/.lovable/oauth/consent'
-      fullPath: '/.lovable/oauth/consent'
-      preLoaderRoute: typeof DotlovableOauthConsentRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/hooks/mcp-sync': {
-      id: '/api/public/hooks/mcp-sync'
-      path: '/api/public/hooks/mcp-sync'
-      fullPath: '/api/public/hooks/mcp-sync'
-      preLoaderRoute: typeof ApiPublicHooksMcpSyncRouteImport
+    '/api/public/hooks/bulk-import-cleanup': {
+      id: '/api/public/hooks/bulk-import-cleanup'
+      path: '/api/public/hooks/bulk-import-cleanup'
+      fullPath: '/api/public/hooks/bulk-import-cleanup'
+      preLoaderRoute: typeof ApiPublicHooksBulkImportCleanupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/freshdesk-sync': {
@@ -696,11 +755,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksFreshdeskSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/bulk-import-cleanup': {
-      id: '/api/public/hooks/bulk-import-cleanup'
-      path: '/api/public/hooks/bulk-import-cleanup'
-      fullPath: '/api/public/hooks/bulk-import-cleanup'
-      preLoaderRoute: typeof ApiPublicHooksBulkImportCleanupRouteImport
+    '/api/public/hooks/mcp-sync': {
+      id: '/api/public/hooks/mcp-sync'
+      path: '/api/public/hooks/mcp-sync'
+      fullPath: '/api/public/hooks/mcp-sync'
+      preLoaderRoute: typeof ApiPublicHooksMcpSyncRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -741,6 +800,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEntryRoute: typeof AuthenticatedEntryRoute
   AuthenticatedMcpAuditRoute: typeof AuthenticatedMcpAuditRoute
+  AuthenticatedMyUploadsRoute: typeof AuthenticatedMyUploadsRoute
   AuthenticatedPrivateCloudRoute: typeof AuthenticatedPrivateCloudRoute
   AuthenticatedPublicCloudRoute: typeof AuthenticatedPublicCloudRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
@@ -750,6 +810,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMmlLabBatchesRoute: typeof AuthenticatedMmlLabBatchesRoute
   AuthenticatedMmlLabCostCatalogRoute: typeof AuthenticatedMmlLabCostCatalogRoute
   AuthenticatedMmlLabLabCatalogRoute: typeof AuthenticatedMmlLabLabCatalogRoute
+  AuthenticatedImportApprovalsIndexRoute: typeof AuthenticatedImportApprovalsIndexRoute
+  AuthenticatedImportApprovalsStageIdRoute: typeof AuthenticatedImportApprovalsStageIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -761,6 +823,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEntryRoute: AuthenticatedEntryRoute,
   AuthenticatedMcpAuditRoute: AuthenticatedMcpAuditRoute,
+  AuthenticatedMyUploadsRoute: AuthenticatedMyUploadsRoute,
   AuthenticatedPrivateCloudRoute: AuthenticatedPrivateCloudRoute,
   AuthenticatedPublicCloudRoute: AuthenticatedPublicCloudRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
@@ -770,6 +833,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMmlLabBatchesRoute: AuthenticatedMmlLabBatchesRoute,
   AuthenticatedMmlLabCostCatalogRoute: AuthenticatedMmlLabCostCatalogRoute,
   AuthenticatedMmlLabLabCatalogRoute: AuthenticatedMmlLabLabCatalogRoute,
+  AuthenticatedImportApprovalsIndexRoute: AuthenticatedImportApprovalsIndexRoute,
+  AuthenticatedImportApprovalsStageIdRoute: AuthenticatedImportApprovalsStageIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

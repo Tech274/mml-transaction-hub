@@ -1,31 +1,104 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
-  PieChart, Pie, Cell, Legend, LineChart, Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  LineChart,
+  Line,
 } from "recharts";
 import { AppShell } from "@/components/app-shell";
+import { pageDocumentTitle, pageShell } from "@/lib/nav";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FilterBar, FilterSearch, FilterSelect } from "@/components/filter-bar";
+import { KpiGrid, SummaryKpi } from "@/components/summaries/summary-kpi";
+import { ChartCard } from "@/components/summaries/chart-card";
+import { NoDataYet } from "@/components/summaries/no-data-yet";
+import { LoadingState } from "@/components/page-states";
+import { TablePagination, TableStateRow } from "@/components/data-table-parts";
+import {
+  CHART_AXIS_TICK,
+  CHART_GRID,
+  CHART_HEIGHT,
+  CHART_TOOLTIP,
+  PIE_SLICE_STROKE,
+  chartSeriesColor,
+} from "@/lib/chart-standard";
+import { kpiPeriodFor } from "@/lib/kpi-period";
+import {
+  PRIORITY_RANK,
+  type Quick,
+  filterTickets,
+  isOverdue,
+  priorityQueue,
+  ticketCounts,
+  ticketSummaryMetrics,
+  type TicketCounts,
+} from "@/lib/tickets-summary";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
-import { RefreshCw, LifeBuoy, AlertTriangle, Eye, Loader2, CheckCircle2, X, UserCheck, History, Flame } from "lucide-react";
+import {
+  RefreshCw,
+  LifeBuoy,
+  AlertTriangle,
+  Eye,
+  Loader2,
+  CheckCircle2,
+  X,
+  UserCheck,
+  History,
+  Flame,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import {
-  getTicketsOverview, syncFreshdeskNow, getAgentDirectory, setMyAgentIdentity,
-  getTicketHistory, resolveTicket, getTicketDescription, type TicketRow, type TicketsOverview,
+  getTicketsOverview,
+  syncFreshdeskNow,
+  getAgentDirectory,
+  setMyAgentIdentity,
+  getTicketHistory,
+  resolveTicket,
+  getTicketDescription,
+  type TicketRow,
+  type TicketsOverview,
 } from "@/lib/freshdesk.functions";
 import {
   getSuperadminCaptureModeEnvForClient,
@@ -38,9 +111,9 @@ export const Route = createFileRoute("/_authenticated/tickets")({
   beforeLoad: requireRouteRoles("/tickets"),
   validateSearch: (search: Record<string, unknown>) => ({
     view: search.view === "mine" ? ("mine" as const) : ("all" as const),
-    quick: (["all", "open", "pending", "resolved", "closed", "overdue", "escalated"] as const).includes(
-      search.quick as never,
-    )
+    quick: (
+      ["all", "open", "pending", "resolved", "closed", "overdue", "escalated"] as const
+    ).includes(search.quick as never)
       ? (search.quick as Quick)
       : ("all" as const),
   }),
@@ -48,31 +121,32 @@ export const Route = createFileRoute("/_authenticated/tickets")({
 
   head: () => ({
     meta: [
-      { title: "Support Tickets Dashboard | MakeMyLabs" },
-      { name: "description", content: "Freshdesk support tickets synced into MakeMyLabs: status, priority, agent workload, agent queues and ticket resolution." },
-      { property: "og:title", content: "Support Tickets Dashboard | MakeMyLabs" },
-      { property: "og:description", content: "Freshdesk support tickets synced into MakeMyLabs: status, priority, agent workload, agent queues and ticket resolution." },
+      { title: pageDocumentTitle("/tickets") },
+      {
+        name: "description",
+        content:
+          "Freshdesk support tickets synced into MakeMyLabs: status, priority, agent workload, agent queues and ticket resolution.",
+      },
+      { property: "og:title", content: pageDocumentTitle("/tickets") },
+      {
+        property: "og:description",
+        content:
+          "Freshdesk support tickets synced into MakeMyLabs: status, priority, agent workload, agent queues and ticket resolution.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
 });
 
-const COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-  "var(--muted-foreground)",
+const STATUS_OPTIONS = [
+  "Open",
+  "Pending",
+  "Waiting on Customer",
+  "Waiting on Third Party",
+  "Resolved",
+  "Closed",
 ];
-
-const OPEN_LIKE = ["Open", "Waiting on Customer", "Waiting on Third Party"];
-const STATUS_OPTIONS = ["Open", "Pending", "Waiting on Customer", "Waiting on Third Party", "Resolved", "Closed"];
-const PRIORITY_RANK: Record<string, number> = { Urgent: 0, High: 1, Medium: 2, Low: 3 };
-
-type Quick = "all" | "open" | "pending" | "resolved" | "closed" | "overdue" | "escalated";
-
 const QUICK_LABEL: Record<Quick, string> = {
   all: "All tickets",
   open: "Open",
@@ -84,12 +158,120 @@ const QUICK_LABEL: Record<Quick, string> = {
 };
 
 const EXAMPLE_TICKETS: TicketRow[] = [
-  { id: 5142, subject: "Unable to launch DevOps lab VM", status: "Open", priority: "High", type: "Incident", source: "Portal", requester_name: "Priya Menon", requester_email: "priya@cognizant.com", company_name: "Cognizant", agent_name: "Ritu Sharma", group_name: "Cloud Labs", tags: ["vm", "launch"], due_by: "2026-09-29T09:30:00Z", is_escalated: true, ticket_created_at: "2026-09-29T03:40:00Z", ticket_updated_at: "2026-09-29T04:50:00Z", synced_at: "2026-09-29T05:15:00Z" },
-  { id: 5139, subject: "Seat quota mismatch in AI Foundations cohort", status: "Pending", priority: "Medium", type: "Service Request", source: "Email", requester_name: "Arun Das", requester_email: "arun@infosys.com", company_name: "Infosys", agent_name: "Ritu Sharma", group_name: "Cloud Labs", tags: ["quota"], due_by: "2026-09-29T13:00:00Z", is_escalated: false, ticket_created_at: "2026-09-28T15:12:00Z", ticket_updated_at: "2026-09-29T02:20:00Z", synced_at: "2026-09-29T05:15:00Z" },
-  { id: 5131, subject: "Need invoice split by BU for private batch", status: "Waiting on Customer", priority: "Low", type: "Question", source: "Portal", requester_name: "Sanjay Rao", requester_email: "sanjay@tcs.com", company_name: "TCS", agent_name: "Nisha Patel", group_name: "Cloud Labs", tags: ["invoice"], due_by: "2026-09-30T10:00:00Z", is_escalated: false, ticket_created_at: "2026-09-28T08:10:00Z", ticket_updated_at: "2026-09-29T00:45:00Z", synced_at: "2026-09-29T05:15:00Z" },
-  { id: 5128, subject: "Freshdesk webhook retry warnings", status: "Open", priority: "Urgent", type: "Incident", source: "Email", requester_name: "Platform Bot", requester_email: "alerts@mml.local", company_name: "MakeMyLabs", agent_name: "Amit Singh", group_name: "Platform Ops", tags: ["integration", "webhook"], due_by: "2026-09-29T07:00:00Z", is_escalated: true, ticket_created_at: "2026-09-28T04:42:00Z", ticket_updated_at: "2026-09-29T04:10:00Z", synced_at: "2026-09-29T05:15:00Z" },
-  { id: 5124, subject: "Add learners to AKS lab after go-live", status: "Resolved", priority: "Medium", type: "Service Request", source: "Portal", requester_name: "Megha Iyer", requester_email: "megha@wipro.com", company_name: "Wipro", agent_name: "Ritu Sharma", group_name: "Cloud Labs", tags: ["learners"], due_by: "2026-09-28T12:00:00Z", is_escalated: false, ticket_created_at: "2026-09-27T17:20:00Z", ticket_updated_at: "2026-09-28T11:05:00Z", synced_at: "2026-09-29T05:15:00Z" },
-  { id: 5116, subject: "Lab DNS issue in APAC region", status: "Closed", priority: "High", type: "Incident", source: "Email", requester_name: "Rahul Nair", requester_email: "rahul@hcl.com", company_name: "HCL", agent_name: "Nisha Patel", group_name: "Cloud Labs", tags: ["dns", "apac"], due_by: "2026-09-27T06:30:00Z", is_escalated: false, ticket_created_at: "2026-09-26T20:10:00Z", ticket_updated_at: "2026-09-27T06:10:00Z", synced_at: "2026-09-29T05:15:00Z" },
+  {
+    id: 5142,
+    subject: "Unable to launch DevOps lab VM",
+    status: "Open",
+    priority: "High",
+    type: "Incident",
+    source: "Portal",
+    requester_name: "Priya Menon",
+    requester_email: "priya@cognizant.com",
+    company_name: "Cognizant",
+    agent_name: "Ritu Sharma",
+    group_name: "Cloud Labs",
+    tags: ["vm", "launch"],
+    due_by: "2026-09-29T09:30:00Z",
+    is_escalated: true,
+    ticket_created_at: "2026-09-29T03:40:00Z",
+    ticket_updated_at: "2026-09-29T04:50:00Z",
+    synced_at: "2026-09-29T05:15:00Z",
+  },
+  {
+    id: 5139,
+    subject: "Seat quota mismatch in AI Foundations cohort",
+    status: "Pending",
+    priority: "Medium",
+    type: "Service Request",
+    source: "Email",
+    requester_name: "Arun Das",
+    requester_email: "arun@infosys.com",
+    company_name: "Infosys",
+    agent_name: "Ritu Sharma",
+    group_name: "Cloud Labs",
+    tags: ["quota"],
+    due_by: "2026-09-29T13:00:00Z",
+    is_escalated: false,
+    ticket_created_at: "2026-09-28T15:12:00Z",
+    ticket_updated_at: "2026-09-29T02:20:00Z",
+    synced_at: "2026-09-29T05:15:00Z",
+  },
+  {
+    id: 5131,
+    subject: "Need invoice split by BU for private batch",
+    status: "Waiting on Customer",
+    priority: "Low",
+    type: "Question",
+    source: "Portal",
+    requester_name: "Sanjay Rao",
+    requester_email: "sanjay@tcs.com",
+    company_name: "TCS",
+    agent_name: "Nisha Patel",
+    group_name: "Cloud Labs",
+    tags: ["invoice"],
+    due_by: "2026-09-30T10:00:00Z",
+    is_escalated: false,
+    ticket_created_at: "2026-09-28T08:10:00Z",
+    ticket_updated_at: "2026-09-29T00:45:00Z",
+    synced_at: "2026-09-29T05:15:00Z",
+  },
+  {
+    id: 5128,
+    subject: "Freshdesk webhook retry warnings",
+    status: "Open",
+    priority: "Urgent",
+    type: "Incident",
+    source: "Email",
+    requester_name: "Platform Bot",
+    requester_email: "alerts@mml.local",
+    company_name: "MakeMyLabs",
+    agent_name: "Amit Singh",
+    group_name: "Platform Ops",
+    tags: ["integration", "webhook"],
+    due_by: "2026-09-29T07:00:00Z",
+    is_escalated: true,
+    ticket_created_at: "2026-09-28T04:42:00Z",
+    ticket_updated_at: "2026-09-29T04:10:00Z",
+    synced_at: "2026-09-29T05:15:00Z",
+  },
+  {
+    id: 5124,
+    subject: "Add learners to AKS lab after go-live",
+    status: "Resolved",
+    priority: "Medium",
+    type: "Service Request",
+    source: "Portal",
+    requester_name: "Megha Iyer",
+    requester_email: "megha@wipro.com",
+    company_name: "Wipro",
+    agent_name: "Ritu Sharma",
+    group_name: "Cloud Labs",
+    tags: ["learners"],
+    due_by: "2026-09-28T12:00:00Z",
+    is_escalated: false,
+    ticket_created_at: "2026-09-27T17:20:00Z",
+    ticket_updated_at: "2026-09-28T11:05:00Z",
+    synced_at: "2026-09-29T05:15:00Z",
+  },
+  {
+    id: 5116,
+    subject: "Lab DNS issue in APAC region",
+    status: "Closed",
+    priority: "High",
+    type: "Incident",
+    source: "Email",
+    requester_name: "Rahul Nair",
+    requester_email: "rahul@hcl.com",
+    company_name: "HCL",
+    agent_name: "Nisha Patel",
+    group_name: "Cloud Labs",
+    tags: ["dns", "apac"],
+    due_by: "2026-09-27T06:30:00Z",
+    is_escalated: false,
+    ticket_created_at: "2026-09-26T20:10:00Z",
+    ticket_updated_at: "2026-09-27T06:10:00Z",
+    synced_at: "2026-09-29T05:15:00Z",
+  },
 ];
 
 const EXAMPLE_TICKETS_OVERVIEW: TicketsOverview = {
@@ -125,7 +307,11 @@ const EXAMPLE_TICKETS_OVERVIEW: TicketsOverview = {
     { month: "2026-09", value: 34 },
   ],
   last_synced_at: "2026-09-29T05:15:00Z",
-  connection: { ok: true, message: "Connected to Freshdesk sandbox", domain: "mml-helpdesk.freshdesk.com" },
+  connection: {
+    ok: true,
+    message: "Connected to Freshdesk sandbox",
+    domain: "mml-helpdesk.freshdesk.com",
+  },
   truncated: false,
 };
 
@@ -138,25 +324,11 @@ const EXAMPLE_AGENT_DIRECTORY = {
   identity: { agent_name: "Ritu Sharma", agent_id: 1401, auto_matched: true },
 };
 
-function isOverdue(t: TicketRow) {
-  return !!t.due_by && new Date(t.due_by).getTime() < Date.now() && !["Resolved", "Closed"].includes(t.status ?? "");
-}
-
-function matchesQuick(t: TicketRow, quick: Quick) {
-  switch (quick) {
-    case "all": return true;
-    case "open": return OPEN_LIKE.includes(t.status ?? "");
-    case "pending": return t.status === "Pending";
-    case "resolved": return t.status === "Resolved";
-    case "closed": return t.status === "Closed";
-    case "escalated": return t.is_escalated;
-    case "overdue": return isOverdue(t);
-  }
-}
-
 function TicketsPage() {
   const qc = useQueryClient();
-  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient());
+  const isExampleCaptureMode = isSuperadminCaptureModeEnabled(
+    getSuperadminCaptureModeEnvForClient(),
+  );
   const { hasAnyRole } = useAuth();
   const canSync = hasAnyRole(["admin", "ops_lead"]);
   const canAct = hasAnyRole(["admin", "ops_lead", "ops_user"]);
@@ -213,46 +385,16 @@ function TicketsPage() {
     return rows;
   }, [d, view, myAgent]);
 
-  const counts = useMemo(() => ({
-    total: scoped.length,
-    open: scoped.filter((r) => OPEN_LIKE.includes(r.status ?? "")).length,
-    pending: scoped.filter((r) => r.status === "Pending").length,
-    resolved: scoped.filter((r) => r.status === "Resolved").length,
-    closed: scoped.filter((r) => r.status === "Closed").length,
-    overdue: scoped.filter(isOverdue).length,
-    escalated: scoped.filter((r) => r.is_escalated).length,
-  }), [scoped]);
+  // SCRUM-128 C7: counts, filters and the queue moved verbatim to lib/tickets-summary.ts
+  // (pinned by lib/__tests__/tickets-summary.test.ts).
+  const counts = useMemo(() => ticketCounts(scoped), [scoped]);
 
-  const filtered = useMemo(() => {
-    const needle = q.trim().toLowerCase();
-    return scoped.filter((r) => {
-      if (!matchesQuick(r, quick)) return false;
-      if (status !== "all" && r.status !== status) return false;
-      if (priority !== "all" && r.priority !== priority) return false;
-      if (agent !== "all" && (r.agent_name ?? "Unassigned") !== agent) return false;
-      if (!needle) return true;
-      return [r.subject, r.requester_name, r.requester_email, r.company_name, String(r.id)]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(needle));
-    });
-  }, [scoped, q, quick, status, priority, agent]);
-
-  const queue = useMemo(
-    () =>
-      scoped
-        .filter((r) => !["Resolved", "Closed"].includes(r.status ?? ""))
-        .sort((a, b) => {
-          const pa = PRIORITY_RANK[a.priority ?? ""] ?? 4;
-          const pb = PRIORITY_RANK[b.priority ?? ""] ?? 4;
-          if (pa !== pb) return pa - pb;
-          const oa = isOverdue(a) ? 0 : 1;
-          const ob = isOverdue(b) ? 0 : 1;
-          if (oa !== ob) return oa - ob;
-          return (a.due_by ?? a.ticket_created_at ?? "").localeCompare(b.due_by ?? b.ticket_created_at ?? "");
-        })
-        .slice(0, 10),
-    [scoped],
+  const filtered = useMemo(
+    () => filterTickets(scoped, { q, quick, status, priority, agent }),
+    [scoped, q, quick, status, priority, agent],
   );
+
+  const queue = useMemo(() => priorityQueue(scoped), [scoped]);
 
   const pageRows = filtered.slice(page * perPage, page * perPage + perPage);
 
@@ -278,7 +420,7 @@ function TicketsPage() {
   }, [scoped]);
 
   return (
-    <AppShell title="Support tickets">
+    <AppShell {...pageShell("/tickets")}>
       <div className="space-y-4">
         <SupportTicketsSummary
           rows={scoped}
@@ -289,15 +431,16 @@ function TicketsPage() {
         />
 
         <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <LifeBuoy className="h-5 w-5" /> Freshdesk tickets
+          <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 space-y-1.5">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <LifeBuoy className="size-4 shrink-0" /> Freshdesk tickets
               </CardTitle>
               <CardDescription>
                 {d?.connection.ok ? (
-                  <span className="inline-flex items-center gap-1 text-emerald-600">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Connected{d.connection.domain ? ` to ${d.connection.domain}` : ""}
+                  <span className="inline-flex items-center gap-1 text-success">
+                    <CheckCircle2 className="size-3.5" /> Connected
+                    {d.connection.domain ? ` to ${d.connection.domain}` : ""}
                   </span>
                 ) : (
                   "Tickets are pulled from your Freshdesk helpdesk."
@@ -307,13 +450,25 @@ function TicketsPage() {
                 )}
               </CardDescription>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => overview.refetch()} disabled={overview.isFetching}>
-                <RefreshCw className={`h-4 w-4 mr-1 ${overview.isFetching ? "animate-spin" : ""}`} /> Refresh
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => overview.refetch()}
+                disabled={overview.isFetching}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 mr-1 ${overview.isFetching ? "animate-spin" : ""}`}
+                />{" "}
+                Refresh
               </Button>
               {canSync && (
                 <Button size="sm" onClick={() => sync.mutate()} disabled={sync.isPending}>
-                  {sync.isPending ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <LifeBuoy className="h-4 w-4 mr-1" />}
+                  {sync.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                  ) : (
+                    <LifeBuoy className="h-4 w-4 mr-1" />
+                  )}
                   Sync now
                 </Button>
               )}
@@ -324,29 +479,35 @@ function TicketsPage() {
               agents={directoryData?.agents ?? []}
               identity={directoryData?.identity ?? null}
               view={view}
-              onView={(v) => { setView(v); setPage(0); }}
+              onView={(v) => {
+                setView(v);
+                setPage(0);
+              }}
             />
 
-            {overview.isLoading && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading tickets…
-              </div>
-            )}
+            {overview.isLoading && <LoadingState thing="tickets" inCard />}
             {overview.isError && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Could not load tickets</AlertTitle>
                 <AlertDescription className="space-y-2">
-                  <p>{overview.error instanceof Error ? overview.error.message : "Unknown error"}</p>
-                  <Button size="sm" variant="outline" onClick={() => overview.refetch()}>Retry</Button>
+                  <p>
+                    {overview.error instanceof Error ? overview.error.message : "Unknown error"}
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => overview.refetch()}>
+                    Retry
+                  </Button>
                 </AlertDescription>
               </Alert>
             )}
             {d?.truncated && (
-              <Alert variant="destructive" className="mb-3">
+              <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Showing the newest 20,000 tickets only</AlertTitle>
-                <AlertDescription>Totals on this page cover those tickets. Server-side totals are the next SCRUM-94 step.</AlertDescription>
+                <AlertDescription>
+                  Totals on this page cover those tickets. Server-side totals are the next SCRUM-94
+                  step.
+                </AlertDescription>
               </Alert>
             )}
             {d && !d.connection.ok && (
@@ -357,10 +518,12 @@ function TicketsPage() {
               </Alert>
             )}
             {quick !== "all" && (
-              <div className="flex items-center gap-2 text-sm">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
                 <Badge variant="secondary" className="gap-1">
                   {QUICK_LABEL[quick]} filter is active
-                  <button aria-label="Clear filter" onClick={() => pick("all")}><X className="h-3 w-3" /></button>
+                  <button type="button" aria-label="Clear filter" onClick={() => pick("all")}>
+                    <X className="size-3" />
+                  </button>
                 </Badge>
               </div>
             )}
@@ -370,8 +533,8 @@ function TicketsPage() {
         {view === "mine" && (
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Flame className="h-4 w-4" /> My priority queue
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Flame className="size-4 shrink-0" /> My priority queue
               </CardTitle>
               <CardDescription>
                 {myAgent
@@ -381,24 +544,33 @@ function TicketsPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {queue.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nothing open in your queue right now.</p>
+                <p className="text-sm text-muted-foreground">
+                  Nothing open in your queue right now.
+                </p>
               )}
               {queue.map((t) => (
                 <button
                   key={t.id}
+                  type="button"
                   onClick={() => setOpen(t)}
-                  className="flex w-full items-center justify-between gap-3 rounded-md border p-3 text-left hover:bg-muted/50"
+                  className="flex w-full flex-col gap-2 rounded-md border border-border p-3 text-left hover:bg-muted/50 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">#{t.id} · {t.subject ?? "—"}</p>
+                    <p className="truncate text-sm font-medium">
+                      #{t.id} · {t.subject ?? "—"}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">
                       {t.company_name ?? t.requester_name ?? "—"}
                       {t.due_by && <> · due {format(new Date(t.due_by), "dd MMM HH:mm")}</>}
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
                     {isOverdue(t) && <Badge variant="destructive">Overdue</Badge>}
-                    <Badge variant={t.priority === "Urgent" || t.priority === "High" ? "destructive" : "outline"}>
+                    <Badge
+                      variant={
+                        t.priority === "Urgent" || t.priority === "High" ? "destructive" : "outline"
+                      }
+                    >
                       {t.priority ?? "—"}
                     </Badge>
                     <Badge variant="outline">{t.status ?? "—"}</Badge>
@@ -409,84 +581,155 @@ function TicketsPage() {
           </Card>
         )}
 
+        <FilterBar>
+          <FilterSearch
+            label="Search tickets"
+            placeholder="Search subject, requester, company, ID"
+            value={q}
+            onChange={(v) => {
+              setQ(v);
+              setPage(0);
+            }}
+          />
+          <FilterSelect
+            label="Status"
+            value={status}
+            width="md"
+            onValueChange={(v) => {
+              setStatus(v);
+              setQuick("all");
+              setPage(0);
+            }}
+            allLabel="All statuses"
+            options={statusOptions.map((o) => ({ value: o, label: o }))}
+          />
+          <FilterSelect
+            label="Priority"
+            value={priority}
+            width="md"
+            onValueChange={(v) => {
+              setPriority(v);
+              setPage(0);
+            }}
+            allLabel="All priorities"
+            options={priorityOptions.map((o) => ({ value: o, label: o }))}
+          />
+          <FilterSelect
+            label="Agent"
+            value={agent}
+            onValueChange={(v) => {
+              setAgent(v);
+              setPage(0);
+            }}
+            allLabel="All agents"
+            width="md"
+            options={agentOptions.map((o) => ({ value: o, label: o }))}
+          />
+        </FilterBar>
+
         <Card>
           <CardHeader>
-            <CardTitle>{view === "mine" ? "My tickets" : "All tickets"}</CardTitle>
-            <CardDescription>{filtered.length.toLocaleString()} matching tickets · click a row to open it</CardDescription>
+            <CardTitle className="text-sm">
+              {view === "mine" ? "My tickets" : "All tickets"}
+            </CardTitle>
+            <CardDescription>
+              <span className="tabular-nums">{filtered.length.toLocaleString()}</span> matching
+              tickets · click a row to open it
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="grid gap-2 sm:grid-cols-4">
-              <Input
-                placeholder="Search subject, requester, company, ID"
-                value={q}
-                onChange={(e) => { setQ(e.target.value); setPage(0); }}
-              />
-              <FilterSelect label="Status" value={status} onChange={(v) => { setStatus(v); setQuick("all"); setPage(0); }} options={statusOptions} />
-              <FilterSelect label="Priority" value={priority} onChange={(v) => { setPriority(v); setPage(0); }} options={priorityOptions} />
-              <FilterSelect label="Agent" value={agent} onChange={(v) => { setAgent(v); setPage(0); }} options={agentOptions} />
-            </div>
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>#</TableHead>
-                    <TableHead>Subject</TableHead>
-                    <TableHead>Requester</TableHead>
-                    <TableHead>Company</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Priority</TableHead>
-                    <TableHead>Agent</TableHead>
-                    <TableHead>Created</TableHead>
-                    <TableHead />
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>#</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Requester</TableHead>
+                  <TableHead>Company</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Priority</TableHead>
+                  <TableHead>Agent</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {overview.isLoading && !isExampleCaptureMode ? (
+                  <TableStateRow colSpan={9}>Loading tickets…</TableStateRow>
+                ) : overview.isError && !isExampleCaptureMode ? (
+                  <TableStateRow colSpan={9} onRetry={() => overview.refetch()}>
+                    Could not load tickets.
+                  </TableStateRow>
+                ) : (
+                  pageRows.length === 0 && (
+                    <TableStateRow colSpan={9}>
+                      {counts.total
+                        ? "No tickets match these filters."
+                        : canSync
+                          ? "No tickets yet — use “Sync now” to pull them from Freshdesk."
+                          : "No tickets synced yet."}
+                    </TableStateRow>
+                  )
+                )}
+                {pageRows.map((t) => (
+                  <TableRow key={t.id} className="cursor-pointer" onClick={() => setOpen(t)}>
+                    <TableCell className="font-mono text-xs tabular-nums">{t.id}</TableCell>
+                    <TableCell className="max-w-72 truncate">{t.subject ?? "—"}</TableCell>
+                    <TableCell className="text-xs">
+                      {t.requester_name ?? t.requester_email ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-xs">{t.company_name ?? "—"}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          t.status === "Open"
+                            ? "default"
+                            : t.status === "Pending"
+                              ? "secondary"
+                              : "outline"
+                        }
+                      >
+                        {t.status ?? "—"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          t.priority === "Urgent" || t.priority === "High"
+                            ? "destructive"
+                            : "outline"
+                        }
+                      >
+                        {t.priority ?? "—"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs">{t.agent_name ?? "Unassigned"}</TableCell>
+                    <TableCell className="text-xs tabular-nums">
+                      {t.ticket_created_at
+                        ? format(new Date(t.ticket_created_at), "dd MMM yyyy")
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Open ticket ${t.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpen(t);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {pageRows.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
-                        {counts.total ? "No tickets match these filters." : canSync ? "No tickets yet — use “Sync now” to pull them from Freshdesk." : "No tickets synced yet."}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {pageRows.map((t) => (
-                    <TableRow key={t.id} className="cursor-pointer" onClick={() => setOpen(t)}>
-                      <TableCell className="font-mono text-xs">{t.id}</TableCell>
-                      <TableCell className="max-w-[280px] truncate">{t.subject ?? "—"}</TableCell>
-                      <TableCell className="text-xs">{t.requester_name ?? t.requester_email ?? "—"}</TableCell>
-                      <TableCell className="text-xs">{t.company_name ?? "—"}</TableCell>
-                      <TableCell>
-                        <Badge variant={t.status === "Open" ? "default" : t.status === "Pending" ? "secondary" : "outline"}>
-                          {t.status ?? "—"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={t.priority === "Urgent" || t.priority === "High" ? "destructive" : "outline"}>
-                          {t.priority ?? "—"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs">{t.agent_name ?? "Unassigned"}</TableCell>
-                      <TableCell className="text-xs">
-                        {t.ticket_created_at ? format(new Date(t.ticket_created_at), "dd MMM yyyy") : "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setOpen(t); }}>
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            {pages > 1 && (
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Page {page + 1} of {pages}</span>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Previous</Button>
-                  <Button variant="outline" size="sm" disabled={page + 1 >= pages} onClick={() => setPage((p) => p + 1)}>Next</Button>
-                </div>
-              </div>
-            )}
+                ))}
+              </TableBody>
+            </Table>
+            <TablePagination
+              page={page + 1}
+              pageCount={pages}
+              onPageChange={(p) => setPage(p - 1)}
+            />
           </CardContent>
         </Card>
       </div>
@@ -502,7 +745,10 @@ function TicketsPage() {
 }
 
 function AgentIdentityBar({
-  agents, identity, view, onView,
+  agents,
+  identity,
+  view,
+  onView,
 }: {
   agents: { id: number; name: string; email: string | null }[];
   identity: { agent_name: string; agent_id: number | null; auto_matched: boolean } | null;
@@ -524,33 +770,38 @@ function AgentIdentityBar({
   });
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border p-3">
+    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border p-3">
       <Tabs value={view} onValueChange={(v) => onView(v as "all" | "mine")}>
         <TabsList>
           <TabsTrigger value="all">All tickets</TabsTrigger>
           <TabsTrigger value="mine">My tickets</TabsTrigger>
         </TabsList>
       </Tabs>
-      <div className="ml-auto flex items-center gap-2">
-        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-          <UserCheck className="h-3.5 w-3.5" /> I am
-        </span>
-        <Select value={identity?.agent_name ?? ""} onValueChange={(v) => save.mutate(v)} disabled={agents.length === 0}>
-          <SelectTrigger className="h-8 w-[220px]">
-            <SelectValue placeholder={agents.length ? "Select your agent name" : "Agent list unavailable"} />
-          </SelectTrigger>
-          <SelectContent>
-            {agents.map((a) => <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
-        {identity?.auto_matched && <Badge variant="secondary">matched by email</Badge>}
+      <div className="flex w-full flex-wrap items-center gap-2 md:ml-auto md:w-auto">
+        <UserCheck className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+        <FilterSelect
+          label="I am"
+          value={identity?.agent_name ?? ""}
+          onValueChange={(v) => save.mutate(v)}
+          width="md"
+          placeholder={agents.length ? "Select your agent name" : "Agent list unavailable"}
+          options={agents.map((a) => ({ value: a.name, label: a.name }))}
+        />
+        {identity?.auto_matched && (
+          <Badge variant="secondary" className="shrink-0">
+            matched by email
+          </Badge>
+        )}
       </div>
     </div>
   );
 }
 
 function TicketDetailSheet({
-  ticket, onClose, canAct, agents,
+  ticket,
+  onClose,
+  canAct,
+  agents,
 }: {
   ticket: TicketRow | null;
   onClose: () => void;
@@ -594,7 +845,9 @@ function TicketDetailSheet({
     },
     onSuccess: () => {
       toast.success("Ticket updated in Freshdesk");
-      setAssignee(""); setNextStatus(""); setNote("");
+      setAssignee("");
+      setNextStatus("");
+      setNote("");
       qc.invalidateQueries({ queryKey: ["freshdesk"] });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Could not update the ticket"),
@@ -632,12 +885,28 @@ function TicketDetailSheet({
                 <Field label="Agent" value={ticket.agent_name ?? "Unassigned"} />
                 <Field label="Group" value={ticket.group_name} />
                 <Field label="Escalated" value={ticket.is_escalated ? "Yes" : "No"} />
-                <Field label="Created" value={ticket.ticket_created_at ? format(new Date(ticket.ticket_created_at), "dd MMM yyyy HH:mm") : null} />
-                <Field label="Due by" value={ticket.due_by ? format(new Date(ticket.due_by), "dd MMM yyyy HH:mm") : null} />
+                <Field
+                  label="Created"
+                  value={
+                    ticket.ticket_created_at
+                      ? format(new Date(ticket.ticket_created_at), "dd MMM yyyy HH:mm")
+                      : null
+                  }
+                />
+                <Field
+                  label="Due by"
+                  value={
+                    ticket.due_by ? format(new Date(ticket.due_by), "dd MMM yyyy HH:mm") : null
+                  }
+                />
               </div>
               {ticket.tags.length > 0 && (
                 <div className="flex flex-wrap gap-1">
-                  {ticket.tags.map((t) => <Badge key={t} variant="secondary">{t}</Badge>)}
+                  {ticket.tags.map((t) => (
+                    <Badge key={t} variant="secondary">
+                      {t}
+                    </Badge>
+                  ))}
                 </div>
               )}
               {description.isLoading && (
@@ -645,13 +914,16 @@ function TicketDetailSheet({
               )}
               {description.isError && (
                 <p className="text-xs text-destructive">
-                  Could not load the description: {description.error instanceof Error ? description.error.message : "unknown error"}
+                  Could not load the description:{" "}
+                  {description.error instanceof Error ? description.error.message : "unknown error"}
                 </p>
               )}
               {description.data?.description_text && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Description</p>
-                  <p className="whitespace-pre-wrap rounded-md border p-3 text-sm">{description.data.description_text}</p>
+                  <p className="whitespace-pre-wrap rounded-md border p-3 text-sm">
+                    {description.data.description_text}
+                  </p>
                 </div>
               )}
             </TabsContent>
@@ -661,27 +933,43 @@ function TicketDetailSheet({
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>View only</AlertTitle>
-                  <AlertDescription>Your role cannot change ticket assignment or status.</AlertDescription>
+                  <AlertDescription>
+                    Your role cannot change ticket assignment or status.
+                  </AlertDescription>
                 </Alert>
               ) : (
                 <>
                   <div className="space-y-2">
                     <Label>Assign to agent</Label>
-                    <Select value={assignee} onValueChange={setAssignee} disabled={agents.length === 0}>
+                    <Select
+                      value={assignee}
+                      onValueChange={setAssignee}
+                      disabled={agents.length === 0}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder={ticket.agent_name ?? "Unassigned"} />
                       </SelectTrigger>
                       <SelectContent>
-                        {agents.map((a) => <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>)}
+                        {agents.map((a) => (
+                          <SelectItem key={a.id} value={a.name}>
+                            {a.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label>Update status</Label>
                     <Select value={nextStatus} onValueChange={setNextStatus}>
-                      <SelectTrigger><SelectValue placeholder={ticket.status ?? "Select a status"} /></SelectTrigger>
+                      <SelectTrigger>
+                        <SelectValue placeholder={ticket.status ?? "Select a status"} />
+                      </SelectTrigger>
                       <SelectContent>
-                        {STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        {STATUS_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {s}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -694,7 +982,8 @@ function TicketDetailSheet({
                       placeholder="What was done to resolve this ticket?"
                     />
                     <p className="text-xs text-muted-foreground">
-                      Notes are added to the ticket in Freshdesk as a private note and recorded in the audit log.
+                      Notes are added to the ticket in Freshdesk as a private note and recorded in
+                      the audit log.
                     </p>
                   </div>
                   <Button
@@ -709,25 +998,27 @@ function TicketDetailSheet({
             </TabsContent>
 
             <TabsContent value="timeline" className="space-y-3">
-              {history.isLoading && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Loading history…
-                </div>
-              )}
+              {history.isLoading && <LoadingState thing="history" inCard />}
               {history.isError && (
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Could not load history</AlertTitle>
                   <AlertDescription className="space-y-2">
-                    <p>{history.error instanceof Error ? history.error.message : "Unknown error"}</p>
-                    <Button size="sm" variant="outline" onClick={() => history.refetch()}>Retry</Button>
+                    <p>
+                      {history.error instanceof Error ? history.error.message : "Unknown error"}
+                    </p>
+                    <Button size="sm" variant="outline" onClick={() => history.refetch()}>
+                      Retry
+                    </Button>
                   </AlertDescription>
                 </Alert>
               )}
               {history.data && (
                 <div className="space-y-3">
                   {history.data.actions.length === 0 && history.data.conversations.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No activity recorded for this ticket yet.</p>
+                    <p className="text-sm text-muted-foreground">
+                      No activity recorded for this ticket yet.
+                    </p>
                   )}
                   {history.data.actions.map((a) => (
                     <div key={a.id} className="rounded-md border p-3 text-sm">
@@ -742,20 +1033,32 @@ function TicketDetailSheet({
                           {a.field_name}: {a.old_value ?? "—"} → {a.new_value ?? "—"}
                         </p>
                       )}
-                      {a.resolution_note && <p className="mt-1 whitespace-pre-wrap">{a.resolution_note}</p>}
-                      <p className="mt-1 text-xs text-muted-foreground">by {a.actor_email ?? "unknown"}</p>
+                      {a.resolution_note && (
+                        <p className="mt-1 whitespace-pre-wrap">{a.resolution_note}</p>
+                      )}
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        by {a.actor_email ?? "unknown"}
+                      </p>
                     </div>
                   ))}
                   {history.data.conversations.length > 0 && <Separator />}
                   {history.data.conversations.map((c) => (
                     <div key={c.id} className="rounded-md border p-3 text-sm">
                       <div className="flex items-center justify-between gap-2">
-                        <Badge variant="outline">{c.incoming ? "Customer reply" : c.private ? "Private note" : "Agent reply"}</Badge>
+                        <Badge variant="outline">
+                          {c.incoming
+                            ? "Customer reply"
+                            : c.private
+                              ? "Private note"
+                              : "Agent reply"}
+                        </Badge>
                         <span className="text-xs text-muted-foreground">
                           {c.created_at ? format(new Date(c.created_at), "dd MMM yyyy HH:mm") : "—"}
                         </span>
                       </div>
-                      {c.from_email && <p className="mt-1 text-xs text-muted-foreground">{c.from_email}</p>}
+                      {c.from_email && (
+                        <p className="mt-1 text-xs text-muted-foreground">{c.from_email}</p>
+                      )}
                       {c.body_text && <p className="mt-1 whitespace-pre-wrap">{c.body_text}</p>}
                     </div>
                   ))}
@@ -771,20 +1074,6 @@ function TicketDetailSheet({
         )}
       </SheetContent>
     </Sheet>
-  );
-}
-
-function FilterSelect({
-  label, value, onChange, options,
-}: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger><SelectValue placeholder={label} /></SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">All {label.toLowerCase()}</SelectItem>
-        {options.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-      </SelectContent>
-    </Select>
   );
 }
 
@@ -805,252 +1094,274 @@ function SupportTicketsSummary({
   onSyncNow,
 }: {
   rows: TicketRow[];
-  counts: {
-    total: number;
-    open: number;
-    pending: number;
-    resolved: number;
-    closed: number;
-    overdue: number;
-    escalated: number;
-  };
+  counts: TicketCounts;
   canSync: boolean;
   syncPending: boolean;
   onSyncNow: () => void;
 }) {
-  const now = Date.now();
-  const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
-  const resolvedLast7 = rows.filter(
-    (row) =>
-      row.ticket_updated_at &&
-      new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo &&
-      row.status === "Resolved",
-  ).length;
-  const closedLast7 = rows.filter(
-    (row) =>
-      row.ticket_updated_at &&
-      new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo &&
-      row.status === "Closed",
-  ).length;
-  const dueResolvedRows = rows.filter(
-    (row) =>
-      row.ticket_updated_at &&
-      row.due_by &&
-      ["Resolved", "Closed"].includes(row.status ?? "") &&
-      new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo,
-  );
-  const resolvedWithinDue = dueResolvedRows.filter(
-    (row) => new Date(row.ticket_updated_at as string).getTime() <= new Date(row.due_by as string).getTime(),
-  ).length;
-  const resolvedWithinDuePct =
-    dueResolvedRows.length > 0 ? Math.round((resolvedWithinDue / dueResolvedRows.length) * 100) : 0;
-
-  const resolutionDurationsHours = rows
-    .filter(
-      (row) =>
-        row.ticket_created_at &&
-        row.ticket_updated_at &&
-        ["Resolved", "Closed"].includes(row.status ?? "") &&
-        new Date(row.ticket_updated_at).getTime() >= sevenDaysAgo,
-    )
-    .map(
-      (row) =>
-        (new Date(row.ticket_updated_at as string).getTime() - new Date(row.ticket_created_at as string).getTime()) /
-        (1000 * 60 * 60),
-    );
-  const avgResolutionHours =
-    resolutionDurationsHours.length > 0
-      ? resolutionDurationsHours.reduce((sum, value) => sum + value, 0) / resolutionDurationsHours.length
-      : 0;
-
-  const dueTodayCount = rows.filter((row) => {
-    if (!row.due_by || ["Resolved", "Closed"].includes(row.status ?? "")) return false;
-    const due = new Date(row.due_by);
-    const current = new Date();
-    return (
-      due.getUTCFullYear() === current.getUTCFullYear() &&
-      due.getUTCMonth() === current.getUTCMonth() &&
-      due.getUTCDate() === current.getUTCDate()
-    );
-  }).length;
-  const dueThisWeekCount = rows.filter((row) => {
-    if (!row.due_by || ["Resolved", "Closed"].includes(row.status ?? "")) return false;
-    const dueTs = new Date(row.due_by).getTime();
-    return dueTs >= now && dueTs <= now + 7 * 24 * 60 * 60 * 1000;
-  }).length;
-
-  const byPriority = tallyBy(rows, (row) => row.priority ?? "Unassigned");
-  const byAgent = tallyBy(rows, (row) => row.agent_name ?? "Unassigned").slice(0, 6);
-  const byCustomer = tallyBy(rows, (row) => row.company_name ?? "Unknown").slice(0, 6);
-
-  const weeklyTrend = buildWeeklyTrend(rows);
-  const recentActivity = [...rows]
-    .sort(
-      (a, b) =>
-        new Date(b.ticket_updated_at ?? b.ticket_created_at ?? 0).getTime() -
-        new Date(a.ticket_updated_at ?? a.ticket_created_at ?? 0).getTime(),
-    )
-    .slice(0, 6);
+  // SCRUM-128 C7: every number comes from lib/tickets-summary.ts (moved verbatim, pinned by
+  // lib/__tests__/tickets-summary.test.ts). Periods: kpi-period.ts tickets.* rules.
+  const {
+    resolvedLast7,
+    closedLast7,
+    dueResolvedCount,
+    resolvedWithinDue,
+    resolvedWithinDuePct,
+    avgResolutionHours,
+    dueTodayCount,
+    dueThisWeekCount,
+    byPriority,
+    byAgent,
+    byCustomer,
+    weeklyTrend,
+    recentActivity,
+  } = ticketSummaryMetrics(rows);
+  const nowPeriod = kpiPeriodFor("tickets.state");
+  const last7Period = kpiPeriodFor("tickets.last7");
+  const todayPeriod = kpiPeriodFor("tickets.dueToday");
+  const statusTiles: { label: string; value: number; quick: Quick }[] = [
+    { label: "Open", value: counts.open, quick: "open" },
+    { label: "Pending", value: counts.pending, quick: "pending" },
+    { label: "Overdue", value: counts.overdue, quick: "overdue" },
+    { label: "Escalated", value: counts.escalated, quick: "escalated" },
+    { label: "Resolved", value: counts.resolved, quick: "resolved" },
+    { label: "Closed", value: counts.closed, quick: "closed" },
+  ];
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-2">
-          <div>
-            <CardTitle className="text-base">Support tickets summary</CardTitle>
-            <CardDescription>At-a-glance support health with one-click drill-downs into the list.</CardDescription>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" asChild>
-              <Link to="/tickets" search={{ quick: "all", view: "all" }}>
-                Open full list
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            <SummaryLinkCard label="Open" value={counts.open} quick="open" />
-            <SummaryLinkCard label="Pending" value={counts.pending} quick="pending" />
-            <SummaryLinkCard label="Overdue" value={counts.overdue} quick="overdue" />
-            <SummaryLinkCard label="Escalated" value={counts.escalated} quick="escalated" />
-            <SummaryLinkCard label="Resolved" value={counts.resolved} quick="resolved" />
-            <SummaryLinkCard label="Closed" value={counts.closed} quick="closed" />
-          </div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-sm font-semibold">Summary</h2>
+          <p className="text-sm text-muted-foreground">
+            At-a-glance support health with one-click drill-downs into the list.
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Button size="sm" variant="outline" asChild>
+            <Link to="/tickets" search={{ quick: "all", view: "all" }}>
+              Open full list
+            </Link>
+          </Button>
+        </div>
+      </div>
 
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <MetricCard label="Resolved (last 7 days)" value={resolvedLast7.toLocaleString()} />
-            <MetricCard label="Closed (last 7 days)" value={closedLast7.toLocaleString()} />
-            <MetricCard label="Avg resolution time" value={`${avgResolutionHours.toFixed(1)} h`} />
-            <MetricCard
-              label="Resolved within due by"
-              value={`${resolvedWithinDuePct}%`}
-              sublabel={`${resolvedWithinDue.toLocaleString()} of ${dueResolvedRows.length.toLocaleString()}`}
-            />
-          </div>
+      <KpiGrid>
+        {statusTiles.map((tile) => (
+          <SummaryKpi
+            key={tile.quick}
+            label={tile.label}
+            value={tile.value.toLocaleString()}
+            period={nowPeriod}
+            to="/tickets"
+            search={{ quick: tile.quick, view: "all" }}
+          />
+        ))}
+      </KpiGrid>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Card className="border-dashed">
-              <CardHeader>
-                <CardTitle className="text-sm">Due-by status</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-2 sm:grid-cols-3">
-                <MetricCard label="Overdue" value={counts.overdue.toLocaleString()} />
-                <MetricCard label="Due today" value={dueTodayCount.toLocaleString()} />
-                <MetricCard label="Due in next 7 days" value={dueThisWeekCount.toLocaleString()} />
-              </CardContent>
-            </Card>
-            <Card className="border-dashed">
-              <CardHeader>
-                <CardTitle className="text-sm">Freshdesk ticket sync</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="text-sm text-muted-foreground">
-                  Keep support data current before review captures and triage actions.
-                </div>
-                <div className="flex items-center gap-2">
-                  {canSync && (
-                    <Button size="sm" onClick={onSyncNow} disabled={syncPending}>
-                      {syncPending ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-                      Sync now
-                    </Button>
-                  )}
-                  <span className="text-xs text-muted-foreground">
-                    Sync now is available to Super Admin.
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </CardContent>
-      </Card>
+      <KpiGrid>
+        <SummaryKpi
+          label="Resolved recently"
+          value={resolvedLast7.toLocaleString()}
+          period={last7Period}
+        />
+        <SummaryKpi
+          label="Closed recently"
+          value={closedLast7.toLocaleString()}
+          period={last7Period}
+        />
+        <SummaryKpi
+          label="Avg resolution time"
+          value={`${avgResolutionHours.toFixed(1)} h`}
+          period={last7Period}
+        />
+        <SummaryKpi
+          label="Resolved within due by"
+          value={`${resolvedWithinDuePct}%`}
+          period={last7Period}
+          subline={`${resolvedWithinDue.toLocaleString()} of ${dueResolvedCount.toLocaleString()}`}
+        />
+      </KpiGrid>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <SummaryChartCard title="Tickets by priority">
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie data={byPriority} dataKey="value" nameKey="name" outerRadius={85} innerRadius={54}>
-                {byPriority.map((_, idx) => (
-                  <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-              <Legend />
-              <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-foreground text-xs font-semibold">
-                {fmtNumber(rows.length)}
-              </text>
-            </PieChart>
-          </ResponsiveContainer>
-        </SummaryChartCard>
-        <SummaryChartCard title="Opened vs resolved (weekly)">
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={weeklyTrend}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis dataKey="week" fontSize={11} />
-              <YAxis fontSize={11} allowDecimals={false} domain={[0, "auto"]} />
-              <Tooltip />
-              <Legend />
-              <Line type="linear" dataKey="opened" name="Opened" stroke="var(--chart-1)" strokeWidth={2} />
-              <Line type="linear" dataKey="resolved" name="Resolved/Closed" stroke="var(--chart-3)" strokeWidth={2} />
-            </LineChart>
-          </ResponsiveContainer>
-        </SummaryChartCard>
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle className="text-sm">Due-by status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <KpiGrid inset>
+              <SummaryKpi
+                variant="inset"
+                label="Overdue"
+                value={counts.overdue.toLocaleString()}
+                period={nowPeriod}
+              />
+              <SummaryKpi
+                variant="inset"
+                label="Due"
+                value={dueTodayCount.toLocaleString()}
+                period={todayPeriod}
+              />
+              <SummaryKpi
+                variant="inset"
+                label="Due in next 7 days"
+                value={dueThisWeekCount.toLocaleString()}
+                period={nowPeriod}
+              />
+            </KpiGrid>
+          </CardContent>
+        </Card>
+        <Card className="min-w-0">
+          <CardHeader>
+            <CardTitle className="text-sm">Freshdesk ticket sync</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              Keep support data current before review captures and triage actions.
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {canSync && (
+                <Button size="sm" onClick={onSyncNow} disabled={syncPending}>
+                  {syncPending ? <Loader2 className="mr-1 size-4 animate-spin" /> : null}
+                  Sync now
+                </Button>
+              )}
+              <span className="text-xs text-muted-foreground">
+                Sync now is available to Super Admin and Ops Lead.
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <ChartCard title="Tickets by priority" description={`${fmtNumber(rows.length)} tickets`}>
+          {byPriority.length === 0 ? (
+            <NoDataYet />
+          ) : (
+            <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+              <PieChart>
+                <Pie
+                  data={byPriority}
+                  dataKey="value"
+                  nameKey="name"
+                  outerRadius={85}
+                  innerRadius={54}
+                  {...PIE_SLICE_STROKE}
+                >
+                  {byPriority.map((_, idx) => (
+                    <Cell key={idx} fill={chartSeriesColor(idx)} />
+                  ))}
+                </Pie>
+                <Tooltip {...CHART_TOOLTIP} />
+                <Legend />
+                <text
+                  x="50%"
+                  y="50%"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  className="fill-foreground text-xs font-semibold"
+                >
+                  {fmtNumber(rows.length)}
+                </text>
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
+        <ChartCard title="Opened vs resolved (weekly)" description="Last 8 weeks">
+          {rows.length === 0 ? (
+            <NoDataYet />
+          ) : (
+            <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+              <LineChart data={weeklyTrend}>
+                <CartesianGrid {...CHART_GRID} />
+                <XAxis dataKey="week" tick={CHART_AXIS_TICK} />
+                <YAxis tick={CHART_AXIS_TICK} allowDecimals={false} domain={[0, "auto"]} />
+                <Tooltip {...CHART_TOOLTIP} />
+                <Legend />
+                <Line
+                  type="linear"
+                  dataKey="opened"
+                  name="Opened"
+                  stroke={chartSeriesColor(0)}
+                  strokeWidth={2}
+                />
+                <Line
+                  type="linear"
+                  dataKey="resolved"
+                  name="Resolved/Closed"
+                  stroke={chartSeriesColor(1)}
+                  strokeWidth={2}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </ChartCard>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="text-sm">Recent ticket activity</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            {recentActivity.length === 0 && <NoDataYet compact />}
             {recentActivity.map((ticket) => (
-              <button
+              <div
                 key={ticket.id}
-                type="button"
-                className="w-full rounded-md border border-border px-3 py-2 text-left hover:bg-muted/30"
+                className="w-full rounded-md border border-border px-3 py-2 text-left"
               >
-                <div className="text-sm font-medium">#{ticket.id} · {ticket.subject ?? "—"}</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {ticket.company_name ?? "Unknown"} · {ticket.status ?? "—"} · {ticket.priority ?? "—"}
+                <div className="truncate text-sm font-medium">
+                  #{ticket.id} · {ticket.subject ?? "—"}
                 </div>
-              </button>
+                <div className="mt-1 truncate text-xs text-muted-foreground">
+                  {ticket.company_name ?? "Unknown"} · {ticket.status ?? "—"} ·{" "}
+                  {ticket.priority ?? "—"}
+                </div>
+              </div>
             ))}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="text-sm">Tickets by agent</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            {byAgent.length === 0 && <NoDataYet compact />}
             {byAgent.map((entry) => (
               <Link
                 key={entry.name}
                 to="/tickets"
                 search={{ quick: "all", view: "all" }}
-                className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+                className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 hover:bg-muted/30"
               >
-                <span className="text-sm">{entry.name}</span>
-                <Badge variant="outline">{entry.value.toLocaleString()}</Badge>
+                <span className="truncate text-sm">{entry.name}</span>
+                <Badge variant="outline" className="shrink-0 tabular-nums">
+                  {entry.value.toLocaleString()}
+                </Badge>
               </Link>
             ))}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="min-w-0">
           <CardHeader>
             <CardTitle className="text-sm">Tickets by customer</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
+            {byCustomer.length === 0 && <NoDataYet compact />}
             {byCustomer.map((entry) => (
               <Link
                 key={entry.name}
                 to="/tickets"
                 search={{ quick: "all", view: "all" }}
-                className="flex items-center justify-between rounded-md border border-border px-3 py-2 hover:bg-muted/30"
+                className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2 hover:bg-muted/30"
               >
-                <span className="text-sm">{entry.name}</span>
-                <Badge variant="outline">{entry.value.toLocaleString()}</Badge>
+                <span className="truncate text-sm">{entry.name}</span>
+                <Badge variant="outline" className="shrink-0 tabular-nums">
+                  {entry.value.toLocaleString()}
+                </Badge>
               </Link>
             ))}
           </CardContent>
@@ -1058,81 +1369,4 @@ function SupportTicketsSummary({
       </div>
     </div>
   );
-}
-
-function SummaryLinkCard({ label, value, quick }: { label: string; value: number; quick: Quick }) {
-  return (
-    <Link
-      to="/tickets"
-      search={{ quick, view: "all" }}
-      className="rounded-md border border-border px-3 py-2 transition hover:bg-muted/30"
-    >
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-xl font-semibold">{value.toLocaleString()}</div>
-    </Link>
-  );
-}
-
-function MetricCard({ label, value, sublabel }: { label: string; value: string; sublabel?: string }) {
-  return (
-    <div className="rounded-md border border-border p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-lg font-semibold">{value}</div>
-      {sublabel && <div className="mt-1 text-xs text-muted-foreground">{sublabel}</div>}
-    </div>
-  );
-}
-
-function SummaryChartCard({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-sm">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  );
-}
-
-function tallyBy(rows: TicketRow[], key: (row: TicketRow) => string) {
-  const map = new Map<string, number>();
-  for (const row of rows) {
-    const value = key(row);
-    map.set(value, (map.get(value) ?? 0) + 1);
-  }
-  return [...map.entries()]
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
-}
-
-function buildWeeklyTrend(rows: TicketRow[]) {
-  const now = new Date();
-  const buckets: { week: string; opened: number; resolved: number }[] = [];
-  for (let index = 7; index >= 0; index--) {
-    const start = new Date(now);
-    start.setDate(now.getDate() - index * 7);
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    buckets.push({
-      week: `${String(start.getMonth() + 1).padStart(2, "0")}/${String(start.getDate()).padStart(2, "0")}`,
-      opened: 0,
-      resolved: 0,
-    });
-    rows.forEach((row) => {
-      const created = row.ticket_created_at ? new Date(row.ticket_created_at).getTime() : null;
-      const updated = row.ticket_updated_at ? new Date(row.ticket_updated_at).getTime() : null;
-      const startTs = start.getTime();
-      const endTs = end.getTime() + 24 * 60 * 60 * 1000;
-      if (created && created >= startTs && created < endTs) buckets[buckets.length - 1].opened += 1;
-      if (
-        updated &&
-        updated >= startTs &&
-        updated < endTs &&
-        ["Resolved", "Closed"].includes(row.status ?? "")
-      ) {
-        buckets[buckets.length - 1].resolved += 1;
-      }
-    });
-  }
-  return buckets;
 }

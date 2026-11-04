@@ -31,6 +31,8 @@ function oauth(): OAuthNamespace {
 
 export const Route = createFileRoute("/.lovable/oauth/consent")({
   ssr: false,
+  // N9: tab title (none before).
+  head: () => ({ meta: [{ title: "Authorize access · MakeMyLabs" }] }),
   validateSearch: (s: Record<string, unknown>) => ({
     authorization_id: typeof s.authorization_id === "string" ? s.authorization_id : "",
   }),
@@ -52,13 +54,15 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
   },
   component: Consent,
   errorComponent: ({ error }) => (
-    <main className="min-h-screen grid place-items-center p-6">
-      <Card className="max-w-md">
+    <main className="grid min-h-screen place-items-center bg-background p-4">
+      <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Authorization request could not be loaded</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">{String((error as Error)?.message ?? error)}</p>
+          <p className="text-sm text-muted-foreground">
+            {String((error as Error)?.message ?? error)}
+          </p>
         </CardContent>
       </Card>
     </main>
@@ -96,12 +100,14 @@ function Consent() {
   const scope = details?.scope;
 
   return (
-    <main className="min-h-screen grid place-items-center bg-gradient-to-br from-background to-secondary p-4">
-      <Card className="w-full max-w-md shadow-xl">
+    // §3.6 standalone layout: plain background and the Card primitive's own shadow.
+    <main className="grid min-h-screen place-items-center bg-background p-4">
+      <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Connect {clientName} to MakeMyLabs</CardTitle>
           <CardDescription>
-            This lets {clientName} use the MakeMyLabs transaction platform as you. It does not bypass this app's roles or backend policies.
+            This lets {clientName} use the MakeMyLabs transaction platform as you. It does not
+            bypass this app's roles or backend policies.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -118,12 +124,21 @@ function Consent() {
               Redirects back to: {redirectUri}
             </div>
           )}
-          {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
-          <div className="flex gap-2 justify-end">
-            <Button variant="outline" disabled={busy} onClick={() => decide(false)}>
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              disabled={busy}
+              onClick={() => decide(false)}
+            >
               Cancel connection
             </Button>
-            <Button disabled={busy} onClick={() => decide(true)}>
+            <Button className="w-full sm:w-auto" disabled={busy} onClick={() => decide(true)}>
               {busy ? "Working…" : "Approve"}
             </Button>
           </div>

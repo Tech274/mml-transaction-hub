@@ -5,13 +5,6 @@ import { readAllRows } from "@/lib/read-all";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -21,22 +14,45 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Download, ArrowUp, ArrowDown, AlertCircle, Loader2 } from "lucide-react";
+import { Download, ArrowUp, ArrowDown, AlertCircle } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { fmtCurrency, fmtNumber, MONTH_NAMES, YEARS } from "@/lib/format";
+import { fmtCurrency, fmtNumber, YEARS } from "@/lib/format";
 import { addNullable } from "@/lib/nullable-sum";
 import {
   computeTotals,
-  groupByKey,
   computeForecast,
   forecastByDimension,
   costBasisCounts,
   reportLineCost,
   type ReportRow,
 } from "@/lib/reports-metrics";
+import {
+  REPORTS_ALL,
+  filterReportRows,
+  reportsByMonthProvider,
+  reportsCustomers,
+  reportsFilterPeriod,
+  reportsMarginByLob,
+  reportsMarginByProvider,
+  reportsProviderTotals,
+  reportsTopLabs,
+} from "@/lib/reports-view-data";
 import { COST_BASIS_LABEL } from "@/lib/cost-calculator";
 import { useAuth } from "@/lib/auth-context";
 import { exportToExcel } from "@/lib/export-xlsx";
+import { FilterBar, FilterSelect, FilterSummary } from "@/components/filter-bar";
+import { KpiGrid, SummaryKpi } from "@/components/summaries/summary-kpi";
+import { ChartCard } from "@/components/summaries/chart-card";
+import { NoDataYet } from "@/components/summaries/no-data-yet";
+import { LoadingState } from "@/components/page-states";
+import { TableStateRow } from "@/components/data-table-parts";
+import {
+  CHART_AXIS_TICK,
+  CHART_GRID,
+  CHART_HEIGHT,
+  CHART_TOOLTIP,
+  chartSeriesColor,
+} from "@/lib/chart-standard";
 import {
   BarChart,
   Bar,
@@ -52,15 +68,7 @@ import {
 
 type Row = ReportRow;
 
-const COLORS = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
-  "hsl(var(--muted-foreground))",
-];
-const ALL = "__all__";
+const ALL = REPORTS_ALL;
 
 export function ReportsView() {
   const [year, setYear] = useState<string>(String(new Date().getFullYear()));
@@ -97,14 +105,10 @@ export function ReportsView() {
     [rows],
   );
 
+  // SCRUM-128 C7: the aggregations moved verbatim to lib/reports-view-data.ts (pinned by
+  // lib/__tests__/reports-view-data.test.ts).
   const filtered = useMemo(
-    () =>
-      rows.filter(
-        (r) =>
-          (year === ALL || r.year === Number(year)) &&
-          (provider === ALL || r.cloud_provider === provider) &&
-          (lob === ALL || r.line_of_business === lob),
-      ),
+    () => filterReportRows(rows, year, provider, lob),
     [rows, year, provider, lob],
   );
 
@@ -118,130 +122,13 @@ export function ReportsView() {
     [drill, filtered],
   );
 
-  // Cloud cost by provider × month
-  const byMonthProvider = useMemo(() => {
-    const providerSet = Array.from(
-      new Set(filtered.map((r) => r.cloud_provider).filter(Boolean)),
-    ).sort();
-    return {
-      providers: providerSet,
-      data: MONTH_NAMES.map((label, i) => {
-        const rec: Record<string, string | number> = { month: label };
-        for (const p of providerSet) {
-          rec[p] = filtered
-            .filter((r) => r.month === i + 1 && r.cloud_provider === p)
-            .reduce((s, r) => addNullable(s, r.selling_cost), 0);
-        }
-        return rec;
-      }),
-    };
-  }, [filtered]);
-
-  const topLabs = useMemo(() => {
-    const map = new Map<string, { lab: string; provider: string; spend: number; users: number }>();
-    for (const r of filtered) {
-      const key = `${r.lab_name}||${r.cloud_provider}`;
-      const cur = map.get(key) ?? {
-        lab: r.lab_name,
-        provider: r.cloud_provider,
-        spend: 0,
-        users: 0,
-      };
-      cur.spend = addNullable(cur.spend, r.selling_cost);
-      cur.users = addNullable(cur.users, r.total_users);
-      map.set(key, cur);
-    }
-    return Array.from(map.values())
-      .sort((a, b) => b.spend - a.spend)
-      .slice(0, 10);
-  }, [filtered]);
-
-  const providerTotals = useMemo(() => {
-    const map = new Map<
-      string,
-      { provider: string; spend: number; cost: number; profit: number }
-    >();
-    for (const r of filtered) {
-      const cur = map.get(r.cloud_provider) ?? {
-        provider: r.cloud_provider,
-        spend: 0,
-        cost: 0,
-        profit: 0,
-      };
-      cur.spend = addNullable(cur.spend, r.selling_cost);
-      cur.cost = addNullable(cur.cost, reportLineCost(r));
-      cur.profit = cur.spend - cur.cost;
-      map.set(r.cloud_provider, cur);
-    }
-    return Array.from(map.values()).sort((a, b) => b.spend - a.spend);
-  }, [filtered]);
-
-  // Customer profitability
-  const customers = useMemo(() => {
-    const map = new Map<
-      string,
-      {
-        customer: string;
-        revenue: number;
-        cost: number;
-        profit: number;
-        margin: number;
-        tx: number;
-        users: number;
-      }
-    >();
-    for (const r of filtered) {
-      const cur = map.get(r.customer_name) ?? {
-        customer: r.customer_name,
-        revenue: 0,
-        cost: 0,
-        profit: 0,
-        margin: 0,
-        tx: 0,
-        users: 0,
-      };
-      cur.revenue = addNullable(cur.revenue, r.selling_cost);
-      cur.cost = addNullable(cur.cost, reportLineCost(r));
-      cur.tx += 1;
-      cur.users = addNullable(cur.users, r.total_users);
-      cur.profit = cur.revenue - cur.cost;
-      cur.margin = cur.revenue > 0 ? (cur.profit / cur.revenue) * 100 : 0;
-      map.set(r.customer_name, cur);
-    }
-    return Array.from(map.values()).sort((a, b) => b.profit - a.profit);
-  }, [filtered]);
-
-  // Margin analysis by LOB and provider
-  const marginByLob = useMemo(() => {
-    const map = new Map<string, { key: string; revenue: number; cost: number }>();
-    for (const r of filtered) {
-      const cur = map.get(r.line_of_business) ?? { key: r.line_of_business, revenue: 0, cost: 0 };
-      cur.revenue = addNullable(cur.revenue, r.selling_cost);
-      cur.cost = addNullable(cur.cost, reportLineCost(r));
-      map.set(r.line_of_business, cur);
-    }
-    return Array.from(map.values())
-      .map((x) => ({
-        key: x.key,
-        revenue: x.revenue,
-        cost: x.cost,
-        profit: x.revenue - x.cost,
-        margin: x.revenue > 0 ? ((x.revenue - x.cost) / x.revenue) * 100 : 0,
-      }))
-      .sort((a, b) => b.revenue - a.revenue);
-  }, [filtered]);
-
-  const marginByProvider = useMemo(
-    () =>
-      providerTotals.map((p) => ({
-        key: p.provider,
-        revenue: p.spend,
-        cost: p.cost,
-        profit: p.profit,
-        margin: p.spend > 0 ? (p.profit / p.spend) * 100 : 0,
-      })),
-    [providerTotals],
-  );
+  const byMonthProvider = useMemo(() => reportsByMonthProvider(filtered), [filtered]);
+  const topLabs = useMemo(() => reportsTopLabs(filtered), [filtered]);
+  const providerTotals = useMemo(() => reportsProviderTotals(filtered), [filtered]);
+  const customers = useMemo(() => reportsCustomers(filtered), [filtered]);
+  const marginByLob = useMemo(() => reportsMarginByLob(filtered), [filtered]);
+  const marginByProvider = useMemo(() => reportsMarginByProvider(providerTotals), [providerTotals]);
+  const kpiPeriod = reportsFilterPeriod(year);
 
   const totals = useMemo(() => computeTotals(filtered), [filtered]);
   const basis = useMemo(() => costBasisCounts(filtered), [filtered]);
@@ -372,63 +259,66 @@ export function ReportsView() {
 
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <Card>
-        <CardContent className="flex flex-wrap gap-3 py-4">
-          <FilterSelect
-            label="Year"
-            value={year}
-            onChange={setYear}
-            options={[
-              { value: ALL, label: "All years" },
-              ...YEARS.map((y) => ({ value: String(y), label: String(y) })),
+      <FilterBar
+        summary={
+          <FilterSummary
+            items={[
+              {
+                label: "Transactions in scope",
+                value: isLoading ? "…" : fmtNumber(totals.count),
+              },
             ]}
           />
-          <FilterSelect
-            label="Cloud provider"
-            value={provider}
-            onChange={setProvider}
-            options={[
-              { value: ALL, label: "All providers" },
-              ...providers.map((p) => ({ value: p, label: p })),
-            ]}
-          />
-          <FilterSelect
-            label="Line of business"
-            value={lob}
-            onChange={setLob}
-            options={[
-              { value: ALL, label: "All LOB" },
-              ...lobs.map((l) => ({ value: l, label: l })),
-            ]}
-          />
-          <div className="ml-auto text-xs text-muted-foreground self-center">
-            {isLoading ? "Loading…" : `${fmtNumber(totals.count)} transactions in scope`}
-          </div>
-        </CardContent>
-      </Card>
+        }
+      >
+        <FilterSelect
+          label="Year"
+          value={year}
+          onValueChange={setYear}
+          allValue={ALL}
+          allLabel="All years"
+          options={YEARS.map((y) => ({ value: String(y), label: String(y) }))}
+        />
+        <FilterSelect
+          label="Cloud provider"
+          width="md"
+          value={provider}
+          onValueChange={setProvider}
+          allValue={ALL}
+          allLabel="All providers"
+          options={providers.map((p) => ({ value: p, label: p }))}
+        />
+        <FilterSelect
+          label="Line of business"
+          width="md"
+          value={lob}
+          onValueChange={setLob}
+          allValue={ALL}
+          allLabel="All LOB"
+          options={lobs.map((l) => ({ value: l, label: l }))}
+        />
+      </FilterBar>
 
       {isError && (
         <Alert variant="destructive" data-testid="reports-error">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Failed to load reports data</AlertTitle>
-          <AlertDescription className="flex items-center justify-between gap-3">
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
             <span className="truncate">{errMsg || "Unknown error"}</span>
             <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching}>
-              {isFetching ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
-              Retry
+              {isFetching ? "Retrying…" : "Retry"}
             </Button>
           </AlertDescription>
         </Alert>
       )}
 
       {/* Totals strip */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Kpi label="Revenue" value={fmtCurrency(totals.revenue)} />
-        <Kpi label="Input cost" value={fmtCurrency(totals.cost)} />
-        <Kpi label="Profit" value={fmtCurrency(totals.profit)} />
-        <Kpi label="Margin" value={`${totals.margin.toFixed(1)}%`} />
-      </div>
+      <KpiGrid>
+        <SummaryKpi label="Revenue" value={fmtCurrency(totals.revenue)} period={kpiPeriod} />
+        <SummaryKpi label="Input cost" value={fmtCurrency(totals.cost)} period={kpiPeriod} />
+        <SummaryKpi label="Profit" value={fmtCurrency(totals.profit)} period={kpiPeriod} />
+        <SummaryKpi label="Margin" value={`${totals.margin.toFixed(1)}%`} period={kpiPeriod} />
+      </KpiGrid>
       <p className="text-xs text-muted-foreground" data-testid="reports-cost-basis">
         Input cost uses actual, then entered, then auto-filled. {COST_BASIS_LABEL.actual}{" "}
         {basis.actual} · {COST_BASIS_LABEL.entered} {basis.entered} · {COST_BASIS_LABEL.auto_avg}{" "}
@@ -437,16 +327,16 @@ export function ReportsView() {
       <HybridSolutionsCard />
 
       <Tabs defaultValue="cost" className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="overflow-x-auto">
           <TabsList>
-            <TabsTrigger value="cost">Cloud Cost</TabsTrigger>
-            <TabsTrigger value="customer">Customer Profitability</TabsTrigger>
-            <TabsTrigger value="margin">Margin Analysis</TabsTrigger>
-            <TabsTrigger value="forecast">Revenue Forecast</TabsTrigger>
+            <TabsTrigger value="cost">Cloud cost</TabsTrigger>
+            <TabsTrigger value="customer">Customer profitability</TabsTrigger>
+            <TabsTrigger value="margin">Margin analysis</TabsTrigger>
+            <TabsTrigger value="forecast">Revenue forecast</TabsTrigger>
           </TabsList>
         </div>
 
-        {/* Cloud Cost */}
+        {/* Cloud cost */}
         <TabsContent value="cost" className="space-y-4">
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={() => exportTab("cost")}>
@@ -454,32 +344,41 @@ export function ReportsView() {
               Export Excel
             </Button>
           </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Spend by provider — monthly</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
+          <ChartCard
+            title="Spend by provider — monthly"
+            description={year === ALL ? "All years, by calendar month" : `Year ${year}`}
+          >
+            {isLoading ? (
+              <LoadingState thing="spend" inCard />
+            ) : byMonthProvider.providers.length === 0 ? (
+              <NoDataYet />
+            ) : (
+              <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
                 <BarChart data={byMonthProvider.data}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="month" />
-                  <YAxis tickFormatter={(v) => fmtCurrency(v as number)} width={90} />
-                  <Tooltip formatter={(v: number) => fmtCurrency(v)} />
+                  <CartesianGrid {...CHART_GRID} />
+                  <XAxis dataKey="month" tick={CHART_AXIS_TICK} />
+                  <YAxis
+                    tick={CHART_AXIS_TICK}
+                    tickFormatter={(v) => fmtCurrency(v as number)}
+                    width={90}
+                  />
+                  <Tooltip {...CHART_TOOLTIP} formatter={(v: number) => fmtCurrency(v)} />
                   <Legend />
                   {byMonthProvider.providers.map((p, i) => (
-                    <Bar key={p} dataKey={p} stackId="a" fill={COLORS[i % COLORS.length]} />
+                    <Bar key={p} dataKey={p} stackId="a" fill={chartSeriesColor(i)} />
                   ))}
                 </BarChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            )}
+          </ChartCard>
 
           <Card>
             <CardHeader>
-              <CardTitle>Provider totals</CardTitle>
+              <CardTitle className="text-sm">Provider totals</CardTitle>
             </CardHeader>
             <CardContent>
               <ReportTable
+                loading={isLoading}
                 headers={["Provider", "Revenue", "Cost", "Profit"]}
                 rows={providerTotals.map((p) => [
                   p.provider,
@@ -497,10 +396,11 @@ export function ReportsView() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Top labs by spend</CardTitle>
+              <CardTitle className="text-sm">Top labs by spend</CardTitle>
             </CardHeader>
             <CardContent>
               <ReportTable
+                loading={isLoading}
                 headers={["Lab", "Provider", "Users", "Spend"]}
                 rows={topLabs.map((l) => [
                   l.lab,
@@ -521,7 +421,7 @@ export function ReportsView() {
           </Card>
         </TabsContent>
 
-        {/* Customer Profitability */}
+        {/* Customer profitability */}
         <TabsContent value="customer" className="space-y-4">
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={() => exportTab("customer")}>
@@ -529,31 +429,37 @@ export function ReportsView() {
               Export Excel
             </Button>
           </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Top 10 customers by profit</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={customers.slice(0, 10)} layout="vertical" margin={{ left: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis type="number" tickFormatter={(v) => fmtCurrency(v as number)} />
-                  <YAxis type="category" dataKey="customer" width={140} />
-                  <Tooltip formatter={(v: number) => fmtCurrency(v)} />
+          <ChartCard title="Top 10 customers by profit">
+            {isLoading ? (
+              <LoadingState thing="customers" inCard />
+            ) : customers.length === 0 ? (
+              <NoDataYet />
+            ) : (
+              <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+                <BarChart data={customers.slice(0, 10)} layout="vertical">
+                  <CartesianGrid {...CHART_GRID} />
+                  <XAxis
+                    type="number"
+                    tick={CHART_AXIS_TICK}
+                    tickFormatter={(v) => fmtCurrency(v as number)}
+                  />
+                  <YAxis type="category" dataKey="customer" width={120} tick={CHART_AXIS_TICK} />
+                  <Tooltip {...CHART_TOOLTIP} formatter={(v: number) => fmtCurrency(v)} />
                   <Legend />
-                  <Bar dataKey="revenue" fill={COLORS[0]} name="Revenue" />
-                  <Bar dataKey="profit" fill={COLORS[1]} name="Profit" />
+                  <Bar dataKey="revenue" fill={chartSeriesColor(0)} name="Revenue" />
+                  <Bar dataKey="profit" fill={chartSeriesColor(1)} name="Profit" />
                 </BarChart>
               </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            )}
+          </ChartCard>
 
           <Card>
             <CardHeader>
-              <CardTitle>Customer profitability</CardTitle>
+              <CardTitle className="text-sm">Customer profitability</CardTitle>
             </CardHeader>
             <CardContent>
               <ReportTable
+                loading={isLoading}
                 headers={["Customer", "Txns", "Users", "Revenue", "Cost", "Profit", "Margin"]}
                 rows={customers.map((c) => [
                   c.customer,
@@ -574,7 +480,7 @@ export function ReportsView() {
           </Card>
         </TabsContent>
 
-        {/* Margin Analysis */}
+        {/* Margin analysis */}
         <TabsContent value="margin" className="space-y-4">
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={() => exportTab("margin")}>
@@ -583,55 +489,60 @@ export function ReportsView() {
             </Button>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Margin % by line of business</CardTitle>
-              </CardHeader>
-              <CardContent className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
+            <ChartCard title="Margin % by line of business">
+              {isLoading ? (
+                <LoadingState thing="margins" inCard />
+              ) : marginByLob.length === 0 ? (
+                <NoDataYet />
+              ) : (
+                <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
                   <BarChart data={marginByLob}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="key" />
-                    <YAxis tickFormatter={(v) => `${v}%`} />
+                    <CartesianGrid {...CHART_GRID} />
+                    <XAxis dataKey="key" tick={CHART_AXIS_TICK} />
+                    <YAxis tick={CHART_AXIS_TICK} tickFormatter={(v) => `${v}%`} />
                     <Tooltip
+                      {...CHART_TOOLTIP}
                       formatter={(v: number, n) =>
                         n === "margin" ? `${v.toFixed(1)}%` : fmtCurrency(v)
                       }
                     />
-                    <Bar dataKey="margin" fill={COLORS[2]} name="Margin %" />
+                    <Bar dataKey="margin" fill={chartSeriesColor(0)} name="Margin %" />
                   </BarChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
+              )}
+            </ChartCard>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Margin % by cloud provider</CardTitle>
-              </CardHeader>
-              <CardContent className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
+            <ChartCard title="Margin % by cloud provider">
+              {isLoading ? (
+                <LoadingState thing="margins" inCard />
+              ) : marginByProvider.length === 0 ? (
+                <NoDataYet />
+              ) : (
+                <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
                   <BarChart data={marginByProvider}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="key" />
-                    <YAxis tickFormatter={(v) => `${v}%`} />
+                    <CartesianGrid {...CHART_GRID} />
+                    <XAxis dataKey="key" tick={CHART_AXIS_TICK} />
+                    <YAxis tick={CHART_AXIS_TICK} tickFormatter={(v) => `${v}%`} />
                     <Tooltip
+                      {...CHART_TOOLTIP}
                       formatter={(v: number, n) =>
                         n === "margin" ? `${v.toFixed(1)}%` : fmtCurrency(v)
                       }
                     />
-                    <Bar dataKey="margin" fill={COLORS[3]} name="Margin %" />
+                    <Bar dataKey="margin" fill={chartSeriesColor(0)} name="Margin %" />
                   </BarChart>
                 </ResponsiveContainer>
-              </CardContent>
-            </Card>
+              )}
+            </ChartCard>
           </div>
 
           <Card>
             <CardHeader>
-              <CardTitle>Margin breakdown by line of business</CardTitle>
+              <CardTitle className="text-sm">Margin breakdown by line of business</CardTitle>
             </CardHeader>
             <CardContent>
               <ReportTable
+                loading={isLoading}
                 headers={["Line of business", "Revenue", "Cost", "Profit", "Margin"]}
                 rows={marginByLob.map((m) => [
                   m.key,
@@ -651,10 +562,11 @@ export function ReportsView() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Margin breakdown by cloud provider</CardTitle>
+              <CardTitle className="text-sm">Margin breakdown by cloud provider</CardTitle>
             </CardHeader>
             <CardContent>
               <ReportTable
+                loading={isLoading}
                 headers={["Provider", "Revenue", "Cost", "Profit", "Margin"]}
                 rows={marginByProvider.map((m) => [
                   m.key,
@@ -673,7 +585,7 @@ export function ReportsView() {
           </Card>
         </TabsContent>
 
-        {/* Revenue Forecast */}
+        {/* Revenue forecast */}
         <TabsContent value="forecast" className="space-y-4">
           <div className="flex justify-end">
             <Button variant="outline" size="sm" onClick={() => exportTab("forecast")}>
@@ -681,55 +593,60 @@ export function ReportsView() {
               Export Excel
             </Button>
           </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>Projected revenue vs cost — next 12 months</CardTitle>
-            </CardHeader>
-            <CardContent className="h-80">
-              {isLoading ? (
-                <div
-                  data-testid="forecast-loading"
-                  className="h-full flex items-center justify-center text-sm text-muted-foreground"
-                >
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading forecast…
-                </div>
-              ) : isError ? (
-                <div
-                  data-testid="forecast-error"
-                  className="h-full flex flex-col items-center justify-center gap-2 text-sm"
-                >
-                  <div className="text-destructive">Could not load forecast data.</div>
-                  <Button size="sm" variant="outline" onClick={() => refetch()}>
-                    Retry
-                  </Button>
-                </div>
-              ) : forecast.every((f) => f.revenue === 0 && f.cost === 0) ? (
-                <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-                  No projected revenue in the next 12 months for the current filters.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={forecast}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="key" />
-                    <YAxis tickFormatter={(v) => fmtCurrency(v as number)} width={90} />
-                    <Tooltip formatter={(v: number) => fmtCurrency(v)} />
-                    <Legend />
-                    <Line type="monotone" dataKey="revenue" stroke={COLORS[0]} name="Revenue" />
-                    <Line type="monotone" dataKey="cost" stroke={COLORS[3]} name="Cost" />
-                    <Line type="monotone" dataKey="profit" stroke={COLORS[1]} name="Profit" />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
-            </CardContent>
-          </Card>
+          <ChartCard title="Projected revenue vs cost — next 12 months">
+            {isLoading ? (
+              <div data-testid="forecast-loading">
+                <LoadingState thing="forecast" inCard />
+              </div>
+            ) : isError ? (
+              <div
+                data-testid="forecast-error"
+                className="flex flex-col items-center gap-2 py-8 text-sm"
+              >
+                <div className="text-destructive">Could not load forecast data.</div>
+                <Button size="sm" variant="outline" onClick={() => refetch()}>
+                  Retry
+                </Button>
+              </div>
+            ) : forecast.every((f) => f.revenue === 0 && f.cost === 0) ? (
+              <NoDataYet message="No projected revenue in the next 12 months for the current filters." />
+            ) : (
+              <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+                <LineChart data={forecast}>
+                  <CartesianGrid {...CHART_GRID} />
+                  <XAxis dataKey="key" tick={CHART_AXIS_TICK} />
+                  <YAxis
+                    tick={CHART_AXIS_TICK}
+                    tickFormatter={(v) => fmtCurrency(v as number)}
+                    width={90}
+                  />
+                  <Tooltip {...CHART_TOOLTIP} formatter={(v: number) => fmtCurrency(v)} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="revenue"
+                    stroke={chartSeriesColor(0)}
+                    name="Revenue"
+                  />
+                  <Line type="monotone" dataKey="cost" stroke={chartSeriesColor(1)} name="Cost" />
+                  <Line
+                    type="monotone"
+                    dataKey="profit"
+                    stroke={chartSeriesColor(2)}
+                    name="Profit"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </ChartCard>
 
           <Card>
             <CardHeader>
-              <CardTitle>Monthly projection</CardTitle>
+              <CardTitle className="text-sm">Monthly projection</CardTitle>
             </CardHeader>
             <CardContent>
               <ReportTable
+                loading={isLoading}
                 headers={["Month", "Revenue", "Cost", "Profit", "Margin"]}
                 rows={forecast.map((f) => [
                   f.key,
@@ -743,33 +660,30 @@ export function ReportsView() {
           </Card>
 
           <div className="grid gap-4 md:grid-cols-3">
-            <ForecastGroupCard title="By customer" data={forecastByCustomer} />
-            <ForecastGroupCard title="By lab" data={forecastByLab} />
-            <ForecastGroupCard title="By provider" data={forecastByProvider} />
+            <ForecastGroupCard loading={isLoading} title="By customer" data={forecastByCustomer} />
+            <ForecastGroupCard loading={isLoading} title="By lab" data={forecastByLab} />
+            <ForecastGroupCard loading={isLoading} title="By provider" data={forecastByProvider} />
           </div>
         </TabsContent>
       </Tabs>
 
       <Dialog open={!!drill} onOpenChange={(o) => !o && setDrill(null)}>
-        <DialogContent className="max-w-5xl">
+        <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>{drill?.title}</DialogTitle>
           </DialogHeader>
           {drill &&
             (isError ? (
               <div data-testid="drill-error" className="py-6 text-sm">
-                <div className="text-destructive mb-2">Could not load underlying transactions.</div>
+                <div className="mb-2 text-destructive">Could not load underlying transactions.</div>
                 <div className="text-muted-foreground mb-3 truncate">{errMsg}</div>
                 <Button size="sm" variant="outline" onClick={() => refetch()}>
                   Retry
                 </Button>
               </div>
             ) : isLoading ? (
-              <div
-                data-testid="drill-loading"
-                className="py-10 flex items-center justify-center text-sm text-muted-foreground"
-              >
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Loading transactions…
+              <div data-testid="drill-loading">
+                <LoadingState thing="transactions" inCard />
               </div>
             ) : (
               <DrillTable rows={drillRows} />
@@ -783,8 +697,10 @@ export function ReportsView() {
 function ForecastGroupCard({
   title,
   data,
+  loading,
 }: {
   title: string;
+  loading: boolean;
   data: { key: string; revenue: number; cost: number; profit: number; margin: number }[];
 }) {
   return (
@@ -794,6 +710,7 @@ function ForecastGroupCard({
       </CardHeader>
       <CardContent>
         <ReportTable
+          loading={loading}
           headers={["Key", "Revenue", "Profit", "Margin"]}
           rows={data
             .slice(0, 10)
@@ -992,7 +909,10 @@ function SortablePaginatedTable<T extends Record<string, unknown>>({
             {paged.map((r, i) => (
               <TableRow key={i}>
                 {columns.map((c, j) => (
-                  <TableCell key={c.key} className={j === 0 ? "font-medium" : ""}>
+                  <TableCell
+                    key={c.key}
+                    className={j === 0 ? "font-medium" : c.numeric ? "tabular-nums" : undefined}
+                  >
                     {c.render ? c.render(r) : String(r[c.key as keyof T] ?? "")}
                   </TableCell>
                 ))}
@@ -1048,17 +968,6 @@ function SortablePaginatedTable<T extends Record<string, unknown>>({
         </div>
       </div>
     </div>
-  );
-}
-
-function Kpi({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="py-4">
-        <div className="text-xs text-muted-foreground">{label}</div>
-        <div className="text-lg font-semibold mt-1">{value}</div>
-      </CardContent>
-    </Card>
   );
 }
 
@@ -1124,10 +1033,10 @@ function HybridSolutionsCard() {
   return (
     <Card data-testid="hybrid-solutions">
       <CardHeader>
-        <CardTitle>Hybrid solutions shipped</CardTitle>
+        <CardTitle className="text-sm">Hybrid solutions shipped</CardTitle>
       </CardHeader>
       <CardContent className="text-sm space-y-1">
-        <div className="text-2xl font-semibold" data-testid="hybrid-count">
+        <div className="text-xl font-semibold tabular-nums" data-testid="hybrid-count">
           {data.count}
         </div>
         <p className="text-xs text-muted-foreground">
@@ -1148,52 +1057,20 @@ function HybridSolutionsCard() {
   );
 }
 
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs text-muted-foreground">{label}</label>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger className="w-[180px]">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
 function ReportTable({
   headers,
   rows,
   empty,
   onRowClick,
+  loading = false,
 }: {
+  /** While the transactions load, show "Loading…" instead of the empty text. */
+  loading?: boolean;
   headers: string[];
   rows: (string | number)[][];
   empty?: string;
   onRowClick?: (index: number) => void;
 }) {
-  if (rows.length === 0) {
-    return (
-      <div className="text-sm text-muted-foreground py-6 text-center">{empty ?? "No data."}</div>
-    );
-  }
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -1205,19 +1082,27 @@ function ReportTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r, i) => (
-            <TableRow
-              key={i}
-              className={onRowClick ? "cursor-pointer hover:bg-muted/50" : undefined}
-              onClick={onRowClick ? () => onRowClick(i) : undefined}
-            >
-              {r.map((c, j) => (
-                <TableCell key={j} className={j === 0 ? "font-medium" : ""}>
-                  {c}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
+          {loading ? (
+            <TableStateRow colSpan={headers.length}>Loading…</TableStateRow>
+          ) : (
+            rows.length === 0 && (
+              <TableStateRow colSpan={headers.length}>{empty ?? "No data."}</TableStateRow>
+            )
+          )}
+          {!loading &&
+            rows.map((r, i) => (
+              <TableRow
+                key={i}
+                className={onRowClick ? "cursor-pointer hover:bg-muted/50" : undefined}
+                onClick={onRowClick ? () => onRowClick(i) : undefined}
+              >
+                {r.map((c, j) => (
+                  <TableCell key={j} className={j === 0 ? "font-medium" : "tabular-nums"}>
+                    {c}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
         </TableBody>
       </Table>
     </div>

@@ -6,10 +6,17 @@ import {
 } from "@/lib/superadmin-capture-mode";
 import { getCaptureRole } from "@/lib/capture-persona";
 import { canLeadershipOpenRoute } from "@/lib/leadership-access";
+import { authenticatedRouteDecision, isImportApprovalsPath } from "@/lib/import-approver-gate";
+import {
+  fetchImportApprovalStatus,
+  importApprovalStatusQueryOptions,
+  NO_IMPORT_APPROVAL_STATUS,
+} from "@/lib/import-approval-status";
+import { isMyUploadsPath, uploaderFlagFrom } from "@/lib/my-uploads";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
-  beforeLoad: async ({ location }) => {
+  beforeLoad: async ({ location, context }) => {
     const pathname = location.pathname;
     if (isSuperadminCaptureModeEnabled(getSuperadminCaptureModeEnvForClient())) {
       const captureRole = getCaptureRole(
@@ -17,6 +24,10 @@ export const Route = createFileRoute("/_authenticated")({
         location.searchStr,
       );
       if (captureRole === "leadership" && !canLeadershipOpenRoute(pathname)) {
+        throw redirect({ to: "/dashboard" });
+      }
+      // Capture mode has no real user, so membership cannot be shown: no Import approvals / My uploads.
+      if (isImportApprovalsPath(pathname) || isMyUploadsPath(pathname)) {
         throw redirect({ to: "/dashboard" });
       }
       return { user: null };
@@ -28,9 +39,25 @@ export const Route = createFileRoute("/_authenticated")({
       supabase.rpc("has_any_role", { _user_id: userId, _roles: ["admin"] }),
       supabase.rpc("has_any_role", { _user_id: userId, _roles: ["leadership"] }),
     ]);
-    if (isLeadership === true && isAdmin !== true && !canLeadershipOpenRoute(pathname)) {
-      throw redirect({ to: "/dashboard" });
-    }
+    // SCRUM-131: Import approvals = isApprover (the approver list, any role); My uploads =
+    // isApprover || canUpload. Both from getImportApprovalStatus(), the same read-only status query
+    // (and cache entry) the sidebar uses. Asked only on those paths; a failed read counts as "no".
+    const gated = isImportApprovalsPath(pathname) || isMyUploadsPath(pathname);
+    const status = gated
+      ? await context.queryClient
+          .fetchQuery(importApprovalStatusQueryOptions(fetchImportApprovalStatus))
+          .catch(() => NO_IMPORT_APPROVAL_STATUS)
+      : NO_IMPORT_APPROVAL_STATUS;
+    const isApprover = status.isApprover;
+    const uploaderFlag = uploaderFlagFrom(status);
+    const decision = authenticatedRouteDecision({
+      pathname,
+      isLeadership: isLeadership === true,
+      isAdmin: isAdmin === true,
+      isApprover,
+      uploaderFlag,
+    });
+    if (decision === "redirect-dashboard") throw redirect({ to: "/dashboard" });
     return { user: data.user };
   },
   component: () => <Outlet />,

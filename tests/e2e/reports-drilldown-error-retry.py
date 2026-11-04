@@ -96,9 +96,9 @@ async def main() -> int:
             await page.keyboard.press("Escape")
             await dialog.wait_for(state="hidden", timeout=3000)
 
-        await check_drill("Cloud Cost", "AWS")
-        await check_drill("Customer Profitability", "Acme")
-        await check_drill("Margin Analysis", "VILT")
+        await check_drill("Cloud cost", "AWS")
+        await check_drill("Customer profitability", "Acme")
+        await check_drill("Margin analysis", "VILT")
 
         await page.screenshot(path=str(SHOTS / "2_recovered.png"))
         await browser.close()

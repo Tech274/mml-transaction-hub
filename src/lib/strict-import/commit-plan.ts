@@ -3,6 +3,7 @@
 // Pure functions: the server re-runs them on every commit, the UI uses them to
 // explain what will happen. Nothing here talks to the database.
 import { normalizeName } from "@/lib/customer-normalize";
+import { providerCloudType, type CanonicalProvider, type CloudType } from "@/lib/cloud-provider";
 import type { StrictRecord, StrictValidationResult } from "./validate";
 
 export const MAX_ROWS_PER_BATCH = 5000; // mirrors the limit inside import_transactions_batch()
@@ -80,12 +81,24 @@ export interface RpcRow {
   total_users: number | null;
   input_cost: string | null;
   selling_cost: string | null;
-  cloud_provider: string | null;
+  /** SCRUM-129: canonical provider; always set (a blank/unknown provider blocks the file earlier). */
+  cloud_provider: CanonicalProvider;
+  /** SCRUM-129: the row's cloud type, decided by its provider. The DB re-derives it and must agree. */
+  lab_type: CloudType;
+  system_config: string | null;
 }
 
-/** One validated record -> exactly one row. Blank and unstorable cells are JSON null, never 0. */
+/**
+ * One validated record -> exactly one row. Blank and unstorable cells are JSON null, never 0.
+ * SCRUM-129: throws if any record lacks a provider or cloud type, or if they disagree. Such a
+ * record can only exist when validation failed, and must never reach the database as public.
+ */
 export function buildRpcRows(records: StrictRecord[]): RpcRow[] {
-  return records.map((r) => ({
+  return records.map((r) => {
+    if (r.cloud_provider === null || r.lab_type === null || providerCloudType(r.cloud_provider) !== r.lab_type) {
+      throw new Error(`Line ${r.line}: Cloud Provider and cloud type are missing or disagree; refusing to build the import row`);
+    }
+    return {
     source_line: r.line,
     potential_id: r.potential_id,
     month: r.month,
@@ -99,7 +112,10 @@ export function buildRpcRows(records: StrictRecord[]): RpcRow[] {
     input_cost: r.input_cost_cents === null ? null : centsToDecimalString(r.input_cost_cents),
     selling_cost: r.selling_cost_cents === null ? null : centsToDecimalString(r.selling_cost_cents),
     cloud_provider: r.cloud_provider,
-  }));
+    lab_type: r.lab_type,
+    system_config: r.lab_type === "private_cloud" ? r.system_config : null,
+    };
+  });
 }
 
 /** Earliest batch that already stored this file hash. Not a hard block. */
@@ -124,6 +140,12 @@ export function commitBlockers(
 ): string[] {
   const reasons: string[] = [];
   if (!validation.ok) reasons.push(`The file has ${validation.summary.errorCount} error(s). Fix them and upload again.`);
+  if (validation.summary.providerErrorRows > 0) {
+    reasons.push(
+      `${validation.summary.providerErrorRows} row(s) have a blank or not-allowed Cloud Provider (or a conflicting Cloud Type). ` +
+        "Use MakeMyLabs, Oracle or SAP (Private cloud) or AWS, Azure or GCP (Public cloud).",
+    );
+  }
   if (validation.summary.rowsToImport === 0) reasons.push("The file has no rows to import.");
   if (validation.summary.rowsToImport > MAX_ROWS_PER_BATCH) {
     reasons.push(`Too many rows in one file (${validation.summary.rowsToImport} > ${MAX_ROWS_PER_BATCH}). Split the file.`);
