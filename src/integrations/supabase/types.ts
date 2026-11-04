@@ -348,6 +348,369 @@ export type Database = {
           },
         ]
       }
+      backup_20261006_cloudtype: {
+        Row: {
+          backed_up_at: string | null
+          cloud_provider: string | null
+          id: string | null
+          import_batch_id: string | null
+          lab_type: string | null
+          repository_type: string | null
+          source_line: number | null
+          system_config: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          cloud_provider?: string | null
+          id?: string | null
+          import_batch_id?: string | null
+          lab_type?: string | null
+          repository_type?: string | null
+          source_line?: number | null
+          system_config?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          cloud_provider?: string | null
+          id?: string | null
+          import_batch_id?: string | null
+          lab_type?: string | null
+          repository_type?: string | null
+          source_line?: number | null
+          system_config?: string | null
+        }
+        Relationships: []
+      }
+      backup_20261006_import_batches: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          file_sha256: string | null
+          filename: string | null
+          id: string | null
+          kind: string | null
+          row_count: number | null
+          status: string | null
+          template_version: string | null
+          total_input: number | null
+          total_selling: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          file_sha256?: string | null
+          filename?: string | null
+          id?: string | null
+          kind?: string | null
+          row_count?: number | null
+          status?: string | null
+          template_version?: string | null
+          total_input?: number | null
+          total_selling?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          file_sha256?: string | null
+          filename?: string | null
+          id?: string | null
+          kind?: string | null
+          row_count?: number | null
+          status?: string | null
+          template_version?: string | null
+          total_input?: number | null
+          total_selling?: number | null
+        }
+        Relationships: []
+      }
+      backup_20261006_tx_activity_log: {
+        Row: {
+          action: string | null
+          changed_at: string | null
+          changed_by: string | null
+          field_name: string | null
+          id: string | null
+          new_value: string | null
+          old_value: string | null
+          transaction_id: string | null
+        }
+        Insert: {
+          action?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          field_name?: string | null
+          id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          transaction_id?: string | null
+        }
+        Update: {
+          action?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          field_name?: string | null
+          id?: string | null
+          new_value?: string | null
+          old_value?: string | null
+          transaction_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_20261006_tx_cost_corrections: {
+        Row: {
+          corrected_at: string | null
+          corrected_by: string | null
+          id: string | null
+          new_actual_consumption: number | null
+          new_credit_allocated: number | null
+          new_input_cost: number | null
+          new_selling_cost: number | null
+          old_actual_consumption: number | null
+          old_credit_allocated: number | null
+          old_input_cost: number | null
+          old_selling_cost: number | null
+          reason: string | null
+          transaction_id: string | null
+        }
+        Insert: {
+          corrected_at?: string | null
+          corrected_by?: string | null
+          id?: string | null
+          new_actual_consumption?: number | null
+          new_credit_allocated?: number | null
+          new_input_cost?: number | null
+          new_selling_cost?: number | null
+          old_actual_consumption?: number | null
+          old_credit_allocated?: number | null
+          old_input_cost?: number | null
+          old_selling_cost?: number | null
+          reason?: string | null
+          transaction_id?: string | null
+        }
+        Update: {
+          corrected_at?: string | null
+          corrected_by?: string | null
+          id?: string | null
+          new_actual_consumption?: number | null
+          new_credit_allocated?: number | null
+          new_input_cost?: number | null
+          new_selling_cost?: number | null
+          old_actual_consumption?: number | null
+          old_credit_allocated?: number | null
+          old_input_cost?: number | null
+          old_selling_cost?: number | null
+          reason?: string | null
+          transaction_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_20261006_tx_import: {
+        Row: {
+          addon_revenue_total: number | null
+          api_key_price_per_user: number | null
+          api_key_service: string | null
+          api_unit_label: string | null
+          api_units_consumed: number | null
+          cloud_provider: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_id: string | null
+          customer_name: string | null
+          end_date: string | null
+          id: string | null
+          import_batch_id: string | null
+          input_cost: number | null
+          input_cost_actual_alloc: number | null
+          input_cost_auto: number | null
+          input_cost_auto_run_id: string | null
+          input_cost_pct: number | null
+          input_cost_per_user: number | null
+          is_complete: boolean | null
+          is_deleted: boolean | null
+          lab_batch_id: string | null
+          lab_name: string | null
+          lab_type: string | null
+          license_name: string | null
+          license_price_per_user: number | null
+          license_seats_used: number | null
+          line_of_business: string | null
+          month: number | null
+          potential_id: string | null
+          public_actual_consumption: number | null
+          public_credit_allocated: number | null
+          public_service_margin: number | null
+          public_total_margin_actual: number | null
+          public_unused_credit: number | null
+          repository_type: string | null
+          selling_cost: number | null
+          selling_price_per_user: number | null
+          source_line: number | null
+          start_date: string | null
+          system_config: string | null
+          total_users: number | null
+          updated_at: string | null
+          updated_by: string | null
+          vm_hours_consumed: number | null
+          vm_price_per_user: number | null
+          year: number | null
+        }
+        Insert: {
+          addon_revenue_total?: number | null
+          api_key_price_per_user?: number | null
+          api_key_service?: string | null
+          api_unit_label?: string | null
+          api_units_consumed?: number | null
+          cloud_provider?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          end_date?: string | null
+          id?: string | null
+          import_batch_id?: string | null
+          input_cost?: number | null
+          input_cost_actual_alloc?: number | null
+          input_cost_auto?: number | null
+          input_cost_auto_run_id?: string | null
+          input_cost_pct?: number | null
+          input_cost_per_user?: number | null
+          is_complete?: boolean | null
+          is_deleted?: boolean | null
+          lab_batch_id?: string | null
+          lab_name?: string | null
+          lab_type?: string | null
+          license_name?: string | null
+          license_price_per_user?: number | null
+          license_seats_used?: number | null
+          line_of_business?: string | null
+          month?: number | null
+          potential_id?: string | null
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          public_service_margin?: number | null
+          public_total_margin_actual?: number | null
+          public_unused_credit?: number | null
+          repository_type?: string | null
+          selling_cost?: number | null
+          selling_price_per_user?: number | null
+          source_line?: number | null
+          start_date?: string | null
+          system_config?: string | null
+          total_users?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vm_hours_consumed?: number | null
+          vm_price_per_user?: number | null
+          year?: number | null
+        }
+        Update: {
+          addon_revenue_total?: number | null
+          api_key_price_per_user?: number | null
+          api_key_service?: string | null
+          api_unit_label?: string | null
+          api_units_consumed?: number | null
+          cloud_provider?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          customer_id?: string | null
+          customer_name?: string | null
+          end_date?: string | null
+          id?: string | null
+          import_batch_id?: string | null
+          input_cost?: number | null
+          input_cost_actual_alloc?: number | null
+          input_cost_auto?: number | null
+          input_cost_auto_run_id?: string | null
+          input_cost_pct?: number | null
+          input_cost_per_user?: number | null
+          is_complete?: boolean | null
+          is_deleted?: boolean | null
+          lab_batch_id?: string | null
+          lab_name?: string | null
+          lab_type?: string | null
+          license_name?: string | null
+          license_price_per_user?: number | null
+          license_seats_used?: number | null
+          line_of_business?: string | null
+          month?: number | null
+          potential_id?: string | null
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          public_service_margin?: number | null
+          public_total_margin_actual?: number | null
+          public_unused_credit?: number | null
+          repository_type?: string | null
+          selling_cost?: number | null
+          selling_price_per_user?: number | null
+          source_line?: number | null
+          start_date?: string | null
+          system_config?: string | null
+          total_users?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vm_hours_consumed?: number | null
+          vm_price_per_user?: number | null
+          year?: number | null
+        }
+        Relationships: []
+      }
+      backup_20261006_tx_tags: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          tag: string | null
+          transaction_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          tag?: string | null
+          transaction_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          tag?: string | null
+          transaction_id?: string | null
+        }
+        Relationships: []
+      }
+      backup_txn_dates_20261006_97fa9e1c: {
+        Row: {
+          backed_up_at: string | null
+          end_date: string | null
+          id: string | null
+          import_batch_id: string | null
+          potential_id: string | null
+          source_line: number | null
+          start_date: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          backed_up_at?: string | null
+          end_date?: string | null
+          id?: string | null
+          import_batch_id?: string | null
+          potential_id?: string | null
+          source_line?: number | null
+          start_date?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          backed_up_at?: string | null
+          end_date?: string | null
+          id?: string | null
+          import_batch_id?: string | null
+          potential_id?: string | null
+          source_line?: number | null
+          start_date?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       bulk_import_audit_events: {
         Row: {
           actor_email: string | null
@@ -645,6 +1008,95 @@ export type Database = {
           },
         ]
       }
+      catalog_audit_log: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          field_name: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          reason: string | null
+          row_key: string
+          table_name: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          field_name: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          reason?: string | null
+          row_key: string
+          table_name: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          field_name?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          reason?: string | null
+          row_key?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
+      cloud_provider_aliases: {
+        Row: {
+          alias_key: string
+          approved_note: string
+          code: string
+          created_at: string
+        }
+        Insert: {
+          alias_key: string
+          approved_note: string
+          code: string
+          created_at?: string
+        }
+        Update: {
+          alias_key?: string
+          approved_note?: string
+          code?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cloud_provider_aliases_code_fkey"
+            columns: ["code"]
+            isOneToOne: false
+            referencedRelation: "cloud_providers"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      cloud_providers: {
+        Row: {
+          cloud_type: string
+          code: string
+          created_at: string
+          provider: string
+          sort_order: number
+        }
+        Insert: {
+          cloud_type: string
+          code: string
+          created_at?: string
+          provider: string
+          sort_order: number
+        }
+        Update: {
+          cloud_type?: string
+          code?: string
+          created_at?: string
+          provider?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       config_master: {
         Row: {
           category: string
@@ -672,6 +1124,33 @@ export type Database = {
           key?: string
           label?: string
           sort_order?: number
+        }
+        Relationships: []
+      }
+      cost_rates: {
+        Row: {
+          currency: string
+          key: string
+          unit: string
+          updated_at: string
+          updated_by: string | null
+          value: number | null
+        }
+        Insert: {
+          currency?: string
+          key: string
+          unit: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: number | null
+        }
+        Update: {
+          currency?: string
+          key?: string
+          unit?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: number | null
         }
         Relationships: []
       }
@@ -840,8 +1319,49 @@ export type Database = {
         }
         Relationships: []
       }
+      import_approval_settings: {
+        Row: {
+          allow_self_approval: boolean
+          approver_roles: Database["public"]["Enums"]["app_role"][]
+          approver_user_ids: string[]
+          id: number
+          mode: string
+          notify_in_app: boolean
+          repeat_file_check: string
+          stage_ttl: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allow_self_approval?: boolean
+          approver_roles?: Database["public"]["Enums"]["app_role"][]
+          approver_user_ids?: string[]
+          id: number
+          mode?: string
+          notify_in_app?: boolean
+          repeat_file_check?: string
+          stage_ttl?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allow_self_approval?: boolean
+          approver_roles?: Database["public"]["Enums"]["app_role"][]
+          approver_user_ids?: string[]
+          id?: number
+          mode?: string
+          notify_in_app?: boolean
+          repeat_file_check?: string
+          stage_ttl?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       import_batches: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           created_by: string | null
           file_sha256: string
@@ -849,12 +1369,16 @@ export type Database = {
           id: string
           kind: string
           row_count: number
+          stage_id: string | null
           status: string
           template_version: string
           total_input: number
           total_selling: number
+          uploaded_by: string | null
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           created_by?: string | null
           file_sha256: string
@@ -862,12 +1386,16 @@ export type Database = {
           id?: string
           kind: string
           row_count: number
+          stage_id?: string | null
           status?: string
           template_version: string
           total_input: number
           total_selling: number
+          uploaded_by?: string | null
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           created_by?: string | null
           file_sha256?: string
@@ -875,12 +1403,630 @@ export type Database = {
           id?: string
           kind?: string
           row_count?: number
+          stage_id?: string | null
           status?: string
           template_version?: string
           total_input?: number
           total_selling?: number
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_batches_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "import_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_corrections: {
+        Row: {
+          created_at: string
+          field: string
+          healed_value: string
+          healer_version: string
+          id: number
+          import_batch_id: string | null
+          original_value: string | null
+          rule: string
+          source_line: number
+          stage_id: string
+          transaction_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          field: string
+          healed_value: string
+          healer_version: string
+          id?: never
+          import_batch_id?: string | null
+          original_value?: string | null
+          rule: string
+          source_line: number
+          stage_id: string
+          transaction_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          field?: string
+          healed_value?: string
+          healer_version?: string
+          id?: never
+          import_batch_id?: string | null
+          original_value?: string | null
+          rule?: string
+          source_line?: number
+          stage_id?: string
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_corrections_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_corrections_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "import_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_transaction_profit_breakdown"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "import_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_transaction_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_stage_rows: {
+        Row: {
+          healed: Json
+          is_incomplete: boolean
+          original: Json
+          source_line: number
+          stage_id: string
+          warnings: Json
+        }
+        Insert: {
+          healed: Json
+          is_incomplete: boolean
+          original: Json
+          source_line: number
+          stage_id: string
+          warnings?: Json
+        }
+        Update: {
+          healed?: Json
+          is_incomplete?: boolean
+          original?: Json
+          source_line?: number
+          stage_id?: string
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_stage_rows_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "import_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_stages: {
+        Row: {
+          approved_file_sha256: string | null
+          approved_healer_version: string | null
+          approved_rows_sha256: string | null
+          blocked_count: number
+          committed_batch_id: string | null
+          correction_count: number
+          decided_at: string | null
+          decided_by: string | null
+          decision_reason: string | null
+          expires_at: string
+          file_sha256: string
+          filename: string
+          healer_version: string
+          id: string
+          incomplete_count: number
+          incomplete_input: number
+          incomplete_selling: number
+          kind: string
+          private_count: number
+          public_count: number
+          repeat_acknowledged_at: string | null
+          repeat_acknowledged_by: string | null
+          repeat_of: Json | null
+          row_count: number
+          rows_sha256: string
+          status: string
+          summary: Json
+          template_version: string
+          total_input: number
+          total_selling: number
+          total_users: number
+          uploaded_at: string
+          uploaded_by: string
+          warning_row_count: number
+        }
+        Insert: {
+          approved_file_sha256?: string | null
+          approved_healer_version?: string | null
+          approved_rows_sha256?: string | null
+          blocked_count?: number
+          committed_batch_id?: string | null
+          correction_count?: number
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          expires_at: string
+          file_sha256: string
+          filename: string
+          healer_version: string
+          id?: string
+          incomplete_count: number
+          incomplete_input?: number
+          incomplete_selling?: number
+          kind: string
+          private_count: number
+          public_count: number
+          repeat_acknowledged_at?: string | null
+          repeat_acknowledged_by?: string | null
+          repeat_of?: Json | null
+          row_count: number
+          rows_sha256: string
+          status: string
+          summary?: Json
+          template_version: string
+          total_input: number
+          total_selling: number
+          total_users?: number
+          uploaded_at?: string
+          uploaded_by: string
+          warning_row_count?: number
+        }
+        Update: {
+          approved_file_sha256?: string | null
+          approved_healer_version?: string | null
+          approved_rows_sha256?: string | null
+          blocked_count?: number
+          committed_batch_id?: string | null
+          correction_count?: number
+          decided_at?: string | null
+          decided_by?: string | null
+          decision_reason?: string | null
+          expires_at?: string
+          file_sha256?: string
+          filename?: string
+          healer_version?: string
+          id?: string
+          incomplete_count?: number
+          incomplete_input?: number
+          incomplete_selling?: number
+          kind?: string
+          private_count?: number
+          public_count?: number
+          repeat_acknowledged_at?: string | null
+          repeat_acknowledged_by?: string | null
+          repeat_of?: Json | null
+          row_count?: number
+          rows_sha256?: string
+          status?: string
+          summary?: Json
+          template_version?: string
+          total_input?: number
+          total_selling?: number
+          total_users?: number
+          uploaded_at?: string
+          uploaded_by?: string
+          warning_row_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_stages_committed_batch_id_fkey"
+            columns: ["committed_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_batch_cost_runs: {
+        Row: {
+          actual_total: number | null
+          avg_used: number | null
+          created_at: string
+          created_by: string | null
+          details: Json | null
+          error: string | null
+          estimated_total: number | null
+          id: string
+          inputs_hash: string
+          known_count: number | null
+          lab_batch_id: string
+          method: string
+          missing_count: number | null
+          status: string
+          trigger: string
+        }
+        Insert: {
+          actual_total?: number | null
+          avg_used?: number | null
+          created_at?: string
+          created_by?: string | null
+          details?: Json | null
+          error?: string | null
+          estimated_total?: number | null
+          id?: string
+          inputs_hash: string
+          known_count?: number | null
+          lab_batch_id: string
+          method?: string
+          missing_count?: number | null
+          status: string
+          trigger: string
+        }
+        Update: {
+          actual_total?: number | null
+          avg_used?: number | null
+          created_at?: string
+          created_by?: string | null
+          details?: Json | null
+          error?: string | null
+          estimated_total?: number | null
+          id?: string
+          inputs_hash?: string
+          known_count?: number | null
+          lab_batch_id?: string
+          method?: string
+          missing_count?: number | null
+          status?: string
+          trigger?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_batch_cost_runs_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "lab_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_batch_cost_runs_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_batch_transaction_totals"
+            referencedColumns: ["lab_batch_id"]
+          },
+        ]
+      }
+      lab_batch_invoices: {
+        Row: {
+          amount: number
+          amount_inr: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          fx_rate_to_inr: number | null
+          id: string
+          invoice_date: string
+          invoice_ref: string | null
+          is_final: boolean
+          lab_batch_id: string
+          note: string | null
+          source: string
+          status: string
+          superseded_by: string | null
+          vendor: string
+        }
+        Insert: {
+          amount: number
+          amount_inr: number
+          created_at?: string
+          created_by?: string | null
+          currency: string
+          fx_rate_to_inr?: number | null
+          id?: string
+          invoice_date: string
+          invoice_ref?: string | null
+          is_final?: boolean
+          lab_batch_id: string
+          note?: string | null
+          source?: string
+          status?: string
+          superseded_by?: string | null
+          vendor: string
+        }
+        Update: {
+          amount?: number
+          amount_inr?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          fx_rate_to_inr?: number | null
+          id?: string
+          invoice_date?: string
+          invoice_ref?: string | null
+          is_final?: boolean
+          lab_batch_id?: string
+          note?: string | null
+          source?: string
+          status?: string
+          superseded_by?: string | null
+          vendor?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_batch_invoices_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "lab_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_batch_invoices_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_batch_transaction_totals"
+            referencedColumns: ["lab_batch_id"]
+          },
+          {
+            foreignKeyName: "lab_batch_invoices_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "lab_batch_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_batches: {
+        Row: {
+          actual_cost_total: number | null
+          api_unit_label: string | null
+          api_units_consumed: number | null
+          auto_line_count: number | null
+          batch_code: string
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          estimated_cost_total: number | null
+          flags: string[]
+          id: string
+          known_line_count: number | null
+          lab_type: string | null
+          last_run_id: string | null
+          license_seats_used: number | null
+          name: string | null
+          needs_recompute: boolean
+          potential_id: string | null
+          reopened_at: string | null
+          reopened_by: string | null
+          revenue_total: number | null
+          status: string
+          updated_at: string
+          vm_hours_consumed: number | null
+        }
+        Insert: {
+          actual_cost_total?: number | null
+          api_unit_label?: string | null
+          api_units_consumed?: number | null
+          auto_line_count?: number | null
+          batch_code: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          estimated_cost_total?: number | null
+          flags?: string[]
+          id?: string
+          known_line_count?: number | null
+          lab_type?: string | null
+          last_run_id?: string | null
+          license_seats_used?: number | null
+          name?: string | null
+          needs_recompute?: boolean
+          potential_id?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          revenue_total?: number | null
+          status?: string
+          updated_at?: string
+          vm_hours_consumed?: number | null
+        }
+        Update: {
+          actual_cost_total?: number | null
+          api_unit_label?: string | null
+          api_units_consumed?: number | null
+          auto_line_count?: number | null
+          batch_code?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          estimated_cost_total?: number | null
+          flags?: string[]
+          id?: string
+          known_line_count?: number | null
+          lab_type?: string | null
+          last_run_id?: string | null
+          license_seats_used?: number | null
+          name?: string | null
+          needs_recompute?: boolean
+          potential_id?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          revenue_total?: number | null
+          status?: string
+          updated_at?: string
+          vm_hours_consumed?: number | null
         }
         Relationships: []
+      }
+      lab_catalog: {
+        Row: {
+          cloud_provider: string | null
+          created_at: string
+          created_by: string | null
+          default_duration_days: number | null
+          description: string | null
+          document_url: string | null
+          id: string
+          lab_type: string
+          line_of_business: string | null
+          published_at: string | null
+          published_by: string | null
+          status: string
+          summary: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          updated_by: string | null
+          vm_tier_id: string | null
+        }
+        Insert: {
+          cloud_provider?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_duration_days?: number | null
+          description?: string | null
+          document_url?: string | null
+          id?: string
+          lab_type: string
+          line_of_business?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          status?: string
+          summary?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          vm_tier_id?: string | null
+        }
+        Update: {
+          cloud_provider?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_duration_days?: number | null
+          description?: string | null
+          document_url?: string | null
+          id?: string
+          lab_type?: string
+          line_of_business?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          status?: string
+          summary?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          vm_tier_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_catalog_vm_tier_id_fkey"
+            columns: ["vm_tier_id"]
+            isOneToOne: false
+            referencedRelation: "vm_tiers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lab_transaction_cost_corrections: {
+        Row: {
+          corrected_at: string
+          corrected_by: string | null
+          id: string
+          new_actual_consumption: number | null
+          new_credit_allocated: number | null
+          new_input_cost: number | null
+          new_selling_cost: number | null
+          old_actual_consumption: number | null
+          old_credit_allocated: number | null
+          old_input_cost: number | null
+          old_selling_cost: number | null
+          reason: string
+          transaction_id: string
+        }
+        Insert: {
+          corrected_at?: string
+          corrected_by?: string | null
+          id?: string
+          new_actual_consumption?: number | null
+          new_credit_allocated?: number | null
+          new_input_cost?: number | null
+          new_selling_cost?: number | null
+          old_actual_consumption?: number | null
+          old_credit_allocated?: number | null
+          old_input_cost?: number | null
+          old_selling_cost?: number | null
+          reason: string
+          transaction_id: string
+        }
+        Update: {
+          corrected_at?: string
+          corrected_by?: string | null
+          id?: string
+          new_actual_consumption?: number | null
+          new_credit_allocated?: number | null
+          new_input_cost?: number | null
+          new_selling_cost?: number | null
+          old_actual_consumption?: number | null
+          old_credit_allocated?: number | null
+          old_input_cost?: number | null
+          old_selling_cost?: number | null
+          reason?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lab_transaction_cost_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lab_transaction_cost_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_transaction_profit_breakdown"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "lab_transaction_cost_corrections_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_transaction_costs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mcp_revoked_clients: {
         Row: {
@@ -1286,10 +2432,72 @@ export type Database = {
             referencedRelation: "transactions"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "transaction_activity_log_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_transaction_profit_breakdown"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_activity_log_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_transaction_costs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      transaction_tags: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          tag: string
+          transaction_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          tag: string
+          transaction_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          tag?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_tags_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_tags_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_transaction_profit_breakdown"
+            referencedColumns: ["transaction_id"]
+          },
+          {
+            foreignKeyName: "transaction_tags_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "v_transaction_costs"
+            referencedColumns: ["id"]
+          },
         ]
       }
       transactions: {
         Row: {
+          addon_revenue_total: number | null
+          api_key_price_per_user: number | null
+          api_key_service: string | null
+          api_unit_label: string | null
+          api_units_consumed: number | null
           cloud_provider: string | null
           created_at: string
           created_by: string | null
@@ -1299,46 +2507,46 @@ export type Database = {
           id: string
           import_batch_id: string | null
           input_cost: number | null
-          addon_revenue_total: number | null
-          api_key_price_per_user: number | null
-          api_key_service: string | null
-          api_unit_label: string | null
-          api_units_consumed: number | null
           input_cost_actual_alloc: number | null
           input_cost_auto: number | null
           input_cost_auto_run_id: string | null
           input_cost_pct: number | null
           input_cost_per_user: number | null
           is_complete: boolean | null
+          is_deleted: boolean
           lab_batch_id: string | null
+          lab_name: string | null
+          lab_type: string
           license_name: string | null
           license_price_per_user: number | null
           license_seats_used: number | null
+          line_of_business: string | null
+          month: number | null
+          potential_id: string | null
           public_actual_consumption: number | null
           public_credit_allocated: number | null
           public_service_margin: number | null
           public_total_margin_actual: number | null
           public_unused_credit: number | null
-          selling_price_per_user: number | null
-          vm_hours_consumed: number | null
-          vm_price_per_user: number | null
-          is_deleted: boolean
-          lab_name: string | null
-          lab_type: string
-          line_of_business: string | null
-          month: number | null
-          potential_id: string | null
           repository_type: string
           selling_cost: number | null
+          selling_price_per_user: number | null
           source_line: number | null
           start_date: string | null
           system_config: string | null
           total_users: number | null
           updated_at: string
           updated_by: string | null
+          vm_hours_consumed: number | null
+          vm_price_per_user: number | null
           year: number | null
         }
         Insert: {
+          addon_revenue_total?: number | null
+          api_key_price_per_user?: number | null
+          api_key_service?: string | null
+          api_unit_label?: string | null
+          api_units_consumed?: number | null
           cloud_provider?: string | null
           created_at?: string
           created_by?: string | null
@@ -1349,10 +2557,6 @@ export type Database = {
           import_batch_id?: string | null
           input_cost?: number | null
           input_cost_actual_alloc?: number | null
-          api_key_price_per_user?: number | null
-          api_key_service?: string | null
-          api_unit_label?: string | null
-          api_units_consumed?: number | null
           input_cost_auto?: number | null
           input_cost_auto_run_id?: string | null
           input_cost_pct?: number | null
@@ -1361,29 +2565,37 @@ export type Database = {
           is_deleted?: boolean
           lab_batch_id?: string | null
           lab_name?: string | null
+          lab_type: string
           license_name?: string | null
           license_price_per_user?: number | null
           license_seats_used?: number | null
-          public_actual_consumption?: number | null
-          public_credit_allocated?: number | null
-          selling_price_per_user?: number | null
-          vm_hours_consumed?: number | null
-          vm_price_per_user?: number | null
-          lab_type: string
           line_of_business?: string | null
           month?: number | null
           potential_id?: string | null
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          public_service_margin?: number | null
+          public_total_margin_actual?: number | null
+          public_unused_credit?: number | null
           repository_type: string
           selling_cost?: number | null
+          selling_price_per_user?: number | null
           source_line?: number | null
           start_date?: string | null
           system_config?: string | null
           total_users?: number | null
           updated_at?: string
           updated_by?: string | null
+          vm_hours_consumed?: number | null
+          vm_price_per_user?: number | null
           year?: number | null
         }
         Update: {
+          addon_revenue_total?: number | null
+          api_key_price_per_user?: number | null
+          api_key_service?: string | null
+          api_unit_label?: string | null
+          api_units_consumed?: number | null
           cloud_provider?: string | null
           created_at?: string
           created_by?: string | null
@@ -1393,10 +2605,6 @@ export type Database = {
           id?: string
           import_batch_id?: string | null
           input_cost?: number | null
-          api_key_price_per_user?: number | null
-          api_key_service?: string | null
-          api_unit_label?: string | null
-          api_units_consumed?: number | null
           input_cost_actual_alloc?: number | null
           input_cost_auto?: number | null
           input_cost_auto_run_id?: string | null
@@ -1406,24 +2614,29 @@ export type Database = {
           is_deleted?: boolean
           lab_batch_id?: string | null
           lab_name?: string | null
+          lab_type?: string
           license_name?: string | null
           license_price_per_user?: number | null
           license_seats_used?: number | null
-          selling_price_per_user?: number | null
-          vm_hours_consumed?: number | null
-          vm_price_per_user?: number | null
-          lab_type?: string
           line_of_business?: string | null
           month?: number | null
           potential_id?: string | null
+          public_actual_consumption?: number | null
+          public_credit_allocated?: number | null
+          public_service_margin?: number | null
+          public_total_margin_actual?: number | null
+          public_unused_credit?: number | null
           repository_type?: string
           selling_cost?: number | null
+          selling_price_per_user?: number | null
           source_line?: number | null
           start_date?: string | null
           system_config?: string | null
           total_users?: number | null
           updated_at?: string
           updated_by?: string | null
+          vm_hours_consumed?: number | null
+          vm_price_per_user?: number | null
           year?: number | null
         }
         Relationships: [
@@ -1448,170 +2661,58 @@ export type Database = {
             referencedRelation: "lab_batches"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      vm_tiers: {
-        Row: {
-          id: string
-          code: string
-          vcpu: number
-          ram_gb: number
-          storage_gb: number | null
-          price_per_day: number | null
-          selling_price_per_day: number | null
-          internal_cost_per_day: number | null
-          currency: string
-          is_active: boolean
-          sort_order: number
-          updated_by: string | null
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          code: string
-          vcpu: number
-          ram_gb: number
-          storage_gb?: number | null
-          price_per_day?: number | null
-          selling_price_per_day?: number | null
-          internal_cost_per_day?: number | null
-          currency?: string
-          is_active?: boolean
-          sort_order?: number
-        }
-        Update: {
-          code?: string
-          price_per_day?: number | null
-          selling_price_per_day?: number | null
-          internal_cost_per_day?: number | null
-          is_active?: boolean
-        }
-        Relationships: []
-      }
-      cost_rates: {
-        Row: { key: string; value: number | null; unit: string; currency: string; updated_by: string | null; updated_at: string }
-        Insert: { key: string; value?: number | null; unit: string; currency?: string }
-        Update: { value?: number | null; updated_by?: string | null; updated_at?: string }
-        Relationships: []
-      }
-      catalog_audit_log: {
-        Row: { id: string; table_name: string; row_key: string; field_name: string; old_value: string | null; new_value: string | null; reason: string | null; changed_by: string | null; changed_at: string }
-        Insert: { id?: string; table_name: string; row_key: string; field_name: string; old_value?: string | null; new_value?: string | null; reason?: string | null }
-        Update: { reason?: string | null }
-        Relationships: []
-      }
-      lab_catalog: {
-        Row: {
-          id: string; title: string; summary: string | null; description: string | null; lab_type: string;
-          cloud_provider: string | null; vm_tier_id: string | null; default_duration_days: number | null;
-          line_of_business: string | null; tags: string[]; document_url: string | null; status: string;
-          published_at: string | null; published_by: string | null; created_by: string | null; updated_by: string | null;
-          created_at: string; updated_at: string
-        }
-        Insert: {
-          id?: string; title: string; summary?: string | null; description?: string | null; lab_type: string;
-          cloud_provider?: string | null; vm_tier_id?: string | null; default_duration_days?: number | null;
-          line_of_business?: string | null; tags?: string[]; document_url?: string | null; status?: string
-        }
-        Update: {
-          title?: string; summary?: string | null; description?: string | null; lab_type?: string;
-          cloud_provider?: string | null; vm_tier_id?: string | null; default_duration_days?: number | null;
-          line_of_business?: string | null; tags?: string[]; document_url?: string | null; status?: string;
-          published_at?: string | null; published_by?: string | null
-        }
-        Relationships: []
-      }
-      lab_batches: {
-        Row: {
-          id: string; batch_code: string; name: string | null; potential_id: string | null; lab_type: string | null;
-          currency: string; status: string; revenue_total: number | null; estimated_cost_total: number | null;
-          actual_cost_total: number | null; known_line_count: number | null; auto_line_count: number | null;
-          flags: string[]; needs_recompute: boolean; last_run_id: string | null; closed_at: string | null;
-          closed_by: string | null; reopened_at: string | null; reopened_by: string | null;
-          vm_hours_consumed: number | null; license_seats_used: number | null; api_units_consumed: number | null;
-          api_unit_label: string | null; created_by: string | null; created_at: string; updated_at: string
-        }
-        Insert: { id?: string; batch_code?: string; name?: string | null; lab_type?: string | null; currency?: string; status?: string; created_by?: string | null }
-        Update: { name?: string | null; status?: string; needs_recompute?: boolean }
-        Relationships: []
-      }
-      lab_batch_invoices: {
-        Row: {
-          id: string; lab_batch_id: string; vendor: string; invoice_ref: string | null; invoice_date: string;
-          currency: string; amount: number; fx_rate_to_inr: number | null; amount_inr: number; is_final: boolean;
-          source: string; status: string; superseded_by: string | null; note: string | null; created_by: string | null; created_at: string
-        }
-        Insert: { lab_batch_id: string; vendor: string; invoice_date: string; currency: string; amount: number; amount_inr: number; fx_rate_to_inr?: number | null; source?: string }
-        Update: { status?: string; superseded_by?: string | null }
-        Relationships: []
-      }
-      lab_batch_cost_runs: {
-        Row: { id: string; lab_batch_id: string; trigger: string; inputs_hash: string; status: string; known_count: number | null; missing_count: number | null; avg_used: number | null; method: string; estimated_total: number | null; actual_total: number | null; details: Json | null; error: string | null; created_by: string | null; created_at: string }
-        Insert: { lab_batch_id: string; trigger: string; inputs_hash: string; status: string }
-        Update: { status?: string }
-        Relationships: []
-      }
-      lab_transaction_cost_corrections: {
-        Row: {
-          corrected_at: string
-          corrected_by: string | null
-          id: string
-          new_actual_consumption: number | null
-          new_credit_allocated: number | null
-          new_input_cost: number | null
-          new_selling_cost: number | null
-          old_actual_consumption: number | null
-          old_credit_allocated: number | null
-          old_input_cost: number | null
-          old_selling_cost: number | null
-          reason: string
-          transaction_id: string
-        }
-        Insert: {
-          corrected_at?: string
-          corrected_by?: string | null
-          id?: string
-          new_actual_consumption?: number | null
-          new_credit_allocated?: number | null
-          new_input_cost?: number | null
-          new_selling_cost?: number | null
-          old_actual_consumption?: number | null
-          old_credit_allocated?: number | null
-          old_input_cost?: number | null
-          old_selling_cost?: number | null
-          reason: string
-          transaction_id: string
-        }
-        Update: {
-          corrected_at?: string
-          corrected_by?: string | null
-          id?: string
-          new_actual_consumption?: number | null
-          new_credit_allocated?: number | null
-          new_input_cost?: number | null
-          new_selling_cost?: number | null
-          old_actual_consumption?: number | null
-          old_credit_allocated?: number | null
-          old_input_cost?: number | null
-          old_selling_cost?: number | null
-          reason?: string
-          transaction_id?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: "lab_transaction_cost_corrections_transaction_id_fkey"
-            columns: ["transaction_id"]
+            foreignKeyName: "transactions_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
             isOneToOne: false
-            referencedRelation: "transactions"
-            referencedColumns: ["id"]
+            referencedRelation: "v_lab_batch_transaction_totals"
+            referencedColumns: ["lab_batch_id"]
           },
         ]
       }
-      transaction_tags: {
-        Row: { transaction_id: string; tag: string; created_by: string | null; created_at: string }
-        Insert: { transaction_id: string; tag: string; created_by?: string | null }
-        Update: { tag?: string }
-        Relationships: []
+      user_notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          kind: string
+          link: string | null
+          read_at: string | null
+          stage_id: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          link?: string | null
+          read_at?: string | null
+          stage_id?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          link?: string | null
+          read_at?: string | null
+          stage_id?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notifications_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "import_stages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -1634,35 +2735,65 @@ export type Database = {
         }
         Relationships: []
       }
+      vm_tiers: {
+        Row: {
+          code: string
+          currency: string
+          id: string
+          internal_cost_per_day: number | null
+          is_active: boolean
+          price_per_day: number | null
+          ram_gb: number
+          selling_price_per_day: number | null
+          sort_order: number
+          storage_gb: number | null
+          updated_at: string
+          updated_by: string | null
+          vcpu: number
+        }
+        Insert: {
+          code: string
+          currency?: string
+          id?: string
+          internal_cost_per_day?: number | null
+          is_active?: boolean
+          price_per_day?: number | null
+          ram_gb: number
+          selling_price_per_day?: number | null
+          sort_order?: number
+          storage_gb?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          vcpu: number
+        }
+        Update: {
+          code?: string
+          currency?: string
+          id?: string
+          internal_cost_per_day?: number | null
+          is_active?: boolean
+          price_per_day?: number | null
+          ram_gb?: number
+          selling_price_per_day?: number | null
+          sort_order?: number
+          storage_gb?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          vcpu?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       v_lab_batch_transaction_totals: {
         Row: {
           actual_cost_total_derived: number | null
-          auto_line_count_derived: number
-          estimated_cost_total_derived: number
-          known_line_count_derived: number
-          lab_batch_id: string
-          line_count_derived: number
-          revenue_total_derived: number
-        }
-        Insert: {
-          actual_cost_total_derived?: number | null
-          auto_line_count_derived?: number
-          estimated_cost_total_derived?: number
-          known_line_count_derived?: number
-          lab_batch_id?: string
-          line_count_derived?: number
-          revenue_total_derived?: number
-        }
-        Update: {
-          actual_cost_total_derived?: number | null
-          auto_line_count_derived?: number
-          estimated_cost_total_derived?: number
-          known_line_count_derived?: number
-          lab_batch_id?: string
-          line_count_derived?: number
-          revenue_total_derived?: number
+          auto_line_count_derived: number | null
+          estimated_cost_total_derived: number | null
+          known_line_count_derived: number | null
+          lab_batch_id: string | null
+          line_count_derived: number | null
+          revenue_total_derived: number | null
         }
         Relationships: []
       }
@@ -1671,55 +2802,115 @@ export type Database = {
           effective_cost: number | null
           input_cost_locked: number | null
           lab_batch_id: string | null
-          lab_type: string
+          lab_type: string | null
           public_actual_consumption: number | null
           public_credit_allocated: number | null
           selling_cost: number | null
           service_margin: number | null
           total_profit_actual: number | null
-          transaction_id: string
+          transaction_id: string | null
           unused_credit: number | null
         }
         Insert: {
-          effective_cost?: number | null
+          effective_cost?: never
           input_cost_locked?: number | null
           lab_batch_id?: string | null
-          lab_type?: string
+          lab_type?: string | null
           public_actual_consumption?: number | null
           public_credit_allocated?: number | null
           selling_cost?: number | null
           service_margin?: number | null
           total_profit_actual?: number | null
-          transaction_id?: string
+          transaction_id?: string | null
           unused_credit?: number | null
         }
         Update: {
-          effective_cost?: number | null
+          effective_cost?: never
           input_cost_locked?: number | null
           lab_batch_id?: string | null
-          lab_type?: string
+          lab_type?: string | null
           public_actual_consumption?: number | null
           public_credit_allocated?: number | null
           selling_cost?: number | null
           service_margin?: number | null
           total_profit_actual?: number | null
-          transaction_id?: string
+          transaction_id?: string | null
           unused_credit?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "lab_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_lab_batch_id_fkey"
+            columns: ["lab_batch_id"]
+            isOneToOne: false
+            referencedRelation: "v_lab_batch_transaction_totals"
+            referencedColumns: ["lab_batch_id"]
+          },
+        ]
+      }
+      v_transaction_costs: {
+        Row: {
+          cost_effective: number | null
+          cost_source: string | null
+          id: string | null
+        }
+        Insert: {
+          cost_effective?: never
+          cost_source?: never
+          id?: string | null
+        }
+        Update: {
+          cost_effective?: never
+          cost_source?: never
+          id?: string | null
         }
         Relationships: []
       }
     }
     Functions: {
+      _assert_batch_closer: { Args: never; Returns: undefined }
+      add_vm_tier: {
+        Args: {
+          p_code: string
+          p_internal_cost_per_day: number
+          p_ram_gb: number
+          p_reason: string
+          p_selling_price_per_day: number
+          p_storage_gb: number
+          p_vcpu: number
+        }
+        Returns: string
+      }
       admin_correct_lab_transaction_costs: {
         Args: {
           p_input_cost: number
-          p_public_actual_consumption?: number | null
-          p_public_credit_allocated?: number | null
-          p_reason?: string | null
+          p_public_actual_consumption?: number
+          p_public_credit_allocated?: number
+          p_reason?: string
           p_selling_cost: number
           p_transaction_id: string
         }
         Returns: undefined
+      }
+      approve_import: {
+        Args: {
+          p_file_sha256: string
+          p_reason?: string
+          p_rows_sha256: string
+          p_stage_id: string
+        }
+        Returns: Json
+      }
+      cancel_import: { Args: { p_stage_id: string }; Returns: undefined }
+      canonical_cloud_provider: {
+        Args: { p_provider: string }
+        Returns: string
       }
       claim_ai_cc_worker_slot: {
         Args: { p_worker_id: string }
@@ -1727,7 +2918,7 @@ export type Database = {
           agent_key: string
           current_load: number
           id: string
-          last_assigned_at: string | null
+          last_assigned_at: string
         }[]
       }
       clean_customer_name: { Args: { p_name: string }; Returns: string }
@@ -1735,6 +2926,18 @@ export type Database = {
         Args: { _run_ids: string[] }
         Returns: number
       }
+      close_lab_batch: { Args: { p_batch_id: string }; Returns: Json }
+      cloud_provider_key: { Args: { p_value: string }; Returns: string }
+      cloud_provider_rule: {
+        Args: { p_provider: string }
+        Returns: {
+          cloud_type: string
+          provider: string
+        }[]
+      }
+      cloud_type_for_provider: { Args: { p_provider: string }; Returns: string }
+      commit_import: { Args: { p_stage_id: string }; Returns: Json }
+      expire_import_stages: { Args: never; Returns: number }
       expired_bulk_import_artifacts: {
         Args: { _days: number }
         Returns: {
@@ -1764,6 +2967,17 @@ export type Database = {
         }
         Returns: boolean
       }
+      import_approval_status: { Args: never; Returns: Json }
+      import_healer_rules: { Args: never; Returns: string[] }
+      import_row_is_incomplete: { Args: { p_row: Json }; Returns: boolean }
+      import_rows_sha256: { Args: { p_stage_id: string }; Returns: string }
+      import_settings_operator: { Args: never; Returns: boolean }
+      import_stage_approvers: { Args: never; Returns: string[] }
+      import_stage_people: { Args: { p_stage_ids: string[] }; Returns: Json }
+      import_stage_summary: {
+        Args: { p_client: Json; p_healer_version: string; p_stage: string }
+        Returns: Json
+      }
       import_transactions_batch: {
         Args: {
           p_customer_names: Json
@@ -1775,18 +2989,39 @@ export type Database = {
         }
         Returns: Json
       }
+      import_values_match: {
+        Args: { p_reported: string; p_staged: string }
+        Returns: boolean
+      }
+      is_blank_text: { Args: { p: string }; Returns: boolean }
+      is_import_approver: { Args: { p_uid: string }; Returns: boolean }
+      mark_all_notifications_read: { Args: never; Returns: undefined }
+      mark_notification_read: { Args: { p_id: string }; Returns: undefined }
       normalize_customer_name: { Args: { p_name: string }; Returns: string }
-      show_limit: { Args: never; Returns: number }
-      show_trgm: { Args: { "": string }; Returns: string[] }
-      verify_cron_secret: { Args: { _token: string }; Returns: boolean }
-      save_cost_rate: { Args: { p_key: string; p_value: number | null; p_reason: string }; Returns: undefined }
-      save_vm_tier: { Args: { p_id: string; p_price_per_day: number | null; p_selling_price_per_day: number | null; p_internal_cost_per_day: number | null; p_is_active: boolean; p_reason: string }; Returns: undefined }
-      add_vm_tier: { Args: { p_code: string; p_vcpu: number; p_ram_gb: number; p_storage_gb: number; p_selling_price_per_day: number | null; p_internal_cost_per_day: number | null; p_reason: string }; Returns: string }
-      close_lab_batch: { Args: { p_batch_id: string }; Returns: Json }
-      reopen_lab_batch: { Args: { p_batch_id: string }; Returns: Json }
-      request_lab_batch_recompute: { Args: { p_batch_id: string }; Returns: Json }
-      record_lab_batch_invoice: { Args: { p_batch_id: string; p_vendor: string; p_invoice_ref: string; p_invoice_date: string; p_currency: string; p_amount: number; p_fx: number | null; p_source: string; p_note: string | null }; Returns: Json }
-      recompute_lab_batch_costs: { Args: { p_batch_id: string; p_trigger: string }; Returns: Json }
+      pending_import_count: { Args: never; Returns: number }
+      recompute_dirty_lab_batches: { Args: never; Returns: Json }
+      recompute_lab_batch_costs: {
+        Args: { p_batch_id: string; p_trigger: string }
+        Returns: Json
+      }
+      record_lab_batch_invoice: {
+        Args: {
+          p_amount: number
+          p_batch_id: string
+          p_currency: string
+          p_fx: number
+          p_invoice_date: string
+          p_invoice_ref: string
+          p_note: string
+          p_source: string
+          p_vendor: string
+        }
+        Returns: Json
+      }
+      reject_import: {
+        Args: { p_reason?: string; p_stage_id: string }
+        Returns: undefined
+      }
       release_ai_cc_worker_slot: {
         Args: { p_worker_id: string }
         Returns: {
@@ -1794,6 +3029,84 @@ export type Database = {
           id: string
         }[]
       }
+      reopen_lab_batch: { Args: { p_batch_id: string }; Returns: Json }
+      request_lab_batch_recompute: {
+        Args: { p_batch_id: string }
+        Returns: Json
+      }
+      save_cost_rate: {
+        Args: { p_key: string; p_reason: string; p_value: number }
+        Returns: undefined
+      }
+      save_vm_tier: {
+        Args: {
+          p_id: string
+          p_internal_cost_per_day: number
+          p_is_active: boolean
+          p_price_per_day: number
+          p_reason: string
+          p_selling_price_per_day: number
+        }
+        Returns: undefined
+      }
+      set_import_approvers: {
+        Args: { p_approver_user_ids: string[] }
+        Returns: undefined
+      }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      stage_import:
+        | {
+            Args: {
+              p_corrections: Json
+              p_file_sha256: string
+              p_filename: string
+              p_healer_version: string
+              p_kind: string
+              p_rows: Json
+              p_summary: Json
+              p_template_version: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_acknowledge_repeat: boolean
+              p_corrections: Json
+              p_file_sha256: string
+              p_filename: string
+              p_healer_version: string
+              p_kind: string
+              p_rows: Json
+              p_summary: Json
+              p_template_version: string
+            }
+            Returns: Json
+          }
+      supersede_lab_batch_invoice: {
+        Args: {
+          p_amount: number
+          p_currency: string
+          p_fx: number
+          p_invoice_date: string
+          p_invoice_id: string
+          p_invoice_ref: string
+          p_note: string
+          p_source: string
+          p_vendor: string
+        }
+        Returns: Json
+      }
+      update_import_approval_settings: {
+        Args: {
+          p_approver_roles: Database["public"]["Enums"]["app_role"][]
+          p_approver_user_ids: string[]
+          p_repeat_file_check: string
+          p_stage_ttl: string
+        }
+        Returns: undefined
+      }
+      verify_cron_secret: { Args: { _token: string }; Returns: boolean }
     }
     Enums: {
       app_role:
