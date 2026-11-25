@@ -20,7 +20,7 @@
     if (!link) rows = rows.filter(function(r){ return r.client_key === "ALL"; }).map(function(r){ delete r.display_name; return r; });
     var D = { source: "live database", draft: rows.some(function(r){ return r.draft; }), rows: rows.map(fix), usage: (res[1] || []).map(fix),
       generated_at: rows.reduce(function(m, r){ return r.as_of > m ? r.as_of : m; }, ""), mode: link ? "link" : "public",
-      clientsAllowed: link, showClientMargin: false, defaultPeriod: C.defaultPeriod || "2026-10" };
+      clientsAllowed: link, showClientMargin: false, defaultPeriod: C.defaultPeriod || "2026-10", pinPeriod: C.pinPeriod || null, monthPaths: C.monthPaths || null };
     var go = function(){ window.__boot(D); };
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", go); else go();
   }).catch(function(){ stop("Could not load data", "Please try again in a minute."); });
