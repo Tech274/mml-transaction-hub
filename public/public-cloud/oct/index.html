@@ -48,7 +48,7 @@ grid-template-areas:"hero hero hero hero hero rev rev rev rev gm gm gm" "hero he
 .chip .s{grid-column:2;font-size:12px;color:var(--mut)}.chip .m{grid-column:2/4}
 /* panels */
 .panels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap);margin-top:var(--gap)}
-.span2{grid-column:span 2}
+.span2{grid-column:span 2}.span3{grid-column:1/-1}
 .card h3{margin:0;font-size:15px;font-weight:600;color:var(--ink);letter-spacing:-.005em}
 .card .hd{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px;margin-bottom:14px}
 .card .note{font-size:11.5px;color:var(--mut2);margin-top:12px;line-height:1.5}
@@ -104,9 +104,13 @@ body.dopen .ov{opacity:1;pointer-events:auto}body.dopen .drawer{transform:none}
 .cc .row[data-act]:hover{background:#f6f8fc}.dbtn{align-self:flex-start;border:1px solid #d6e2fa;background:#eef3fd;color:var(--acc);border-radius:10px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer}
 .kstrip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:var(--gap)}.ks{background:var(--card);border:1px solid var(--line2);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;display:flex;flex-direction:column;gap:3px;min-width:0}.ks .kv2{font-size:24px;font-weight:650;color:var(--ink);line-height:1.15}.ks .s{font-size:12px;color:var(--mut)}.ks .lbl{font-size:10px;font-weight:650;letter-spacing:.05em;color:#7a5410;background:#fff1cf;border-radius:999px;padding:1px 7px;align-self:flex-start}
 @media(max-width:1180px){.kstrip{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.kstrip{grid-template-columns:1fr}}
+.cvr{display:flex;flex-direction:column;gap:16px}.cvrow{display:grid;grid-template-columns:64px minmax(0,1fr);gap:4px 10px;align-items:center;padding:6px 6px;border-radius:10px}.cvrow:hover{background:#f6f8fc}.cvn{grid-row:span 2;font-weight:600;color:var(--ink);font-size:13px}.cvn i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px}
+.cvl{display:none}.cvb{display:flex;align-items:center;gap:8px;min-width:0}.cvb .bar{height:12px;border-radius:3px;flex:0 0 auto;max-width:62%}.cvb .val{font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--txt);font-weight:550}.cvb .val.miss{font-style:italic;font-weight:600;font-size:12px}
+.drawer.wide{width:min(820px,100%)}.ulv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.ulv .ms .mv{font-size:22px}.ulv .ms.sel{outline:2px solid #d6e2fa}.crumbs2{font-size:12.5px;color:var(--mut)}.crumbs2 a{color:var(--acc);cursor:pointer;font-weight:600}.ks[data-act]:hover{border-color:#d5dbe7}
+.dt.ct td,.dt.ct th{padding:9px 6px}.dt.ct td.sm{font-size:11.5px;color:var(--mut)}.dt.ct tr[data-act]:hover td{background:#f6f8fc}.dt.ct tr.tot td{font-weight:650;border-top:2px solid var(--line)}
 .kv{display:grid;grid-template-columns:96px 1fr;gap:6px 12px;font-size:12.5px}.kv span:nth-child(odd){color:var(--mut2)}
 </style></head><body><div class="wrap">
-<header><div><h1>MML Cloud Cost &amp; Revenue</h1><div class="sub">Leadership view &middot; aggregates only &middot; October and November 2026 only &middot; INR and USD are separate figures; the one conversion (October business total) is owner-provided and labelled</div></div><div class="sub" id="srcinfo"></div></header>
+<header><div><h1>MML Cloud Cost &amp; Revenue</h1><div class="sub">Leadership view &middot; October and November 2026 &middot; INR and USD shown separately</div></div><div class="sub" id="srcinfo"></div></header>
 <div class="draft" id="draft" hidden><b>DRAFT</b><span>These figures are awaiting Vivek's approval. Do not forward or quote them as final.</span></div>
 <div class="bar"><nav class="tabs" id="tabs" role="tablist"></nav><div class="crumbs" id="crumbs"></div></div>
 <section class="filters" id="filters"></section>
@@ -172,7 +176,7 @@ const KPI_ASOF="2026-11-25T03:45:00+05:30";
 
 // Owner-provided October business total (Vivek, voice, 25 Nov 2026 08:37 IST). The only INR/USD conversion on the page.
 // Not spread across clients. Margin and cost/revenue stay on INR billing only.
-const BIZ={"2026-10":{inrBilled:2041870,usd:5982.40,rate:92.92,usdInr:555884.61,total:2597754.61,rateLabel:"ECB ref., 24 Nov 2026",usdLabel:"USD billing (owner-provided, source pending)",src:"Owner-provided 25 Nov 2026 voice; USD 5982.40 @ 92.92 ECB 24 Nov"}};
+const BIZ={"2026-10":{inrBilled:2041870,usd:5982.40,rate:92.92,usdInr:555884.61,total:2597754.61,rateLabel:"ECB ref., 24 Nov 2026",usdLabel:"USD billing (October billing file)",src:"Owner-provided headline (Vivek, 25 Nov 2026); USD = October billing file USD lines; rate ECB ref. 24 Nov 2026"}};
 const money2=v=>v==null?null:"₹"+v.toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2});
 const orList=a=>a.length<2?a.join(""):a.slice(0,-1).join(", ")+" or "+a[a.length-1];
 const andList=a=>a.length<2?a.join(""):a.slice(0,-1).join(", ")+" and "+a[a.length-1];
@@ -249,7 +253,7 @@ function kstrip(){const ym=S.period,k=KPI[ym]||{},g=(m,cl)=>k[m]&&k[m][cl]!=null
   const bi=agg(ym,{tab:"ALL",client:"ALL",cat:"ALL",cur:"INR"}),nd=t=>'<span class="nodata" style="font-size:15px">'+t+'</span>';
   const per=ub&&bi.billed?bi.billed/ub:null,pc=cl=>{const b=bi.clouds[cl]&&bi.clouds[cl].billed,u=g("users_billed",cl);return b&&u?cl+" "+money(b/u,"INR"):null};
   const card=(lbl,v,s,act2)=>'<div class="ks"'+(act2||'')+'><div class="k">'+lbl+'</div><div class="kv2">'+v+'</div><div class="s">'+s+'</div><span class="lbl">DRAFT</span></div>';
-  let h=card("Billed seats &middot; "+mon(ym),ub==null?nd("no "+fmtM(ym).split(" ")[0]+" billing file yet"):n(ub),ub==null?"billed seats come only from a billing file":"billed seats on billing lines, not distinct people &middot; "+["Azure","AWS","GCP"].filter(cl=>g("users_billed",cl)!=null).map(cl=>cl+" "+n(g("users_billed",cl))).join(" &middot; "));
+  let h=card("Total user count &middot; users per platform",ub==null?nd("no "+fmtM(ym).split(" ")[0]+" billing file yet"):n(ub),ub==null?"user count comes from the billing file":["Azure","AWS","GCP"].filter(cl=>g("users_billed",cl)!=null).map(cl=>cl+" <b>"+n(g("users_billed",cl))+"</b>").join(" &middot; ")+" &middot; seats on billing lines, not distinct people",D.clientsAllowed?act("tile",'data-m="users"',"Open users view"):"");
   h+=card("Users with Azure cost"+mt,uc==null?nd("not in data"):n(uc),"distinct learner accounts with Azure cost &gt; 0 (count only)");
   document.getElementById("kstrip").innerHTML=h;}
 function tiles(){
@@ -260,21 +264,20 @@ function tiles(){
   const nd='<span class="nodata">no data</span>';
   const z=(c==="INR"&&S.tab==="ALL"&&S.client==="ALL"&&S.cat==="ALL")?bizFor(S.period):null;
   const sparkH='<div class="spark"><div class="k" style="margin-bottom:4px;font-size:10px;color:var(--mut2)">Cost trend &middot; '+fmtM(S.from)+' &ndash; '+fmtM(S.to)+' &middot; click a month</div>'+spark(rangeMonths(),c)+'</div>';
-  if(z)t.push('<div class="card hero"'+act("tile",'data-m="cost"',"Overall total details")+'><div class="k">Overall total &middot; '+mL(S.period)+' &middot; business billing<span class="est">draft</span></div><div class="v">'+money2(z.total)+'</div>'
-    +'<div class="bizbk" data-biz="'+S.period+'">'+bizLine(z)+'<br><span class="usdl">'+esc(z.usdLabel)+'</span></div>'
-    +(z.ok?'':'<div class="warn">&#9888; Check: INR billing in the database ('+money2(z.dataInr)+') does not match the owner-provided breakdown</div>')
-    +'<div class="costl">Cloud cost: <b>'+(a.cost==null?'no data':money2(a.cost))+'</b> ('+(a.costClouds.size?andList([...a.costClouds]):'none')+' only; '+andList(CLOUDS.filter(x=>!a.costClouds.has(x)))+' cost not collected)</div>'
-    +sparkH+'<div class="m">'+asof+' &middot; headline source: '+esc(z.src)+' &middot; margin uses INR billing only</div></div>');
+  if(z)t.push('<div class="card hero"'+act("tile",'data-m="cost"',"Overall total details")+'><div class="k">Overall total &middot; '+mL(S.period)+'</div><div class="v" data-biz="'+S.period+'">'+money(z.total,"INR")+'</div>'
+    +'<div class="alt">'+fmtM(S.period).split(" ")[0].replace("Oct","October").replace("Nov","November")+' billing, all clouds &middot; click for breakdown</div>'
+    +(z.ok?'':'<div class="warn">&#9888; Breakdown check failed; see details</div>')
+    +sparkH+'<div class="m">'+asof+(a.cost!=null?' &middot; cloud cost '+money(a.cost,"INR")+' (Azure only)':'')+'</div></div>');
   else t.push('<div class="card hero"'+act("tile",'data-m="cost"',"Overall total details")+'><div class="k">Overall total &middot; '+mL(S.period)+estB(a.est)+'</div><div class="v">'+(a.cost==null?nd:money(a.cost,c))+'</div>'
     +'<div class="alt">'+(ao.cost!=null?'<b>'+money(ao.cost,other)+'</b> separate '+other+' figure, not converted':'')+(a.mtd?(ao.cost!=null?' &middot; ':'')+'month to date'+(mtdInfo(S.period)?' (1&ndash;'+mtdInfo(S.period).through+' '+fmtM(S.period).split(" ")[0]+')':'')+', partial':'')+'</div>'
     +(fc.cost!=null?'<div class="fc">Forecast full month: <b>'+money(fc.cost,c)+'</b><span class="est">estimate</span> not added</div>':'')
-    +(S.client==="ALL"&&S.cat==="ALL"?gapHtml(S.period,{list:false}):'')
+    +(S.client==="ALL"&&S.cat==="ALL"&&(gaps(S.period).noBilled.length||gaps(S.period).noCost.length)?'<div class="warn">&#9888; '+[gaps(S.period).noBilled.length?'Billed revenue not yet received':'',gaps(S.period).noCost.length?andList(gaps(S.period).noCost)+' cost not collected':''].filter(Boolean).join(' &middot; ')+' &middot; click for details</div>':'')
     +sparkH+'<div class="m">'+asof+(a.cost!=null&&S.tab==="ALL"?" &middot; covers: "+[...a.costClouds].join(", "):"")+' &middot; source: '+esc([...a.srcs][0]||"none")+'</div></div>');
   const rv=agg(S.period,{cur:"INR"});
   const warn=rv.review?'<div class="warn">&#9888; Includes '+short(rv.review,"INR")+' line under review ('+[...rv.reviewClouds].join(", ")+')</div>':"";
-  t.push('<div class="card rev"'+act("tile",'data-m="rev"',"Revenue details")+'><div class="k">Revenue (billed)'+estB(a.est)+'</div><div class="v">'+(a.billed==null?nd:money(a.billed,c))+'</div><div class="alt">'+(ao.billed!=null?money(ao.billed,other)+" (separate)":"")+'</div>'+warn+(S.client==="ALL"&&S.cat==="ALL"&&gaps(S.period).noBilled.length?gapHtml(S.period):'')+'<div class="m">'+asof+(a.billed!=null&&S.tab==="ALL"?"<br>covers: "+[...a.revClouds].join(", ")+(z?" &middot; INR only; USD billing separate":""):"")+'</div></div>');
+  t.push('<div class="card rev"'+act("tile",'data-m="rev"',"Revenue details")+'><div class="k">Revenue (billed)'+estB(a.est)+'</div><div class="v">'+(a.billed==null?nd:money(a.billed,c))+'</div><div class="alt">'+(ao.billed!=null?money(ao.billed,other)+" (separate)":"")+'</div>'+warn+(S.client==="ALL"&&S.cat==="ALL"&&gaps(S.period).noBilled.length?'<div class="warn">&#9888; '+mon(S.period)+' billed revenue: not yet received for '+orList(gaps(S.period).noBilled)+' &middot; click for details</div>':'')+'<div class="m">'+asof+(a.billed!=null&&S.tab==="ALL"?"<br>covers: "+[...a.revClouds].join(", "):"")+'</div></div>');
   const hideM=S.client!=="ALL"&&!D.showClientMargin;
-  const cov=mi.marginClouds.length?"covers: "+mi.marginClouds.map(cl=>cl+" cost vs "+cl+" INR billed").join("; ")+(BIZ[S.period]?" (INR billing only, not the converted business total)":"")+"<br>":"";
+  const cov=mi.marginClouds.length?"covers: "+mi.marginClouds.join(", ")+(BIZ[S.period]?" &middot; INR billing only":"")+"<br>":"";
   const noLike=mi.margin==null&&!hideM?"no cloud has both cost and revenue":"";
   const hideB=!hideM&&mi.billed==null&&mi.cost!=null, HM=hideM||hideB, HT=hideM?'Hidden (policy)':'Hidden: no billed data';
   t.push('<div class="card gm'+(HM?' nb':'')+'"'+act("tile",'data-m="gm"',"Gross margin details")+'>'+(HM?'':ring(mi.margin,"#1fa971"))+'<div class="body"><div class="k">Gross margin %'+estB(mi.est)+'</div><div class="v">'+(HM?'<span class="nodata">'+HT+'</span>':(mi.margin==null?nd:mi.margin.toFixed(1)+"%"))+'</div><div class="m" style="color:var(--mut)">'+(HM?(hideB?"Margin needs billed revenue; hidden until a billing file exists for this month":""):(noLike||"INR basis, like-for-like clouds"))+'</div></div><div class="m gmeta">'+(HM?"":cov+asof)+'</div></div>');
@@ -326,6 +329,19 @@ function svgCvr(ms,cur,costCol){
     g+='<text x="'+cx+'" y="'+(H-8)+'" fill="'+(sel?"#0f172a":"#98a2b3")+'" font-weight="'+(sel?650:450)+'" font-size="11" text-anchor="middle">'+esc(fmtM(d.ym))+(d.mtd?" (MTD)":"")+'</text></g>'});
   return'<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Monthly cost vs revenue">'+g+'</svg>';
 }
+function clientTable(ym){const nob=gaps(ym).noBilled.length===3,mt=mtdInfo(ym)?' <span class="mtd">MTD</span>':'';
+  let h='<div class="card span3" id="p-ctable"><div class="hd"><h3>Client-wise consumption vs revenue &middot; '+mL(ym)+' (INR)</h3></div>';
+  const L=D.clientsAllowed?clientData(ym,"INR").sort((a,b)=>((b.billed||0)-(a.billed||0))||((b.cost||0)-(a.cost||0))):[];
+  const T=agg(ym,{tab:"ALL",client:"ALL",cat:"ALL",cur:"INR"}),TU=agg(ym,{tab:"ALL",client:"ALL",cat:"ALL",cur:"USD"});
+  const rev=v=>nob?'<span class="nodata">not received</span>':(v?money(v,"INR"):'<span class="nodata">no billing line</span>');
+  const split=o=>nob?'':["Azure","AWS","GCP"].map(cl=>cl+' '+(o[cl]?money(o[cl],"INR"):'&ndash;')).join(' &middot; ');
+  h+='<table class="dt ct"><tr><th>Client</th><th>Consumption (cost'+mt+', Azure only)</th><th>Revenue (billed INR)</th><th>Revenue split (Azure &middot; AWS &middot; GCP)</th><th>USD billed</th></tr>';
+  h+=L.map(o=>'<tr data-ct-row'+act("cdrw",'data-c="'+esc(o.key)+'"',"Details for "+dn(o.key))+'><td>'+esc(dn(o.key))+'</td><td>'+(o.cost==null?'<span class="nodata">not collected</span>':money(o.cost,"INR"))+'</td><td>'+rev(o.billed)+'</td><td class="sm">'+split(o.rev)+'</td><td>'+(o.other?money(o.other,"USD"):'')+'</td></tr>').join("");
+  const tr={};["Azure","AWS","GCP"].forEach(cl=>{if(T.clouds[cl]&&T.clouds[cl].billed)tr[cl]=T.clouds[cl].billed});
+  h+='<tr class="sel tot"><td>Total</td><td>'+(T.cost==null?'<span class="nodata">not collected</span>':money(T.cost,"INR"))+'</td><td>'+rev(T.billed)+'</td><td class="sm">'+split(tr)+'</td><td>'+(TU.billed?money(TU.billed,"USD"):'')+'</td></tr></table>';
+  if(!D.clientsAllowed)h+='<div class="note">Client rows are shown on the private link only; totals above.</div>';
+  h+='<div class="note">Cost is Azure only (AWS/GCP cost not collected)'+(nob?' &middot; '+mon(ym)+' billed revenue not yet received for Azure, AWS or GCP':'')+'.</div></div>';
+  return h}
 function clientData(ym,cur){const ck=cur==="INR"?"_inr":"_usd",ok=cur==="INR"?"_usd":"_inr",by={};
   rows.filter(r=>r.ym===ym&&r.client_key!=="ALL").forEach(r=>{const o=by[r.client_key]||(by[r.client_key]={key:r.client_key,cost:null,costCl:new Set(),rev:{},billed:null,other:null,otherCl:{}});
     const c=r["cost"+ck],b=r["billed"+ck],x=r["billed"+ok];if(c!=null){o.cost=(o.cost||0)+c;o.costCl.add(r.cloud)}
@@ -380,30 +396,40 @@ function rankList(items,cur,opts){
 function charts(){
   const ms=rangeMonths(),c=S.cur,out=[];
   const costCol=S.tab==="ALL"?COSTC:HEXC[S.tab];
-  out.push('<div class="card span2" id="p-monthly"><div class="hd"><h3>'+(c==="INR"?"Monthly cost vs revenue (INR)":"Monthly cost vs revenue (USD)")+'</h3><div class="lg"><span><i style="background:'+costCol+'"></i>Cost</span>'+CLOUDS.map(cl=>'<span><i style="background:'+REVS[cl]+'"></i>Revenue '+cl+'</span>').join("")+'<span><i style="border:1.5px dashed '+FCC+';background:none"></i>Forecast (estimate, not added)</span><span><i style="border:1.5px dashed '+REVC+';background:none"></i>Billed not received</span></div></div>'+svgCvr(ms,c,costCol)+ms.map(ym=>gapHtml(ym,{list:false})).join("")+'<div class="note">Side by side per month: cost bar (left) and billed revenue bar (right, purple, stacked by cloud). Click a month to select it. Missing figures are flagged, never shown as zero. Current month cost = month-to-date actual; dashed outline = full-month forecast, never added. Revenue bars are billed INR (or USD) lines only; the October business total in the headline is not drawn here.</div></div>');
-  const a=agg(S.period,{tab:"ALL"}),metric=S.view==="rev"?"billed":"cost";
-  const vals=CLOUDS.map(cl=>({cl,v:a.clouds[cl]?a.clouds[cl][metric]:null,dim:S.tab!=="ALL"&&S.tab!==cl}));const tot=vals.reduce((x,y)=>x+(y.v||0),0);
-  const dl='<div class="dl">'+vals.map(v=>'<div class="'+(v.dim?'off':'')+'"'+act("cloud",'data-cl="'+v.cl+'"',"Open "+v.cl+" tab")+'><span><i style="background:'+HEXC[v.cl]+'"></i>'+v.cl+'</span><span>'+(v.v==null?'<span class="nodata">no data</span>':money(v.v,c)+' <span class="pc">'+(100*v.v/tot).toFixed(0)+'%</span>')+'</span></div>').join("")+'</div>';
-  const s2=ms.map(ym=>{const b=agg(ym,{tab:"ALL"});return{ym,stacks:CLOUDS.map(cl=>({cl,v:b.clouds[cl]?b.clouds[cl][metric]:null,color:HEXC[cl],name:cl}))}});
-  out.push('<div class="card"><div class="hd"><h3>'+(S.view==="rev"?"Revenue":"Cost")+' by cloud &middot; '+mL(S.period)+'</h3></div><div class="donut">'+donut(vals,c,S.period)+dl+'</div><div class="strip"><div class="k" style="margin-bottom:6px">Over time, stacked</div>'+svgBars(s2,{cur:c,w:420,h:96,axis:false,nosel:false})+'</div><div class="note">Click a slice or segment to open that cloud. AWS and GCP cost: awaiting read-only billing access (revenue is available).</div></div>');
-  const hideM=S.client!=="ALL"&&!D.showClientMargin;
-  out.push('<div class="card"><div class="hd"><h3>Gross margin trend</h3><span class="k">INR &middot; like-for-like</span></div>'+(hideM?'<div class="empty">Per-client margin is hidden by policy</div>':svgArea(ms.map(ym=>{const m=marginINR(ym);return{ym,v:m.margin}}))+mstats(ms))+'<div class="note">Like-for-like: each month uses only clouds with both cost and revenue. Click a point for that month\u2019s breakdown.</div></div>');
-  if(S.tab==="Azure"){
+  out.push(clientTable(S.period));
+  {
     const rs=rows.filter(r=>r.ym===S.period&&r.cloud==="Azure"&&r.category!=="ALL"&&(S.client==="ALL"?r.client_key==="ALL":r.client_key===S.client));
     const k=c==="INR"?"cost_inr":"cost_usd";const by={};rs.forEach(r=>{if(r[k]!=null)by[r.category]=(by[r.category]||0)+r[k]});
     const ent=Object.entries(by).sort((x,y)=>y[1]-x[1]);const tt=ent.reduce((x,y)=>x+y[1],0);
     const vh=(D.usage||[]).find(u=>u.period.slice(0,7)===S.period&&u.cloud==="Azure"&&u.metric==="vm_hours_running");
-    out.push('<div class="card span2"><div class="hd"><h3>Azure cost by category &middot; '+mL(S.period)+' ('+c+')</h3><span class="k">click a row to filter</span></div>'+rankList(ent.map(([n,v])=>({label:n,cost:v,c2:(100*v/tt).toFixed(1)+"%",color:HEXC.Azure,sel:S.cat===n,act:act("cat",'data-c="'+esc(n)+'"',"Filter category "+n)})),c,{head:"Category",c1:"Cost",c2:"Share"})+(vh?'<div class="note">Running VM-hours (Azure, est.): '+Math.round(vh.value).toLocaleString("en-IN")+' h &middot; as of '+fmtTs(vh.as_of)+'</div>':'')+'<div class="note">Aggregated service categories only; no resource names.</div></div>');
-  } else if(D.clientsAllowed&&S.client==="ALL"){
-    const tot=clientData(S.period,c).reduce((x,o)=>({cost:x.cost+(o.cost||0),billed:o.billed==null?x.billed:(x.billed||0)+o.billed}),{cost:0,billed:null});
-    out.push('<div class="card span2" id="p-clients"><div class="hd"><h3>By client &middot; cost vs billed &middot; '+mL(S.period)+' ('+c+')</h3><div class="lg"><span><i style="background:'+COSTC+'"></i>Cost (Azure only)</span>'+CLOUDS.map(cl=>'<span><i style="background:'+REVS[cl]+'"></i>Billed '+cl+'</span>').join("")+'<span><i style="background:'+REVS.AWS+';background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.6) 0 2px,transparent 2px 5px)"></i>Billed, cost not collected</span></div></div>'+clientChart(S.period,c)+'<div class="note">Exact figures, every client with cost or billing. Totals: cost '+money2(tot.cost).replace(/^₹/,c==="INR"?"₹":"$")+' &middot; billed '+(tot.billed==null?'no billing data loaded':money(tot.billed,c))+'. Cost per client is Azure only (AWS/GCP cost not collected), so AWS/GCP revenue has no matching cost. Click a client for its detail. Per-client margin is not shown. Per-client user counts are not in the data, so users billed per client and billed per user per client cannot be shown yet.</div></div>');
-  } else {
-    const b=agg(S.period);
-    out.push('<div class="card span2"><div class="hd"><h3>Coverage by cloud &middot; '+fmtM(S.period)+(S.client!=="ALL"?' &middot; '+esc(dn(S.client)):'')+'</h3><div class="lg"><span><i style="background:'+COSTC+'"></i>Cost</span><span><i style="background:'+REVC+'"></i>Revenue</span></div></div>'+rankList(CLOUDS.filter(cl=>S.tab==="ALL"||cl===S.tab).map(cl=>{const v=b.clouds[cl]||{};return{label:cl,cost:v.cost==null?null:v.cost,billed:v.billed==null?null:v.billed,color:HEXC[cl],act:act("cloud",'data-cl="'+cl+'"',"Open "+cl+" tab")}}),c,{head:"Cloud",c1:"Cost",c2:"Revenue",rev:true})+'<div class="note">'+(D.clientsAllowed?'':'Cloud totals only in this view.')+' "no data" means no figure exists yet; it is not zero.</div></div>');
+    out.push('<div class="card span3" id="p-cat"><div class="hd"><h3>Azure cost by category &middot; '+mL(S.period)+' ('+c+')</h3><span class="k">click a row to filter</span></div>'+rankList(ent.map(([n,v])=>({label:n,cost:v,c2:(100*v/tt).toFixed(1)+"%",color:HEXC.Azure,sel:S.cat===n,act:act("cat",'data-c="'+esc(n)+'"',"Filter category "+n)})),c,{head:"Category",c1:"Cost",c2:"Share"})+(vh?'<div class="note">Running VM-hours (Azure, est.): '+Math.round(vh.value).toLocaleString("en-IN")+' h &middot; as of '+fmtTs(vh.as_of)+'</div>':'')+'<div class="note">Aggregated service categories only; no resource names.</div></div>');
   }
+  const a=agg(S.period,{tab:"ALL",client:"ALL",cat:"ALL"});
+  const cvc=["Azure","AWS","GCP"].map(cl=>{const v=a.clouds[cl]||{};return{cl,cost:v.cost==null?null:v.cost,billed:v.billed==null?null:v.billed}});
+  const cmax=Math.max(1,...cvc.map(x=>Math.max(x.cost||0,x.billed||0))),hatch="repeating-linear-gradient(45deg,rgba(91,107,134,.18) 0 4px,transparent 4px 8px)",hatchR="repeating-linear-gradient(45deg,rgba(124,92,214,.18) 0 4px,transparent 4px 8px)";
+  const barr=(v,col,miss,missTxt,hp)=>v!=null?'<div class="cvb"><span class="bar" style="width:'+Math.max(1.5,100*v/cmax).toFixed(2)+'%;background:'+col+'"></span><span class="val">'+money(v,c)+'</span></div>':'<div class="cvb"><span class="bar miss" style="width:38%;background:'+hp+';border:1px dashed '+miss+'"></span><span class="val miss" style="color:'+miss+'">'+missTxt+'</span></div>';
+  const cvHtml='<div class="cvr">'+cvc.map(x=>'<div class="cvrow" data-cvr="'+x.cl+'"'+act("cloud",'data-cl="'+x.cl+'"',"Open "+x.cl+" tab")+'><div class="cvn"><i style="background:'+HEXC[x.cl]+'"></i>'+x.cl+'</div>'
+    +'<div class="cvl">Cost'+(a.mtd&&x.cost!=null?' (MTD)':'')+'</div>'+barr(x.cost,COSTC,"#8a5a00","not collected",hatch)
+    +'<div class="cvl">Revenue</div>'+barr(x.billed,REVS[x.cl]||REVC,"#5b3fb5",a.billed==null?"not received":"no billing line",hatchR)+'</div>').join("")+'</div>';
+  out.push('<div class="card span3" id="p-cvc"><div class="hd"><h3>Cost vs revenue by cloud &middot; '+mL(S.period)+' ('+c+')</h3></div><div class="lg" style="margin-bottom:12px"><span><i style="background:'+COSTC+'"></i>Cost</span><span><i style="background:'+REVC+'"></i>Revenue (billed)</span><span><i style="background:'+hatch+';border:1px dashed #8a5a00"></i>Not collected / not received</span></div>'+cvHtml+'<div class="note">Hatched bars mean no figure exists yet (not zero). AWS and GCP cost need read-only billing access. Click a cloud to open its tab.</div></div>');
   document.getElementById("charts").innerHTML=out.join("");
 }
 const DR={open:false,m:null,arg:null};
+const UB=()=>D.ulevel&&D.ulevel.batches?D.ulevel:null;// token-gated batch/user rows (pseudonymised), absent until loaded
+const NOTLOADED='<div class="empty" style="padding:16px" data-notloaded>Batch and user data not loaded yet</div>';
+function batchTable(ym,client){const u=UB();if(!u)return NOTLOADED;const bs=u.batches.filter(b=>b.period.slice(0,7)===ym&&(!client||b.client_key===client)).sort((x,y)=>(y.cost_inr||0)-(x.cost_inr||0));
+  if(!bs.length)return'<div class="empty" style="padding:16px">No Azure batches with cost'+(client?' for this client':'')+' in '+fmtM(ym)+'</div>';
+  return'<table class="dt" data-level="batches"><tr><th>Batch</th>'+(client?'':'<th>Client</th>')+'<th>Users</th><th>Cost INR</th></tr>'+bs.map(b=>'<tr data-batch-row'+act("ubatch",'data-b="'+esc(b.batch_key)+'"',"Users in "+b.batch_key)+'><td>'+esc(b.batch_key)+'</td>'+(client?'':'<td>'+esc(dn(b.client_key))+'</td>')+'<td>'+b.users+'</td><td>'+money2(b.cost_inr)+'</td></tr>').join("")+'</table>'}
+function userTable(ym,batch){const u=UB();if(!u)return NOTLOADED;const us=u.users.filter(x=>x.period.slice(0,7)===ym&&x.batch_key===batch).sort((x,y)=>(y.cost_inr||0)-(x.cost_inr||0));
+  if(!us.length)return'<div class="empty" style="padding:16px">No user rows for this batch</div>';
+  return'<table class="dt" data-level="users"><tr><th>User</th><th>Cost INR</th></tr>'+us.map(x=>'<tr data-user-row><td>'+esc(x.user_key)+'</td><td>'+money2(x.cost_inr)+'</td></tr>').join("")+'</table>'}
+function usersView(batch){const n=v=>v==null?null:Math.round(v).toLocaleString("en-IN");
+  const lv1=["2026-10","2026-11"].filter(ym=>months.includes(ym)).map(ym=>{const k=KPI[ym]||{},g=(m,cl)=>k[m]&&k[m][cl]!=null?k[m][cl]:null,ub=g("users_billed","All"),uc=g("users_with_azure_cost","Azure");
+    return'<div class="ms'+(ym===S.period?' sel':'')+'"><div class="k">'+fmtM(ym)+(mtdInfo(ym)?' (MTD)':'')+'</div><div class="mv">'+(ub==null?'<span class="nodata" style="font-size:14px">no '+mon(ym)+' billing file yet</span>':n(ub)+' <span style="font-size:12px;color:var(--mut)">total user count</span>')+'</div><div class="m">'+(ub==null?'':["Azure","AWS","GCP"].map(cl=>cl+' '+n(g("users_billed",cl))).join(' &middot; ')+' (seats on billing lines, not distinct people)<br>')+'Users with Azure cost: <b>'+(uc==null?'not in data':n(uc))+'</b></div></div>'}).join("");
+  let h='<div class="k">Level 1 &middot; users month on month</div><div class="ulv">'+lv1+'</div><div class="note" style="margin-top:0">Sources: total user count = billing-file lines (October billing file); users with Azure cost = Azure Cost Management, accounts with cost &gt; 0. Draft.</div>';
+  if(!batch){h+='<div class="k">Level 2 &middot; Azure batches &middot; '+fmtM(S.period)+'</div>'+batchTable(S.period,null)+'<div class="note" style="margin-top:0">AWS and GCP: no batch/user-level data.</div>'}
+  else{const b=UB()&&UB().batches.find(x=>x.batch_key===batch&&x.period.slice(0,7)===S.period);h+='<div class="crumbs2"><a'+act("ublist",'',"Back to batches")+'>&larr; All batches</a> &middot; '+esc(batch)+(b?' &middot; '+esc(dn(b.client_key))+' &middot; '+b.users+' users &middot; '+money2(b.cost_inr):'')+'</div><div class="k">Level 3 &middot; users in '+esc(batch)+'</div>'+userTable(S.period,batch)+'<div class="note" style="margin-top:0">Pseudonymous user IDs only; no usernames, emails or real batch IDs. AWS and GCP: no batch/user-level data.</div>'}
+  return h}
 const MN={cost:"Overall total",rev:"Revenue (billed)",gm:"Gross margin %",cr:"Cost / revenue",sav:"Savings estimate / month",mom:"MoM change (cost)",mp:"Like-for-like margin"};
 function seriesFor(m,ym,c){
   const a=agg(ym),mi=marginINR(ym);
@@ -415,15 +441,18 @@ function seriesFor(m,ym,c){
   if(m==="mom"){const p=agg(prevMonth(ym)),cmp=a.mtd?null:a.cost;const v=(cmp!=null&&p.cost)?100*(cmp-p.cost)/p.cost:null;return{v:v==null?null:(v>=0?"+":"")+v.toFixed(1)+"%",a}}
 }
 function openDrawer(m,arg,silent){
-  if(!D.clientsAllowed&&(m==="client"||m==="cl"))return;
+  if(!D.clientsAllowed&&(m==="client"||m==="cl"||m==="users"))return;
+  document.getElementById("drawer").classList.toggle("wide",m==="users");
+  if(m==="users")history.replaceState(null,"","#"+S.tab+":"+S.period+":users"+(arg?":"+arg:""));
   DR.open=true;DR.m=m;DR.arg=arg;const c=S.cur,ms=rangeMonths();let body="",title=MN[m]||"",flags=[];
   if(D.draft)flags.push('<span class="flag d">DRAFT</span>');
-  if(m==="cl"){const o=clientData(S.period,c).find(x=>x.key===arg);if(!o)return;title=esc(dn(arg))+" &middot; "+fmtM(S.period);
+  if(m==="users"){title="Users &middot; "+fmtM(S.period);body=usersView(arg);}
+  else if(m==="cl"){const o=clientData(S.period,c).find(x=>x.key===arg);if(!o)return;title=esc(dn(arg))+" &middot; "+fmtM(S.period);
     const pc={};rows.filter(r=>r.ym===S.period&&r.client_key===arg).forEach(r=>{const q=pc[r.cloud]||(pc[r.cloud]={ci:null,cu:null,bi:null,bu:null});[["ci","cost_inr"],["cu","cost_usd"],["bi","billed_inr"],["bu","billed_usd"]].forEach(([k,f])=>{if(r[f]!=null)q[k]=(q[k]||0)+r[f]})});
     const cell=(v,cu)=>v==null?'<span class="nodata">no data</span>':(cu==="INR"?money2(v):money(v,"USD"));
     body='<table class="dt"><tr><th>Cloud</th><th>Cost INR</th><th>Billed INR</th><th>Billed USD</th></tr>'+CLOUDS.filter(cl=>pc[cl]).map(cl=>'<tr><td>'+cl+'</td><td>'+(pc[cl].ci==null?'<span class="nodata">not collected</span>':money2(pc[cl].ci))+'</td><td>'+cell(pc[cl].bi,"INR")+'</td><td>'+cell(pc[cl].bu,"USD")+'</td></tr>').join("")+'</table>'
       +(o.tags.length?'<div class="gapbox"><b>Gaps</b><ul>'+o.tags.map(t=>'<li>'+esc(t[1])+'</li>').join("")+'</ul></div>':'')
-      +'<div class="drill" data-level="batch"><div class="k" style="margin-bottom:4px">Batches &rarr; users</div><div class="empty" style="padding:16px">Batch-level data not loaded yet. Next levels (cost and seats per batch, then pseudonymous user rows per batch) will appear here once loaded behind this private link.</div></div>'+'<div class="kv"><span>Basis</span><span>Cost: Azure Cost Management actual (Azure only). Billed: billing file lines. INR and USD separate, never added.</span><span>Margin</span><span>Per-client margin is not shown.</span></div><button class="dbtn"'+act("client",'data-c="'+esc(arg)+'"',"Filter page to "+dn(arg))+'>Filter page to this client</button>';
+      +'<div class="drill" data-level="batch"><div class="k" style="margin-bottom:4px">Azure batches &rarr; users</div>'+batchTable(S.period,arg)+'</div>'+'<div class="kv"><span>Basis</span><span>Cost: Azure Cost Management actual (Azure only). Billed: billing file lines. INR and USD separate, never added.</span><span>Margin</span><span>Per-client margin is not shown.</span></div><button class="dbtn"'+act("client",'data-c="'+esc(arg)+'"',"Filter page to "+dn(arg))+'>Filter page to this client</button>';
   } else if(m==="mp"){const ym=arg,mi=marginINR(ym);title="Margin breakdown &middot; "+fmtM(ym);
     const rr=CLOUDS.map(cl=>{const v=mi.clouds[cl]||{};const inc=mi.marginClouds.includes(cl);return'<tr><td>'+cl+(inc?'':' <span class="nodata" style="font-size:11px">(excluded)</span>')+'</td><td>'+(v.cost==null?'<span class="nodata">no data</span>':money(v.cost,"INR"))+'</td><td>'+(v.billed==null?'<span class="nodata">no data</span>':money(v.billed,"INR"))+'</td><td>'+(inc?(100*(v.billed-v.cost)/v.billed).toFixed(1)+"%":"&ndash;")+'</td></tr>'}).join("");
     if(mi.est)flags.push('<span class="flag e">ESTIMATE</span>');
@@ -435,7 +464,10 @@ function openDrawer(m,arg,silent){
     const cov=m==="gm"||m==="cr"?(ca.marginClouds&&ca.marginClouds.length?ca.marginClouds.map(cl=>cl+" cost vs "+cl+" billed").join("; "):"no cloud has both cost and revenue")+" (INR, like-for-like)":(ca.costClouds?"cost: "+([...ca.costClouds].join(", ")||"none")+" &middot; revenue: "+([...ca.revClouds].join(", ")||"none"):"from the latest savings analysis");
     const tr=hideM?'<div class="empty">Per-client margin is hidden by policy</div>':'<table class="dt"><tr><th>Month</th><th>'+esc(MN[m])+'</th><th></th></tr>'+ms.map(ym=>{const s=seriesFor(m,ym,c);return'<tr class="'+(ym===S.period?'sel':'')+'"><td>'+fmtM(ym)+'</td><td>'+(s.v==null?'<span class="nodata">no data</span>':s.v)+'</td><td style="color:var(--mut2);font-size:11.5px">'+(s.x||"")+'</td></tr>'}).join("")+'</table>';
     const zz=m==="cost"&&c==="INR"&&S.tab==="ALL"&&S.client==="ALL"&&S.cat==="ALL"?bizFor(S.period):null;
-    const pre=(zz?'<div class="kv"><span>Business total</span><span><b>'+money2(zz.total)+'</b> (draft)</span><span>Breakdown</span><span>'+bizLine(zz)+'</span><span>USD part</span><span>'+esc(zz.usdLabel)+'</span><span>Headline source</span><span>'+esc(zz.src)+'</span><span>Cloud cost</span><span>'+(ca.cost==null?'no data':money2(ca.cost))+' (Azure only)</span></div>':'')+((m==="rev"||m==="cost")&&S.client==="ALL"&&S.cat==="ALL"?gapHtml(S.period):'');
+    const usdBy={};if(zz)rows.filter(r=>r.ym===S.period&&r.client_key!=="ALL"&&r.billed_usd).forEach(r=>{usdBy[r.client_key]=(usdBy[r.client_key]||0)+r.billed_usd});
+    const usdTxt=Object.keys(usdBy).length?Object.entries(usdBy).sort((x,y)=>y[1]-x[1]).map(([k,v])=>esc(dn(k))+' '+money(v,"USD")).join(" + "):"USD lines in the October billing file";
+    const pre=(zz?'<table class="dt"><tr><th>Business total &middot; '+fmtM(S.period)+'</th><th>Amount</th></tr>'+zz.per.filter(p=>p[1]!=null).map(p=>'<tr><td>INR billing &middot; '+p[0]+'</td><td>'+money2(p[1])+'</td></tr>').join("")+'<tr><td><b>INR billing total</b></td><td><b>'+money2(zz.inrBilled)+'</b></td></tr><tr><td>'+esc(zz.usdLabel)+'<br><span style="color:var(--mut2);font-size:11.5px">'+usdTxt+'</span></td><td>$'+zz.usd.toLocaleString("en-US",{minimumFractionDigits:2})+'</td></tr><tr><td>USD at ₹'+zz.rate.toFixed(2)+' ('+zz.rateLabel+')</td><td>'+money2(zz.usdInr)+'</td></tr><tr class="sel"><td>Overall total (exact)</td><td>'+money2(zz.total)+'</td></tr></table>'
+      +'<div class="kv"><span>Cloud cost</span><span>'+(ca.cost==null?'no data':money2(ca.cost))+' (Azure only; AWS/GCP not collected)</span><span>Margin basis</span><span>Gross margin and cost/revenue use INR billing only, not the converted total</span><span>Headline source</span><span>'+esc(zz.src)+'</span>'+(zz.ok?'':'<span>Check</span><span style="color:#a2321f">INR billing in the database ('+money2(zz.dataInr)+') does not match the breakdown</span>')+'</div>':'')+((m==="rev"||m==="cost")&&S.client==="ALL"&&S.cat==="ALL"?gapHtml(S.period):'');
     body=pre+'<div class="kv"><span>Scope</span><span>'+scope+'</span><span>Selected</span><span>'+fmtM(S.period)+': <b>'+(hideM?'hidden':(cur.v==null?'no data':cur.v))+'</b></span><span>As of</span><span>'+(fmtTs(ca.as_of)||"&ndash;")+'</span><span>Source</span><span>'+esc([...(ca.srcs||[])].join("; ")||(m==="sav"?"Savings analysis (estimate)":"none"))+'</span><span>Coverage</span><span>'+cov+'</span>'+(m==="rev"&&agg(S.period,{cur:"INR"}).review?'<span>Review</span><span style="color:#8a5a00">&#9888; includes '+short(agg(S.period,{cur:"INR"}).review,"INR")+' line under review</span>':'')+'</div>'+tr+'<div class="note" style="font-size:11.5px;color:var(--mut2)">Monthly series over the selected trend range. "no data" means no figure exists; it is not zero.</div>';
   }
   document.getElementById("dk").innerHTML=(m==="mp"?"Gross margin":"Metric detail");document.getElementById("dt").innerHTML=title;
@@ -443,14 +475,16 @@ function openDrawer(m,arg,silent){
   document.body.classList.add("dopen");document.getElementById("drawer").setAttribute("aria-hidden","false");
   if(!silent)setTimeout(()=>document.getElementById("dclose").focus(),50);
 }
-function closeDrawer(){DR.open=false;document.body.classList.remove("dopen");document.getElementById("drawer").setAttribute("aria-hidden","true")}
+function closeDrawer(){DR.open=false;document.body.classList.remove("dopen");document.getElementById("drawer").setAttribute("aria-hidden","true");if(/:users/.test(location.hash))history.replaceState(null,"","#"+S.tab)}
 function onAct(el){const a=el.dataset.act;
-  if(a==="tile"){openDrawer(el.dataset.m);if(el.dataset.m==="cost"){const p=document.getElementById("p-monthly");if(p){p.scrollIntoView({behavior:"smooth",block:"center"});p.classList.remove("flash");void p.offsetWidth;p.classList.add("flash")}}return}
+  if(a==="tile"){openDrawer(el.dataset.m);if(el.dataset.m==="cost"){const p=document.getElementById("p-ctable");if(p){p.scrollIntoView({behavior:"smooth",block:"center"});p.classList.remove("flash");void p.offsetWidth;p.classList.add("flash")}}return}
   if(a==="month"){if(goMonth(el.dataset.ym))return;S.period=el.dataset.ym;render();return}
   if(a==="cloud"){S.tab=el.dataset.cl;if(S.tab!=="Azure")S.cat="ALL";history.replaceState(null,"","#"+S.tab);render();return}
   if(a==="mpoint"){openDrawer("mp",el.dataset.ym);return}
   if(a==="client"){if(!D.clientsAllowed)return;S.client=el.dataset.c;if(DR.open&&DR.m==="cl")closeDrawer();render();return}
   if(a==="cdrw"){if(!D.clientsAllowed)return;openDrawer("cl",el.dataset.c);return}
+  if(a==="ubatch"){if(!D.clientsAllowed)return;openDrawer("users",el.dataset.b);return}
+  if(a==="ublist"){if(!D.clientsAllowed)return;openDrawer("users",null);return}
   if(a==="cat"){S.tab="Azure";S.cat=el.dataset.c;render();return}
   if(a==="clr"){const k=el.dataset.k;if(k==="all"){S.tab="ALL";S.client="ALL";S.cat="ALL";S.period=D.defaultPeriod;S.from=months[0];S.to=months[months.length-1];S.view="cvr";S.cur="INR";S.kind="all";if(!months.includes(S.period))S.period=months[months.length-1];history.replaceState(null,"","#ALL")}
     else if(k==="tab"){S.tab="ALL";S.cat="ALL"}else if(k==="client")S.client="ALL";else if(k==="cat")S.cat="ALL";else if(k==="period"){S.period=months.includes(D.defaultPeriod)?D.defaultPeriod:months[months.length-1]}render()}
@@ -460,5 +494,6 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&DR.open){closeDrawe
   const el=e.target.closest&&e.target.closest("[data-act],.tab");if(el&&(e.key==="Enter"||e.key===" ")){e.preventDefault();if(el.classList.contains("tab"))el.click();else onAct(el)}});
 document.getElementById("ov").onclick=closeDrawer;document.getElementById("dclose").onclick=closeDrawer;
 render();
+{const hp=decodeURIComponent(location.hash.slice(1)).split(":");if(hp[2]==="users"&&D.clientsAllowed)openDrawer("users",hp[3]||null,true);}
 };
 </script></body></html>
