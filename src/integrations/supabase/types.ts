@@ -2878,10 +2878,10 @@ export type Database = {
       add_vm_tier: {
         Args: {
           p_code: string
-          p_internal_cost_per_day: number
+          p_internal_cost_per_day: number | null
           p_ram_gb: number
           p_reason: string
-          p_selling_price_per_day: number
+          p_selling_price_per_day: number | null
           p_storage_gb: number
           p_vcpu: number
         }
@@ -2890,8 +2890,8 @@ export type Database = {
       admin_correct_lab_transaction_costs: {
         Args: {
           p_input_cost: number
-          p_public_actual_consumption?: number
-          p_public_credit_allocated?: number
+          p_public_actual_consumption?: number | null
+          p_public_credit_allocated?: number | null
           p_reason?: string
           p_selling_cost: number
           p_transaction_id: string
@@ -3009,10 +3009,10 @@ export type Database = {
           p_amount: number
           p_batch_id: string
           p_currency: string
-          p_fx: number
+          p_fx: number | null
           p_invoice_date: string
           p_invoice_ref: string
-          p_note: string
+          p_note: string | null
           p_source: string
           p_vendor: string
         }
@@ -3035,17 +3035,17 @@ export type Database = {
         Returns: Json
       }
       save_cost_rate: {
-        Args: { p_key: string; p_reason: string; p_value: number }
+        Args: { p_key: string; p_reason: string; p_value: number | null }
         Returns: undefined
       }
       save_vm_tier: {
         Args: {
           p_id: string
-          p_internal_cost_per_day: number
+          p_internal_cost_per_day: number | null
           p_is_active: boolean
-          p_price_per_day: number
+          p_price_per_day: number | null
           p_reason: string
-          p_selling_price_per_day: number
+          p_selling_price_per_day: number | null
         }
         Returns: undefined
       }
