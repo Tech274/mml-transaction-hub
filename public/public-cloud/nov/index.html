@@ -1,0 +1,377 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="referrer" content="no-referrer"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MML Cloud Cost &amp; Revenue - Leadership view</title>
+<style>
+:root{--bg:#f5f6fa;--card:#ffffff;--line:#e6e9f0;--line2:#eef0f5;--mut:#6b7686;--mut2:#98a2b3;--txt:#1d2433;--ink:#0f172a;
+--az:#2f6fde;--aws:#f08a24;--gcp:#1fa971;--rev:#7c5cd6;--cost:#5b6b86;--bad:#d9534f;--ok:#1fa971;--warn:#b7791f;--acc:#2f6fde;
+--shadow:0 1px 2px rgba(16,24,40,.04),0 6px 20px rgba(16,24,40,.05);--r:18px;--gap:28px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1360px;margin:0 auto;padding:0 32px 40px}
+header{padding:28px 0 8px;display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 24px;justify-content:space-between}
+h1{font-size:24px;font-weight:650;margin:0;letter-spacing:-.01em;color:var(--ink)}.sub{color:var(--mut);font-size:12.5px;font-weight:400}
+#srcinfo{color:var(--mut2)}
+.draft{margin:14px 0 4px;padding:10px 16px;border:1px solid #f3dca8;border-left:4px solid #e0a526;background:#fff8e8;color:#7a5410;border-radius:12px;font-weight:500;font-size:13px;display:flex;gap:10px;align-items:center}
+.draft b{font-weight:700;letter-spacing:.06em;font-size:11px;background:#f6d98f;color:#5c3d05;padding:2px 8px;border-radius:999px}
+.bar{display:flex;flex-wrap:wrap;gap:16px 24px;align-items:flex-end;justify-content:space-between;margin:22px 0 0}
+.tabs{display:inline-flex;gap:4px;padding:4px;background:#e9ecf3;border-radius:14px}
+.tab{padding:8px 18px;border-radius:10px;color:var(--mut);cursor:pointer;font-weight:550;font-size:13.5px;user-select:none}
+.tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(16,24,40,.08)}
+.filters{display:flex;flex-wrap:wrap;gap:12px 14px;padding:14px 18px;margin:16px 0 0;background:rgba(255,255,255,.7);border:1px solid var(--line);border-radius:16px;align-items:end}
+.f{display:flex;flex-direction:column;gap:5px}.f label{font-size:10.5px;color:var(--mut2);text-transform:uppercase;letter-spacing:.08em;font-weight:500}
+select,button.tg{background:#fff;color:var(--txt);border:1px solid var(--line);border-radius:9px;padding:6px 10px;font:inherit;font-size:13px}
+.seg{display:flex;background:#f1f3f8;border-radius:10px;padding:3px;gap:2px}.seg button{border:none;background:transparent;border-radius:8px;cursor:pointer;color:var(--mut);padding:5px 11px}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(16,24,40,.1);font-weight:600}
+.est{display:inline-block;font-size:9.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:#fdf1d6;color:#8a5a00;margin-left:6px;vertical-align:middle}
+.nodata{color:var(--mut2);font-style:italic;font-weight:400}
+.k{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;font-weight:500}
+.m{font-size:11px;color:var(--mut2);font-weight:400;line-height:1.45}
+.card{background:var(--card);border:1px solid var(--line2);border-radius:var(--r);box-shadow:var(--shadow);padding:22px 24px;min-width:0}
+/* KPI mosaic */
+.kpis{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:var(--gap);margin:var(--gap) 0 0;
+grid-template-areas:"hero hero hero hero hero rev rev rev rev gm gm gm" "hero hero hero hero hero cr cr cr cr chips chips chips"}
+.hero{grid-area:hero;padding:28px 30px;display:flex;flex-direction:column;gap:6px;background:linear-gradient(160deg,#ffffff 55%,#f3f6fd)}
+.hero .v{font-size:54px;font-weight:650;letter-spacing:-.025em;color:var(--ink);line-height:1.05;margin-top:6px}
+.hero .alt{font-size:15px;color:var(--mut);font-weight:400}.hero .alt b{color:var(--txt);font-weight:550}
+.hero .fc{font-size:13px;color:var(--mut);margin-top:2px}.hero .fc b{color:var(--txt);font-weight:600}
+.hero .spark{margin-top:auto;padding-top:14px}.hero .m{margin-top:8px}
+.rev{grid-area:rev;display:flex;flex-direction:column;gap:6px}.rev .v{font-size:34px;font-weight:600;letter-spacing:-.02em;color:var(--ink);line-height:1.1;margin-top:4px}
+.rev .alt{font-size:13px;color:var(--mut)}.rev .m{margin-top:auto}
+.warn{margin-top:6px;padding:8px 10px;border-radius:10px;background:#fff6e6;color:#8a5a00;font-size:12px;line-height:1.4}
+.gm{grid-area:gm;display:grid;grid-template-columns:96px minmax(0,1fr);gap:10px 16px;align-items:center}.gm .ring{width:96px;height:96px}.gm .body{display:flex;flex-direction:column;gap:2px;min-width:0}.gm .gmeta{grid-column:1/-1}
+.gm .v{font-size:26px;font-weight:600;color:var(--ink)}.card .v .nodata{font-size:20px}.gm.nb{grid-template-columns:1fr}
+.cr{grid-area:cr;display:flex;flex-direction:column;gap:6px}.cr .v{font-size:26px;font-weight:600;color:var(--ink);line-height:1.15}
+.meter{height:10px;border-radius:999px;background:#eef1f6;overflow:hidden;margin:8px 0 2px;position:relative}.meter i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#8fb2ef,var(--az))}
+.scale{display:flex;justify-content:space-between;font-size:10px;color:var(--mut2)}
+.chips{grid-area:chips;display:flex;flex-direction:column;gap:14px;justify-content:center}
+.chip{display:grid;grid-template-columns:4px 1fr auto;gap:4px 12px;align-items:center;background:var(--card);border:1px solid var(--line2);border-radius:14px;padding:12px 16px 12px 0;box-shadow:var(--shadow)}
+.chip>span{grid-row:1/4;align-self:stretch;border-radius:0 4px 4px 0}
+.chip .k{grid-column:2}.chip .cv{grid-column:3;grid-row:1/3;font-size:22px;font-weight:600;color:var(--ink);text-align:right;white-space:nowrap}
+.chip .s{grid-column:2;font-size:12px;color:var(--mut)}.chip .m{grid-column:2/4}
+/* panels */
+.panels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--gap);margin-top:var(--gap)}
+.span2{grid-column:span 2}
+.card h3{margin:0;font-size:15px;font-weight:600;color:var(--ink);letter-spacing:-.005em}
+.card .hd{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px;margin-bottom:14px}
+.card .note{font-size:11.5px;color:var(--mut2);margin-top:12px;line-height:1.5}
+.empty{padding:36px;text-align:center;color:var(--mut2);border:1px dashed var(--line);border-radius:12px}
+.lg{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--mut)}.lg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.donut{display:flex;gap:22px;align-items:center;flex-wrap:wrap}.donut svg{flex:0 0 150px}
+.dl{flex:1;min-width:140px;display:flex;flex-direction:column;gap:10px}.dl div{display:flex;justify-content:space-between;gap:10px;font-size:13px}.dl i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px}
+.dl .pc{color:var(--mut);font-size:12px;font-weight:400}.dl .off{opacity:.45}
+.mstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:16px}.ms{background:#f7f9fc;border-radius:12px;padding:10px 12px}.ms .mv{font-size:18px;font-weight:600;color:var(--ink)}.ms .k{font-size:10px}
+.strip{margin-top:18px;padding-top:14px;border-top:1px solid var(--line2)}
+.rk{display:flex;flex-direction:column;gap:12px}
+.rk .row{display:grid;grid-template-columns:120px minmax(0,1fr) 108px 108px;gap:14px;align-items:center;font-size:13px}
+.rk .row.hd2{font-size:10.5px;color:var(--mut2);text-transform:uppercase;letter-spacing:.08em}
+.rk .nm{font-weight:550;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rk .bars{display:flex;flex-direction:column;gap:4px}.rk .b{height:9px;border-radius:999px;min-width:2px}.rk .b.r{height:5px;opacity:.75}
+.rk .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}.rk .num.r{color:var(--mut)}
+.rk .row.sel{background:#f3f6fd;border-radius:8px}
+footer{padding:28px 0 10px;color:var(--mut2);font-size:11.5px;line-height:1.6;max-width:980px}
+@media(max-width:1180px){.kpis{grid-template-columns:repeat(6,minmax(0,1fr));grid-template-areas:"hero hero hero hero hero hero" "rev rev rev gm gm gm" "cr cr cr chips chips chips"}}
+@media(max-width:980px){.panels{grid-template-columns:1fr}.span2{grid-column:auto}}
+@media(max-width:700px){.wrap{padding:0 16px 32px}:root{--gap:18px}.kpis{grid-template-columns:1fr;grid-template-areas:"hero" "rev" "gm" "cr" "chips"}.hero .v{font-size:40px}
+.rk .row{grid-template-columns:90px minmax(0,1fr) 86px;}.rk .num.r{display:none}}
+[data-act]{cursor:pointer;outline:none}
+.card[data-act],.chip[data-act]{transition:box-shadow .15s,transform .15s,border-color .15s}
+.card[data-act]:hover,.chip[data-act]:hover{box-shadow:0 2px 4px rgba(16,24,40,.06),0 12px 28px rgba(16,24,40,.09);border-color:#d5dbe7}
+[data-act]:focus-visible{box-shadow:0 0 0 3px rgba(47,111,222,.35)!important;border-radius:10px}
+g[data-act]:hover rect.hit{fill:rgba(47,111,222,.06)}g[data-act]:focus-visible rect.hit{fill:rgba(47,111,222,.12)}
+path[data-act]:hover,rect[data-act]:hover{opacity:.82}circle.pt:hover{r:6}
+.rk .row[data-act]:hover{background:#f6f8fc;border-radius:8px}
+.tab:hover{color:var(--ink)}.tab:focus-visible{box-shadow:0 0 0 3px rgba(47,111,222,.35)}
+.crumbs{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.crumb{display:inline-flex;align-items:center;gap:6px;padding:5px 10px 5px 12px;border-radius:999px;background:#fff;border:1px solid var(--line);font-size:12.5px;color:var(--txt)}
+.crumb .x{color:var(--mut2);font-size:14px;line-height:1}.crumb:hover{border-color:#c8d0de}.crumb.clear{background:#eef3fd;border-color:#d6e2fa;color:var(--acc);font-weight:550}
+.mtd{display:inline-block;font-size:9.5px;font-weight:650;letter-spacing:.06em;padding:2px 7px;border-radius:999px;background:#e8effd;color:#2f6fde;margin-left:4px;vertical-align:middle;text-transform:uppercase}
+.flash{animation:fl 1.2s ease}@keyframes fl{0%{box-shadow:0 0 0 0 rgba(47,111,222,.5)}40%{box-shadow:0 0 0 6px rgba(47,111,222,.25)}100%{box-shadow:var(--shadow)}}
+.ov{position:fixed;inset:0;background:rgba(15,23,42,.28);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+.drawer{position:fixed;top:0;right:0;height:100%;width:min(440px,100%);background:#fff;box-shadow:-12px 0 40px rgba(16,24,40,.14);transform:translateX(104%);transition:transform .22s ease;z-index:41;display:flex;flex-direction:column}
+body.dopen .ov{opacity:1;pointer-events:auto}body.dopen .drawer{transform:none}
+.drawer .dh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:22px 24px 14px;border-bottom:1px solid var(--line2)}
+.drawer h2{margin:4px 0 0;font-size:19px;font-weight:600;color:var(--ink)}
+.drawer .close{border:1px solid var(--line);background:#fff;border-radius:10px;width:34px;height:34px;font-size:18px;color:var(--mut);cursor:pointer}
+.drawer .db{padding:18px 24px 28px;overflow:auto;display:flex;flex-direction:column;gap:16px}
+.flags{display:flex;gap:6px;flex-wrap:wrap}.flag{font-size:10px;font-weight:650;letter-spacing:.07em;padding:3px 8px;border-radius:999px;background:#eef1f6;color:var(--mut)}.flag.d{background:#fff1cf;color:#7a5410}.flag.e{background:#fdf1d6;color:#8a5a00}
+.dt{width:100%;border-collapse:collapse;font-size:13px}.dt td,.dt th{padding:7px 4px;border-bottom:1px solid var(--line2);text-align:right;font-variant-numeric:tabular-nums}.dt td:first-child,.dt th:first-child{text-align:left}.dt th{font-size:10.5px;color:var(--mut2);text-transform:uppercase;letter-spacing:.07em;font-weight:500}
+.dt tr.sel td{background:#f3f6fd;font-weight:600}
+.kv{display:grid;grid-template-columns:96px 1fr;gap:6px 12px;font-size:12.5px}.kv span:nth-child(odd){color:var(--mut2)}
+</style></head><body><div class="wrap">
+<header><div><h1>MML Cloud Cost &amp; Revenue</h1><div class="sub">Leadership view &middot; aggregates only &middot; INR and USD are separate figures, never converted or added</div></div><div class="sub" id="srcinfo"></div></header>
+<div class="draft" id="draft" hidden><b>DRAFT</b><span>These figures are awaiting Vivek's approval. Do not forward or quote them as final.</span></div>
+<div class="bar"><nav class="tabs" id="tabs" role="tablist"></nav><div class="crumbs" id="crumbs"></div></div>
+<section class="filters" id="filters"></section>
+<section class="kpis" id="tiles"></section>
+<section class="panels" id="charts"></section>
+<footer id="foot"></footer>
+</div>
+<div class="ov" id="ov"></div><aside class="drawer" id="drawer" aria-hidden="true" role="dialog" aria-label="Detail"><div class="dh"><div><div class="k" id="dk"></div><h2 id="dt"></h2></div><button class="close" id="dclose" aria-label="Close">&times;</button></div><div class="db" id="db"></div></aside>
+<script src="./assets/config.js"></script><script src="./assets/loader.js"></script><script>
+window.__boot=function(D){
+const CLOUDS=["AWS","Azure","GCP"],COL={Azure:"var(--az)",AWS:"var(--aws)",GCP:"var(--gcp)"};
+const S={tab:"ALL",period:D.defaultPeriod,from:null,to:null,client:"ALL",cat:"ALL",view:"cvr",cur:"INR",kind:"all"};
+{const [h,pp]=decodeURIComponent(location.hash.slice(1)).split(":");if(["ALL","AWS","Azure","GCP"].includes(h))S.tab=h;if(/^\d{4}-\d{2}$/.test(pp||""))S.period=pp;}
+const rows=D.rows.map(r=>({...r,ym:r.period.slice(0,7)}));
+const months=[...new Set(rows.map(r=>r.ym))].sort();
+if(!months.includes(S.period))S.period=months[months.length-1]||S.period;
+S.from=months[0];S.to=months[months.length-1];
+const clientKeys=[...new Set(rows.filter(r=>r.client_key!=="ALL").map(r=>r.client_key))].sort((a,b)=>(a.length-b.length)||a.localeCompare(b));
+const fmtM=ym=>{const[y,m]=ym.split("-");return new Date(+y,+m-1,1).toLocaleString("en-GB",{month:"short",year:"numeric"})};
+const money=(v,c)=>v==null?null:(c==="INR"?"\u20b9"+Math.round(v).toLocaleString("en-IN"):"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}));
+const short=(v,c)=>v==null?"":c==="INR"?(Math.abs(v)>=1e5?"\u20b9"+(v/1e5).toFixed(1)+"L":"\u20b9"+Math.round(v/1e3)+"k"):"$"+(Math.abs(v)>=1e3?(v/1e3).toFixed(1)+"k":Math.round(v));
+const fmtTs=t=>{if(!t)return"";const d=new Date(t);return d.toLocaleString("en-IN",{timeZone:"Asia/Kolkata",day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})+" IST"};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+// Select rows for a scope. Returns {cost,billed,savings,as_of,est,src,clouds:{}} with nulls where no data.
+function agg(ym,opts={}){
+  const tab=opts.tab??S.tab, client=opts.client??S.client, cat=opts.cat??S.cat, cur=opts.cur??S.cur, kind=S.kind;
+  const ck=cur==="INR"?"_inr":"_usd";
+  let rs=rows.filter(r=>r.ym===ym&&(tab==="ALL"||r.cloud===tab));
+  if(client==="ALL"){rs=rs.filter(r=>r.client_key==="ALL"&&(tab==="Azure"&&cat!=="ALL"?r.category===cat:r.category==="ALL"));}
+  else{rs=rs.filter(r=>r.client_key===client&&(tab==="Azure"&&cat!=="ALL"?r.category===cat:true));}
+  const ft=opts.ft||"main";rs=rs.filter(r=>ft==="forecast"?r.figure_type==="forecast":r.figure_type!=="forecast");
+  if(kind==="actual")rs=rs.filter(r=>!r.is_estimate);if(kind==="est"&&ft==="main")rs=rs.filter(r=>r.is_estimate);
+  const o={cost:null,billed:null,savings:null,review:null,reviewClouds:new Set(),mtd:false,as_of:"",est:false,srcs:new Set(),clouds:{},costClouds:new Set(),revClouds:new Set(),layer:new Set()};
+  for(const r of rs){
+    const c=r["cost"+ck],b=r["billed"+ck],s=r["savings_estimate"+ck];
+    const cc=o.clouds[r.cloud]||(o.clouds[r.cloud]={cost:null,billed:null});
+    if(c!=null){o.cost=(o.cost||0)+c;cc.cost=(cc.cost||0)+c;o.costClouds.add(r.cloud)}
+    if(b!=null&&(b!==0||client!=="ALL")){o.billed=(o.billed||0)+b;cc.billed=(cc.billed||0)+b;o.revClouds.add(r.cloud)}
+    if(s!=null)o.savings=(o.savings||0)+s;
+    if(r.billed_under_review_inr&&cur==="INR"&&b!=null){o.review=(o.review||0)+r.billed_under_review_inr;o.reviewClouds.add(r.cloud)}
+    if(r.billed_under_review_inr&&b!=null)o.reviewClouds.add(r.cloud);
+    if(r.figure_type==="mtd")o.mtd=true;
+    if(r.as_of>o.as_of)o.as_of=r.as_of;if(r.is_estimate)o.est=true;o.srcs.add(r.source_label);o.layer.add(r.layer);
+  }
+  // margin only over clouds that have BOTH cost and revenue (INR basis)
+  let mc=0,mb=0,mcl=[];
+  for(const [cl,v] of Object.entries(o.clouds)){if(v.cost!=null&&v.billed){mc+=v.cost;mb+=v.billed;mcl.push(cl)}}
+  o.margin=mb?100*(mb-mc)/mb:null;o.ratio=mb?mc/mb:null;o.marginClouds=mcl;
+  o.empty=!rs.length;return o;
+}
+function marginINR(ym,opts={}){return agg(ym,{...opts,cur:"INR"})}
+function prevMonth(ym){const[y,m]=ym.split("-").map(Number);const d=new Date(y,m-2,1);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")}
+function savingsAt(ym,cur){let v=null,asof="",cl=new Set();for(const r of rows){if(r.ym!==ym||r.client_key!=="ALL"||r.category!=="ALL")continue;const x=r["savings_estimate"+(cur==="INR"?"_inr":"_usd")];if(x!=null){v=(v||0)+x;if(r.as_of>asof)asof=r.as_of;cl.add(r.cloud)}}return v==null?null:{v,as_of:asof,clouds:cl}}
+function latestSavings(){for(let i=months.length-1;i>=0;i--){const a=savingsAt(months[i],"INR");if(a)return{ym:months[i],...a}}return null}
+function rangeMonths(){const out=[];let [y,m]=S.from.split("-").map(Number);const [ty,tm]=S.to.split("-").map(Number);while(y<ty||(y===ty&&m<=tm)){out.push(y+"-"+String(m).padStart(2,"0"));m++;if(m>12){m=1;y++}if(out.length>36)break}return out}
+const HEXC={Azure:"#2f6fde",AWS:"#f08a24",GCP:"#1fa971"},REVC="#7c5cd6",COSTC="#5b6b86",FCC="#e0a526";
+const dn=k=>{if(k==null)return"";const r=D.clientsAllowed?rows.find(x=>x.client_key===k&&x.display_name):null;return r?r.display_name:k};
+const lab=ym=>fmtM(ym).replace(" 20"," '");
+const PERIODS=(()=>{const p=["2026-10","2026-11"].filter(m=>months.includes(m));return p.length?p:months.slice(-1)})();
+if(!PERIODS.includes(S.period))S.period=PERIODS.includes(D.defaultPeriod)?D.defaultPeriod:PERIODS[0];
+function mtdInfo(ym){let a="";for(const r of rows)if(r.ym===ym&&r.figure_type==="mtd"&&r.as_of>a)a=r.as_of;if(!a)return null;const d=new Date(a),day=+d.toLocaleString("en-GB",{timeZone:"Asia/Kolkata",day:"numeric"});return{through:day,as_of:a}}
+const mtdTxt=ym=>{const i=mtdInfo(ym);return i?" (MTD, 1–"+i.through+")":""};
+const mL=ym=>{const i=mtdInfo(ym);return fmtM(ym)+(i?' <span class="mtd">MTD 1&ndash;'+i.through+'</span>':'')};
+const mact=ym=>PERIODS.includes(ym)?act("month",'data-ym="'+ym+'"',"Set month "+fmtM(ym)):'';
+const mon=ym=>fmtM(ym).split(" ")[0];
+const act=(a,attrs,label)=>' data-act="'+a+'" '+attrs+' tabindex="0" role="button"'+(label?' aria-label="'+esc(label)+'"':'');
+const hasFilters=()=>S.tab!=="ALL"||S.client!=="ALL"||S.cat!=="ALL"||S.period!==D.defaultPeriod||S.from!==months[0]||S.to!==months[months.length-1]||S.view!=="cvr"||S.cur!=="INR"||S.kind!=="all";
+function render(){
+  document.getElementById("draft").hidden=!D.draft;
+  document.getElementById("srcinfo").textContent="Data: "+D.source+" \u00b7 refreshed "+fmtTs(D.generated_at)+" \u00b7 access: "+(D.mode==="link"?"private link":"public");
+  if(!D.clientsAllowed)S.client="ALL";
+  const T=[["ALL","All business"],["AWS","AWS"],["Azure","Azure"],["GCP","GCP"]];
+  document.getElementById("tabs").innerHTML=T.map(([k,l])=>'<div class="tab'+(S.tab===k?" on":"")+'" data-t="'+k+'" tabindex="0" role="tab" aria-selected="'+(S.tab===k)+'">'+l+'</div>').join("");
+  document.querySelectorAll(".tab").forEach(e=>e.onclick=()=>{S.tab=e.dataset.t;history.replaceState(null,"","#"+S.tab);if(S.tab!=="Azure")S.cat="ALL";render()});
+  const cr=[];
+  if(S.tab!=="ALL")cr.push(['tab','Cloud: '+S.tab]);
+  if(S.client!=="ALL")cr.push(['client','Client: '+dn(S.client)]);
+  if(S.cat!=="ALL")cr.push(['cat','Category: '+S.cat]);
+  if(S.period!==D.defaultPeriod)cr.push(['period','Month: '+fmtM(S.period)+mtdTxt(S.period)]);
+  document.getElementById("crumbs").innerHTML=cr.map(([k,l])=>'<span class="crumb"'+act("clr",'data-k="'+k+'"',"Clear "+l)+'>'+esc(l)+'<span class="x">&times;</span></span>').join("")+(hasFilters()?'<span class="crumb clear"'+act("clr",'data-k="all"',"Clear filters")+'>Clear filters</span>':'');
+  const opt=(arr,sel)=>arr.map(([v,l])=>'<option value="'+esc(v)+'"'+(v===sel?" selected":"")+'>'+esc(l)+'</option>').join("");
+  const seg=(id,arr,sel)=>'<div class="seg" data-s="'+id+'">'+arr.map(([v,l])=>'<button class="tg'+(v===sel?" on":"")+'" data-v="'+v+'">'+l+'</button>').join("")+'</div>';
+  const cats=[...new Set(rows.filter(r=>r.cloud==="Azure"&&r.category!=="ALL"&&(S.client==="ALL"?r.client_key==="ALL":r.client_key===S.client)).map(r=>r.category))].sort();
+  let f='<div class="f"><label>Month</label><select id="fp">'+opt(PERIODS.map(m=>[m,fmtM(m)+(m==="2026-10"?" (pilot)":mtdTxt(m))]),S.period)+'</select></div>';
+  f+='<div class="f"><label>Trend range</label><div style="display:flex;gap:6px"><select id="ff">'+opt(months.map(m=>[m,fmtM(m)]),S.from)+'</select><select id="ft">'+opt(months.map(m=>[m,fmtM(m)]),S.to)+'</select></div></div>';
+  f+='<div class="f"><label>Cloud</label><select id="fc">'+opt([["ALL","All clouds"],["AWS","AWS"],["Azure","Azure"],["GCP","GCP"]],S.tab)+'</select></div>';
+  if(D.clientsAllowed){f+='<div class="f"><label>Client</label><select id="fcl">'+(clientKeys.length?opt([["ALL","All clients"],...clientKeys.map(c=>[c,dn(c)])],S.client):'<option>Awaiting data</option>')+'</select></div>';}
+  if(S.tab==="Azure")f+='<div class="f"><label>Azure category</label><select id="fcat">'+(cats.length?opt([["ALL","All categories"],...cats.map(c=>[c,c])],S.cat):'<option>Awaiting data</option>')+'</select></div>';
+  f+='<div class="f"><label>View</label>'+seg("view",[["cost","Cost"],["rev","Revenue"],["cvr","Cost vs Revenue"]],S.view)+'</div>';
+  f+='<div class="f"><label>Currency</label>'+seg("cur",[["INR","INR"],["USD","USD"]],S.cur)+'</div>';
+  f+='<div class="f"><label>Figures</label>'+seg("kind",[["all","All"],["actual","Actual"],["est","Estimate"]],S.kind)+'</div>';
+  document.getElementById("filters").innerHTML=f;
+  const on=(id,fn)=>{const e=document.getElementById(id);if(e)e.onchange=()=>{fn(e.value);render()}};
+  on("fp",v=>S.period=v);on("ff",v=>S.from=v);on("ft",v=>S.to=v);on("fc",v=>{S.tab=v;if(v!=="Azure")S.cat="ALL"});on("fcl",v=>S.client=v);on("fcat",v=>S.cat=v);
+  document.querySelectorAll(".seg").forEach(g=>g.querySelectorAll("button").forEach(b=>b.onclick=()=>{S[g.dataset.s]=b.dataset.v;render()}));
+  tiles();charts();
+  if(DR.open)openDrawer(DR.m,DR.arg,true);
+  const named=D.clientsAllowed&&rows.some(r=>r.display_name);
+  document.getElementById("foot").innerHTML="Sources: "+esc([...new Set(rows.map(r=>r.source_label))].join(" \u00b7 "))+"<br>Gross margin and cost/revenue use INR only, and only clouds with both cost and revenue for the month. Azure INR cost covers all Azure usage, including batches billed in USD. 'Awaiting data' and 'no data' mean no figure exists yet; it is not zero. "+(named?"Client names appear only on the private link; small clients are grouped as 'Other clients'.":"Clients are pseudonyms; small clients are grouped as 'Other clients'.")+(D.showClientMargin?"":" Per-client margin is hidden by policy.");
+}
+function ring(pct,color){const r=46,C=2*Math.PI*r,v=pct==null?0:Math.max(0,Math.min(100,pct));
+  return'<svg class="ring" viewBox="0 0 112 112" width="112" height="112"><circle cx="56" cy="56" r="'+r+'" fill="none" stroke="#eef1f6" stroke-width="11"/>'+(pct==null?'':'<circle cx="56" cy="56" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+(C*v/100).toFixed(1)+' '+C.toFixed(1)+'" transform="rotate(-90 56 56)"/>')+'<text x="56" y="61" text-anchor="middle" font-size="17" font-weight="650" fill="#0f172a">'+(pct==null?'&ndash;':Math.round(pct)+'%')+'</text></svg>'}
+function spark(ms,c){
+  const W=520,H=120,pts=ms.map(ym=>({ym,v:agg(ym).cost,f:agg(ym,{ft:"forecast"}).cost}));const ok=pts.filter(p=>p.v!=null);if(!ok.length)return'';
+  const mx=Math.max(...pts.map(p=>Math.max(p.v||0,p.f||0)))||1,n=pts.length,dx=n>1?(W-16)/(n-1):0,X=i=>8+i*dx,Y=v=>H-12-(v/mx)*(H-22);
+  let g='<line x1="8" x2="'+(W-8)+'" y1="'+(H-12)+'" y2="'+(H-12)+'" stroke="#eef1f6"/>',seg=[],segs=[];
+  pts.forEach((p,i)=>{if(p.v==null){if(seg.length)segs.push(seg);seg=[]}else seg.push([X(i),Y(p.v)])});if(seg.length)segs.push(seg);
+  segs.forEach(s=>{if(s.length>1)g+='<path d="M'+s.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' L')+' L'+s[s.length-1][0].toFixed(1)+','+(H-12)+' L'+s[0][0].toFixed(1)+','+(H-12)+'Z" fill="rgba(47,111,222,.08)"/><polyline fill="none" stroke="#2f6fde" stroke-width="2" stroke-linejoin="round" points="'+s.map(q=>q[0].toFixed(1)+','+q[1].toFixed(1)).join(' ')+'"/>'});
+  pts.forEach((p,i)=>{const sel=p.ym===S.period;
+    g+='<g'+mact(p.ym)+'><rect class="hit" x="'+(X(i)-dx/2)+'" y="0" width="'+Math.max(dx,16)+'" height="'+H+'" fill="transparent"/>';
+    if(p.f!=null)g+='<circle cx="'+X(i)+'" cy="'+Y(p.f)+'" r="3.5" fill="#fff" stroke="'+FCC+'" stroke-dasharray="2 2"><title>Forecast '+esc(fmtM(p.ym))+' (estimate, not added): '+esc(money(p.f,c)||"")+'</title></circle>';
+    if(p.v!=null)g+='<circle cx="'+X(i)+'" cy="'+Y(p.v)+'" r="'+(sel?5:2.5)+'" fill="'+(sel?"#2f6fde":"#9db8ee")+'"'+(sel?' stroke="#fff" stroke-width="2"':'')+'><title>'+esc(fmtM(p.ym)+": "+money(p.v,c))+'</title></circle>';
+    g+='<text x="'+X(i)+'" y="'+(H)+'" font-size="9" fill="'+(sel?"#0f172a":"#98a2b3")+'" text-anchor="middle">'+mon(p.ym)+'</text></g>'});
+  return'<svg viewBox="0 0 '+W+' '+(H+2)+'" width="100%" role="img" aria-label="Cost trend">'+g+'</svg>'}
+function tiles(){
+  const a=agg(S.period),mi=marginINR(S.period),c=S.cur,asof=a.as_of?"as of "+fmtTs(a.as_of):"";
+  const other=c==="INR"?"USD":"INR",ao=agg(S.period,{cur:other});
+  const fc=agg(S.period,{ft:"forecast"});const t=[];
+  const estB=e=>e?'<span class="est">estimate</span>':'';
+  const nd='<span class="nodata">no data</span>';
+  t.push('<div class="card hero"'+act("tile",'data-m="cost"',"Overall total details")+'><div class="k">Overall total &middot; '+mL(S.period)+estB(a.est)+'</div><div class="v">'+(a.cost==null?nd:money(a.cost,c))+'</div>'
+    +'<div class="alt">'+(ao.cost!=null?'<b>'+money(ao.cost,other)+'</b> separate '+other+' figure, not converted':'')+(a.mtd?(ao.cost!=null?' &middot; ':'')+'month to date'+(mtdInfo(S.period)?' (1&ndash;'+mtdInfo(S.period).through+' '+fmtM(S.period).split(" ")[0]+')':'')+', partial':'')+'</div>'
+    +(fc.cost!=null?'<div class="fc">Forecast full month: <b>'+money(fc.cost,c)+'</b><span class="est">estimate</span> not added</div>':'')
+    +'<div class="spark"><div class="k" style="margin-bottom:4px;font-size:10px;color:var(--mut2)">Cost trend &middot; '+fmtM(S.from)+' &ndash; '+fmtM(S.to)+' &middot; click a month</div>'+spark(rangeMonths(),c)+'</div><div class="m">'+asof+(a.cost!=null&&S.tab==="ALL"?" &middot; covers: "+[...a.costClouds].join(", "):"")+' &middot; source: '+esc([...a.srcs][0]||"none")+'</div></div>');
+  const rv=agg(S.period,{cur:"INR"});
+  const warn=rv.review?'<div class="warn">&#9888; Includes '+short(rv.review,"INR")+' line under review ('+[...rv.reviewClouds].join(", ")+')</div>':"";
+  t.push('<div class="card rev"'+act("tile",'data-m="rev"',"Revenue details")+'><div class="k">Revenue (billed)'+estB(a.est)+'</div><div class="v">'+(a.billed==null?nd:money(a.billed,c))+'</div><div class="alt">'+(ao.billed!=null?money(ao.billed,other)+" (separate)":"")+'</div>'+warn+'<div class="m">'+asof+(a.billed!=null&&S.tab==="ALL"?"<br>covers: "+[...a.revClouds].join(", "):"")+'</div></div>');
+  const hideM=S.client!=="ALL"&&!D.showClientMargin;
+  const cov=mi.marginClouds.length?"covers: "+mi.marginClouds.map(cl=>cl+" cost vs "+cl+" billed").join("; ")+"<br>":"";
+  const noLike=mi.margin==null&&!hideM?"no cloud has both cost and revenue":"";
+  const hideB=!hideM&&mi.billed==null&&mi.cost!=null, HM=hideM||hideB, HT=hideM?'Hidden (policy)':'Hidden: no billed data';
+  t.push('<div class="card gm'+(HM?' nb':'')+'"'+act("tile",'data-m="gm"',"Gross margin details")+'>'+(HM?'':ring(mi.margin,"#1fa971"))+'<div class="body"><div class="k">Gross margin %'+estB(mi.est)+'</div><div class="v">'+(HM?'<span class="nodata">'+HT+'</span>':(mi.margin==null?nd:mi.margin.toFixed(1)+"%"))+'</div><div class="m" style="color:var(--mut)">'+(HM?(hideB?"Margin needs billed revenue; hidden until a billing file exists for this month":""):(noLike||"INR basis, like-for-like clouds"))+'</div></div><div class="m gmeta">'+(HM?"":cov+asof)+'</div></div>');
+  const ratio=mi.ratio==null?null:mi.ratio*100;
+  t.push('<div class="card cr"'+act("tile",'data-m="cr"',"Cost to revenue details")+'><div class="k">Cost / revenue'+estB(mi.est)+'</div><div class="v">'+(HM?'<span class="nodata">'+HT+'</span>':(ratio==null?nd:ratio.toFixed(1)+"%"))+'</div>'+(HM||ratio==null?'':'<div class="meter"><i style="width:'+Math.min(100,ratio).toFixed(1)+'%"></i></div><div class="scale"><span>0%</span><span>cost uses '+Math.round(ratio)+'p of every rupee billed</span><span>100%</span></div>')+'<div class="m" style="margin-top:6px">'+(HM?(hideB?"Margin needs billed revenue; hidden until a billing file exists for this month":""):(noLike||"INR basis, like-for-like clouds")+"<br>"+cov+asof)+'</div></div>');
+  const ls=S.client==="ALL"&&S.cat==="ALL"?latestSavings():null;
+  const sv=ls&&(S.tab==="ALL"||ls.clouds.has(S.tab))?savingsAt(ls.ym,c):null;
+  const pm=prevMonth(S.period),p=agg(pm);
+  const useFc=a.mtd&&fc.cost!=null, cmp=useFc?fc.cost:(a.mtd?null:a.cost);
+  const mom=(cmp!=null&&p.cost!=null&&p.cost)?100*(cmp-p.cost)/p.cost:null;
+  const pLiveOnly=p.cost!=null&&!p.layer.has("historical");
+  let momSub=mom==null?(a.mtd?"month in progress; no forecast":"no "+fmtM(pm)+" figure to compare"):(useFc?"forecast vs "+fmtM(pm)+": ":(pLiveOnly?"vs live "+fmtM(pm).split(" ")[0]+" pull (estimate): ":"vs "+fmtM(pm)+": "))+(mom==null?"":money(p.cost,c));
+  t.push('<div class="chips"><div class="chip"'+act("tile",'data-m="sav"',"Savings estimate details")+'><span style="background:#1fa971"></span><div class="k">Savings / month<span class="est">estimate</span></div><div class="cv">'+(sv?money(sv.v,c):'<span class="nodata" style="font-size:14px">Awaiting data</span>')+'</div><div class="s">'+(sv?"from "+fmtM(ls.ym)+" analysis":"")+'</div><div class="m">'+(sv?"as of "+fmtTs(sv.as_of):"")+'</div></div>'
+    +'<div class="chip"'+act("tile",'data-m="mom"',"Month over month details")+'><span style="background:'+(mom!=null&&mom>0?"#e0803a":"#2f6fde")+'"></span><div class="k">MoM change (cost)'+((a.est||p.est||pLiveOnly||useFc)?'<span class="est">estimate</span>':'')+'</div><div class="cv" style="color:'+(mom!=null&&mom>0?"#c2541b":"#0f172a")+'">'+(mom==null?'<span class="nodata" style="font-size:14px">Awaiting data</span>':(mom>=0?"+":"")+mom.toFixed(1)+"%")+'</div><div class="s">'+momSub+'</div><div class="m">'+asof+(pLiveOnly?" &middot; prior month not yet reviewed":"")+'</div></div></div>');
+  document.getElementById("tiles").innerHTML=t.join("");
+}
+function axisY(max,cur,W,P,y){let g="";for(let i=0;i<=4;i++){const v=max*i/4,yy=y(v);g+='<line x1="'+P+'" x2="'+W+'" y1="'+yy+'" y2="'+yy+'" stroke="'+(i?"#f0f2f6":"#e3e7ee")+'"/><text x="'+(P-6)+'" y="'+(yy+3)+'" fill="#98a2b3" font-size="9.5" text-anchor="end">'+short(v,cur)+'</text>'}return g}
+function svgBars(series,opt){
+  const W=opt.w||760,H=opt.h||250,P=opt.axis===false?6:44,n=series.length;if(!n)return'<div class="empty">Awaiting data</div>';
+  let max=0;for(const s of series){const st=s.stacks.reduce((a,b)=>a+(b.v||0),0);max=Math.max(max,st,s.line&&s.line.v||0,s.ghost||0)}
+  if(!max)return'<div class="empty">Awaiting data</div>';
+  const bot=opt.axis===false?16:26,top=opt.axis===false?4:14,bw=(W-P-6)/n,y=v=>H-bot-(v/max)*(H-bot-top);let g=opt.axis===false?'':axisY(max,opt.cur,W,P,y);
+  let pts=[];
+  series.forEach((s,i)=>{const sel=s.ym===S.period,x=P+i*bw+bw*(opt.axis===false?0.2:0.22),w=bw*(opt.axis===false?0.6:0.56);let acc=0,any=false;
+    g+='<g'+mact(s.ym)+'><rect class="hit" x="'+(P+i*bw)+'" y="0" width="'+bw+'" height="'+H+'" fill="transparent" rx="6"/>';
+    s.stacks.forEach((st,j)=>{if(st.v==null)return;any=true;const h=(st.v/max)*(H-bot-top);const last=j===s.stacks.length-1||s.stacks.slice(j+1).every(q=>q.v==null);
+      g+='<rect'+(st.cl?act("cloud",'data-cl="'+st.cl+'"',"Open "+st.cl+" tab"):'')+' x="'+x+'" y="'+(y(acc)-h)+'" width="'+w+'" height="'+Math.max(h,0.8)+'" rx="'+(last?3:0)+'" fill="'+st.color+'" opacity="'+(sel||opt.nosel?1:0.55)+'"><title>'+esc(st.name+" "+fmtM(s.ym)+": "+money(st.v,opt.cur))+'</title></rect>';acc+=st.v});
+    if(s.ghost!=null){const gh=(s.ghost/max)*(H-bot-top);g+='<rect x="'+x+'" y="'+(y(0)-gh)+'" width="'+w+'" height="'+gh+'" rx="3" fill="none" stroke="'+FCC+'" stroke-width="1.5" stroke-dasharray="4 3"><title>'+esc("Forecast "+fmtM(s.ym)+" (estimate, not added): "+money(s.ghost,opt.cur))+'</title></rect>';any=true}
+    if(!any&&!(s.line&&s.line.v!=null))g+=opt.axis===false?'<line x1="'+(x+w*0.3)+'" x2="'+(x+w*0.7)+'" y1="'+(H-bot-2)+'" y2="'+(H-bot-2)+'" stroke="#c5ccd8" stroke-width="1.5"><title>'+esc(fmtM(s.ym))+': no data</title></line>':'<text x="'+(x+w/2)+'" y="'+(H-bot-6)+'" fill="#b0b8c6" font-size="9" font-style="italic" text-anchor="middle">no data</text>';
+    if(s.line&&s.line.v!=null)pts.push([x+w/2,y(s.line.v),s.line.v,s.ym]);else if(s.line)pts.push(null);
+    g+='<text x="'+(x+w/2)+'" y="'+(H-4)+'" fill="'+(sel?"#0f172a":"#98a2b3")+'" font-weight="'+(sel?600:400)+'" font-size="'+(opt.axis===false?8.5:9.5)+'" text-anchor="middle">'+esc(opt.axis===false?mon(s.ym):lab(s.ym))+'</text></g>'});
+  const segs=[];let cu=[];for(const p of pts){if(p)cu.push(p);else{if(cu.length)segs.push(cu);cu=[]}}if(cu.length)segs.push(cu);pts=pts.filter(Boolean);
+  if(pts.length){segs.forEach(sg=>g+='<polyline fill="none" stroke="'+REVC+'" stroke-width="2.25" stroke-linejoin="round" points="'+sg.map(p=>p[0]+","+p[1]).join(" ")+'"/>');pts.forEach(p=>g+='<circle class="pt"'+mact(p[3])+' cx="'+p[0]+'" cy="'+p[1]+'" r="4" fill="#fff" stroke="'+REVC+'" stroke-width="2"><title>Revenue '+esc(fmtM(p[3]))+": "+money(p[2],opt.cur)+'</title></circle>')}
+  return'<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img">'+g+'</svg>';
+}
+function donut(vals,cur,ym){
+  const tot=vals.reduce((a,b)=>a+(b.v||0),0);if(!tot)return'<div class="empty">No data for '+fmtM(ym)+'</div>';
+  const R=62,r=42,cx=75,cy=75;let a0=-Math.PI/2,g='';
+  vals.forEach(v=>{if(!v.v)return;const fr=v.v/tot,a1=a0+fr*2*Math.PI;
+    if(fr>0.9999){g+='<circle'+act("cloud",'data-cl="'+v.cl+'"',"Open "+v.cl+" tab")+' cx="'+cx+'" cy="'+cy+'" r="'+((R+r)/2)+'" fill="none" stroke="'+HEXC[v.cl]+'" stroke-width="'+(R-r)+'" opacity="'+(v.dim?0.35:1)+'"><title>'+esc(v.cl+": "+money(v.v,cur))+'</title></circle>'}
+    else{const L=fr>0.5?1:0,p=(rr,a)=>(cx+rr*Math.cos(a)).toFixed(2)+','+(cy+rr*Math.sin(a)).toFixed(2);
+      g+='<path'+act("cloud",'data-cl="'+v.cl+'"',"Open "+v.cl+" tab")+' d="M'+p(R,a0)+' A'+R+','+R+' 0 '+L+' 1 '+p(R,a1)+' L'+p(r,a1)+' A'+r+','+r+' 0 '+L+' 0 '+p(r,a0)+'Z" fill="'+HEXC[v.cl]+'" opacity="'+(v.dim?0.35:1)+'" stroke="#fff" stroke-width="2"><title>'+esc(v.cl+": "+money(v.v,cur))+'</title></path>'}
+    a0=a1});
+  g+='<text pointer-events="none" x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="15" font-weight="650" fill="#0f172a">'+short(tot,cur)+'</text><text pointer-events="none" x="'+cx+'" y="'+(cy+14)+'" text-anchor="middle" font-size="9.5" fill="#98a2b3">'+esc(fmtM(ym))+'</text>';
+  return'<svg viewBox="0 0 150 150" width="150" height="150" role="img">'+g+'</svg>';
+}
+function svgArea(points){
+  const W=440,H=220,P=34;const ok=points.filter(p=>p.v!=null);if(!ok.length)return'<div class="empty">Awaiting data</div>';
+  const mn=Math.min(0,...ok.map(p=>p.v)),mx=Math.max(100,...ok.map(p=>p.v)),n=points.length,bw=(W-P-6)/n,y=v=>H-24-((v-mn)/(mx-mn))*(H-40);let g='<defs><linearGradient id="ga" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#1fa971" stop-opacity=".28"/><stop offset="1" stop-color="#1fa971" stop-opacity="0"/></linearGradient></defs>';
+  for(const v of [0,50,100]){const yy=y(v);g+='<line x1="'+P+'" x2="'+W+'" y1="'+yy+'" y2="'+yy+'" stroke="'+(v?"#f0f2f6":"#e3e7ee")+'"/><text x="'+(P-6)+'" y="'+(yy+3)+'" fill="#98a2b3" font-size="9.5" text-anchor="end">'+v+'%</text>'}
+  let seg=[],segs=[];points.forEach((p,i)=>{const x=P+i*bw+bw/2,sel=p.ym===S.period;g+='<text x="'+x+'" y="'+(H-6)+'" fill="'+(sel?"#0f172a":"#98a2b3")+'" font-weight="'+(sel?600:400)+'" font-size="9.5" text-anchor="middle">'+mon(p.ym)+'</text>';
+    if(p.v==null){if(seg.length)segs.push(seg);seg=[];g+='<text x="'+x+'" y="'+(H-32)+'" fill="#b0b8c6" font-size="8.5" font-style="italic" text-anchor="middle" transform="rotate(-90 '+x+' '+(H-32)+')">no data</text>'}else{seg.push([x,y(p.v),p.v,p.ym])}});if(seg.length)segs.push(seg);
+  for(const s of segs){const d=s.map(p=>p[0].toFixed(1)+","+p[1].toFixed(1));
+    if(s.length>1)g+='<path d="M'+d.join(" L")+" L"+s[s.length-1][0].toFixed(1)+","+y(0)+" L"+s[0][0].toFixed(1)+","+y(0)+'Z" fill="url(#ga)"/><polyline fill="none" stroke="#1fa971" stroke-width="2.25" stroke-linejoin="round" points="'+d.join(" ")+'"/>';
+    s.forEach(p=>g+='<g'+act("mpoint",'data-ym="'+p[3]+'"',"Margin breakdown "+fmtM(p[3]))+'><circle cx="'+p[0]+'" cy="'+(p[1]-5)+'" r="14" fill="transparent"/><circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(p[3]===S.period?6:4.5)+'" fill="'+(p[3]===S.period?"#1fa971":"#fff")+'" stroke="#1fa971" stroke-width="2"><title>'+esc(fmtM(p[3]))+": "+p[2].toFixed(1)+'% (click for breakdown)</title></circle><text x="'+p[0]+'" y="'+(p[1]-10)+'" fill="#475467" font-size="9.5" font-weight="600" text-anchor="middle">'+p[2].toFixed(0)+'%</text></g>')}
+  return'<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img">'+g+'</svg>';
+}
+function mstats(ms){const pts=ms.map(ym=>({ym,m:marginINR(ym)})).filter(p=>p.m.margin!=null);if(!pts.length)return'';const cur=marginINR(S.period),hi=pts.reduce((a,b)=>b.m.margin>a.m.margin?b:a),lo=pts.reduce((a,b)=>b.m.margin<a.m.margin?b:a);
+  const st=(k,v,s,ym)=>'<div class="ms"'+(ym?act("mpoint",'data-ym="'+ym+'"',k+" breakdown"):'')+'><div class="k">'+k+'</div><div class="mv">'+v+'</div><div class="m">'+s+'</div></div>';
+  return'<div class="mstats">'+st(fmtM(S.period),cur.margin==null?'<span class="nodata">no data</span>':cur.margin.toFixed(1)+'%',cur.marginClouds.join(" + ")||"&ndash;",cur.margin==null?null:S.period)+st("Highest",hi.m.margin.toFixed(1)+'%',fmtM(hi.ym),hi.ym)+st("Lowest",lo.m.margin.toFixed(1)+'%',fmtM(lo.ym),lo.ym)+'</div>'}
+function rankList(items,cur,opts){
+  if(!items.length)return'<div class="empty">no data for '+fmtM(S.period)+' yet</div>';
+  const max=Math.max(...items.map(i=>Math.max(i.cost||0,opts.rev?i.billed||0:0)))||1;
+  let h='<div class="rk"><div class="row hd2"><span>'+opts.head+'</span><span></span><span class="num">'+opts.c1+'</span><span class="num r">'+opts.c2+'</span></div>';
+  for(const it of items){h+='<div class="row'+(it.sel?' sel':'')+'"'+(it.act||'')+'><span class="nm" title="'+esc(it.label)+'">'+esc(it.label)+'</span><span class="bars">'+(it.cost!=null?'<span class="b" style="width:'+(100*it.cost/max).toFixed(1)+'%;background:'+(it.color||COSTC)+'"></span>':'<span class="nodata" style="font-size:11px">no cost data</span>')+(opts.rev&&it.billed?'<span class="b r" style="width:'+(100*it.billed/max).toFixed(1)+'%;background:'+REVC+'"></span>':'')+'</span><span class="num">'+(it.cost==null?'<span class="nodata">no data</span>':money(it.cost,cur))+'</span><span class="num r">'+(it.c2!=null?it.c2:(it.billed==null?'<span class="nodata">no data</span>':money(it.billed,cur)))+'</span></div>'}
+  return h+'</div>';
+}
+function charts(){
+  const ms=rangeMonths(),c=S.cur,out=[];
+  const costCol=S.tab==="ALL"?COSTC:HEXC[S.tab];
+  const s1=ms.map(ym=>{const a=agg(ym),f=agg(ym,{ft:"forecast"});return{ym,ghost:S.view==="rev"?null:f.cost,stacks:S.view==="rev"?[]:[{v:a.cost,color:costCol,name:"Cost"}],line:S.view==="cost"?null:{v:a.billed}}});
+  const lg='<div class="lg">'+(S.view!=="rev"?'<span><i style="background:'+costCol+'"></i>Cost</span>':'')+(S.view!=="cost"?'<span><i style="background:'+REVC+';border-radius:50%"></i>Revenue (billed)</span>':'')+(S.view!=="rev"?'<span><i style="border:1.5px dashed '+FCC+';background:none"></i>Forecast (estimate, not added)</span>':'')+'</div>';
+  const t1=S.view==="cvr"&&c==="INR"?"Monthly cost vs revenue (INR)":"Monthly "+(S.view==="cost"?"cost":S.view==="rev"?"revenue":"cost vs revenue")+" ("+c+")";
+  out.push('<div class="card span2" id="p-monthly"><div class="hd"><h3>'+t1+'</h3>'+lg+'</div>'+svgBars(s1,{cur:c})+'<div class="note">Bars are cost, the line is revenue. Click a month to select it. Months without a figure show "no data" (not zero). Current month bar = month-to-date actual; dashed outline = full-month forecast, never added.</div></div>');
+  const a=agg(S.period,{tab:"ALL"}),metric=S.view==="rev"?"billed":"cost";
+  const vals=CLOUDS.map(cl=>({cl,v:a.clouds[cl]?a.clouds[cl][metric]:null,dim:S.tab!=="ALL"&&S.tab!==cl}));const tot=vals.reduce((x,y)=>x+(y.v||0),0);
+  const dl='<div class="dl">'+vals.map(v=>'<div class="'+(v.dim?'off':'')+'"'+act("cloud",'data-cl="'+v.cl+'"',"Open "+v.cl+" tab")+'><span><i style="background:'+HEXC[v.cl]+'"></i>'+v.cl+'</span><span>'+(v.v==null?'<span class="nodata">no data</span>':money(v.v,c)+' <span class="pc">'+(100*v.v/tot).toFixed(0)+'%</span>')+'</span></div>').join("")+'</div>';
+  const s2=ms.map(ym=>{const b=agg(ym,{tab:"ALL"});return{ym,stacks:CLOUDS.map(cl=>({cl,v:b.clouds[cl]?b.clouds[cl][metric]:null,color:HEXC[cl],name:cl}))}});
+  out.push('<div class="card"><div class="hd"><h3>'+(S.view==="rev"?"Revenue":"Cost")+' by cloud &middot; '+mL(S.period)+'</h3></div><div class="donut">'+donut(vals,c,S.period)+dl+'</div><div class="strip"><div class="k" style="margin-bottom:6px">Over time, stacked</div>'+svgBars(s2,{cur:c,w:420,h:96,axis:false,nosel:false})+'</div><div class="note">Click a slice or segment to open that cloud. AWS and GCP cost: awaiting read-only billing access (revenue is available).</div></div>');
+  const hideM=S.client!=="ALL"&&!D.showClientMargin;
+  out.push('<div class="card"><div class="hd"><h3>Gross margin trend</h3><span class="k">INR &middot; like-for-like</span></div>'+(hideM?'<div class="empty">Per-client margin is hidden by policy</div>':svgArea(ms.map(ym=>{const m=marginINR(ym);return{ym,v:m.margin}}))+mstats(ms))+'<div class="note">Like-for-like: each month uses only clouds with both cost and revenue. Click a point for that month\u2019s breakdown.</div></div>');
+  if(S.tab==="Azure"){
+    const rs=rows.filter(r=>r.ym===S.period&&r.cloud==="Azure"&&r.category!=="ALL"&&(S.client==="ALL"?r.client_key==="ALL":r.client_key===S.client));
+    const k=c==="INR"?"cost_inr":"cost_usd";const by={};rs.forEach(r=>{if(r[k]!=null)by[r.category]=(by[r.category]||0)+r[k]});
+    const ent=Object.entries(by).sort((x,y)=>y[1]-x[1]);const tt=ent.reduce((x,y)=>x+y[1],0);
+    const vh=(D.usage||[]).find(u=>u.period.slice(0,7)===S.period&&u.cloud==="Azure"&&u.metric==="vm_hours_running");
+    out.push('<div class="card span2"><div class="hd"><h3>Azure cost by category &middot; '+mL(S.period)+' ('+c+')</h3><span class="k">click a row to filter</span></div>'+rankList(ent.map(([n,v])=>({label:n,cost:v,c2:(100*v/tt).toFixed(1)+"%",color:HEXC.Azure,sel:S.cat===n,act:act("cat",'data-c="'+esc(n)+'"',"Filter category "+n)})),c,{head:"Category",c1:"Cost",c2:"Share"})+(vh?'<div class="note">Running VM-hours (Azure, est.): '+Math.round(vh.value).toLocaleString("en-IN")+' h &middot; as of '+fmtTs(vh.as_of)+'</div>':'')+'<div class="note">Aggregated service categories only; no resource names.</div></div>');
+  } else if(D.clientsAllowed&&S.client==="ALL"){
+    const pr=rows.filter(r=>r.ym===S.period&&r.client_key!=="ALL"&&(S.tab==="ALL"||r.cloud===S.tab));
+    const ck=c==="INR"?"_inr":"_usd",by={};pr.forEach(r=>{const o=by[r.client_key]||(by[r.client_key]={cost:null,billed:null});if(r["cost"+ck]!=null)o.cost=(o.cost||0)+r["cost"+ck];if(r["billed"+ck]!=null)o.billed=(o.billed||0)+r["billed"+ck]});
+    const ent=Object.entries(by).sort((x,y)=>((y[1].billed||0)+(y[1].cost||0))-((x[1].billed||0)+(x[1].cost||0)));
+    out.push('<div class="card span2"><div class="hd"><h3>By client &middot; '+mL(S.period)+' ('+c+')</h3><div class="lg"><span><i style="background:'+COSTC+'"></i>Cost</span><span><i style="background:'+REVC+'"></i>Revenue</span></div></div>'+rankList(ent.map(([n,v])=>({label:dn(n),cost:v.cost,billed:v.billed,act:act("client",'data-c="'+esc(n)+'"',"Filter to "+dn(n))})),c,{head:"Client",c1:"Cost",c2:"Revenue",rev:true})+'<div class="note">Ranked by cost plus revenue. Click a client to filter the page. Cost per client is Azure only (AWS/GCP cost awaiting access). Margin per client is not shown.</div></div>');
+  } else {
+    const b=agg(S.period);
+    out.push('<div class="card span2"><div class="hd"><h3>Coverage by cloud &middot; '+fmtM(S.period)+(S.client!=="ALL"?' &middot; '+esc(dn(S.client)):'')+'</h3><div class="lg"><span><i style="background:'+COSTC+'"></i>Cost</span><span><i style="background:'+REVC+'"></i>Revenue</span></div></div>'+rankList(CLOUDS.filter(cl=>S.tab==="ALL"||cl===S.tab).map(cl=>{const v=b.clouds[cl]||{};return{label:cl,cost:v.cost==null?null:v.cost,billed:v.billed==null?null:v.billed,color:HEXC[cl],act:act("cloud",'data-cl="'+cl+'"',"Open "+cl+" tab")}}),c,{head:"Cloud",c1:"Cost",c2:"Revenue",rev:true})+'<div class="note">'+(D.clientsAllowed?'':'Cloud totals only in this view.')+' "no data" means no figure exists yet; it is not zero.</div></div>');
+  }
+  document.getElementById("charts").innerHTML=out.join("");
+}
+const DR={open:false,m:null,arg:null};
+const MN={cost:"Overall total",rev:"Revenue (billed)",gm:"Gross margin %",cr:"Cost / revenue",sav:"Savings estimate / month",mom:"MoM change (cost)",mp:"Like-for-like margin"};
+function seriesFor(m,ym,c){
+  const a=agg(ym),mi=marginINR(ym);
+  if(m==="cost"){const f=agg(ym,{ft:"forecast"});return{v:a.cost==null?null:money(a.cost,c)+(a.mtd?" (MTD)":""),x:f.cost==null?"":money(f.cost,c)+" fcst",a}}
+  if(m==="rev")return{v:a.billed==null?null:money(a.billed,c),a};
+  if(m==="gm")return{v:mi.margin==null?null:mi.margin.toFixed(1)+"%",x:mi.marginClouds.join("+"),a:mi};
+  if(m==="cr")return{v:mi.ratio==null?null:(mi.ratio*100).toFixed(1)+"%",x:mi.marginClouds.join("+"),a:mi};
+  if(m==="sav"){const s=savingsAt(ym,c);return{v:s?money(s.v,c):null,a:{as_of:s?s.as_of:"",srcs:new Set(),est:true}}}
+  if(m==="mom"){const p=agg(prevMonth(ym)),cmp=a.mtd?null:a.cost;const v=(cmp!=null&&p.cost)?100*(cmp-p.cost)/p.cost:null;return{v:v==null?null:(v>=0?"+":"")+v.toFixed(1)+"%",a}}
+}
+function openDrawer(m,arg,silent){
+  if(!D.clientsAllowed&&m==="client")return;
+  DR.open=true;DR.m=m;DR.arg=arg;const c=S.cur,ms=rangeMonths();let body="",title=MN[m]||"",flags=[];
+  if(D.draft)flags.push('<span class="flag d">DRAFT</span>');
+  if(m==="mp"){const ym=arg,mi=marginINR(ym);title="Margin breakdown &middot; "+fmtM(ym);
+    const rr=CLOUDS.map(cl=>{const v=mi.clouds[cl]||{};const inc=mi.marginClouds.includes(cl);return'<tr><td>'+cl+(inc?'':' <span class="nodata" style="font-size:11px">(excluded)</span>')+'</td><td>'+(v.cost==null?'<span class="nodata">no data</span>':money(v.cost,"INR"))+'</td><td>'+(v.billed==null?'<span class="nodata">no data</span>':money(v.billed,"INR"))+'</td><td>'+(inc?(100*(v.billed-v.cost)/v.billed).toFixed(1)+"%":"&ndash;")+'</td></tr>'}).join("");
+    if(mi.est)flags.push('<span class="flag e">ESTIMATE</span>');
+    body='<table class="dt"><tr><th>Cloud</th><th>Cost</th><th>Billed</th><th>Margin</th></tr>'+rr+'</table><div class="kv"><span>Like-for-like</span><span>'+(mi.margin==null?'no cloud has both cost and revenue':mi.margin.toFixed(1)+'% over '+mi.marginClouds.join(" + "))+'</span><span>Rule</span><span>Only clouds with both cost and revenue for the month are included. INR basis.</span><span>As of</span><span>'+(fmtTs(mi.as_of)||"&ndash;")+'</span><span>Source</span><span>'+esc([...mi.srcs].join("; ")||"none")+'</span></div>';
+  } else {
+    const hideM=(m==="gm"||m==="cr")&&S.client!=="ALL"&&!D.showClientMargin;
+    const cur=seriesFor(m,S.period,c),ca=cur.a;if(ca.est||m==="sav"||m==="mom")flags.push('<span class="flag e">ESTIMATE</span>');
+    const scope=(S.tab==="ALL"?"All clouds":S.tab)+(S.client!=="ALL"?" &middot; "+esc(dn(S.client)):"")+(S.cat!=="ALL"?" &middot; "+esc(S.cat):"");
+    const cov=m==="gm"||m==="cr"?(ca.marginClouds&&ca.marginClouds.length?ca.marginClouds.map(cl=>cl+" cost vs "+cl+" billed").join("; "):"no cloud has both cost and revenue")+" (INR, like-for-like)":(ca.costClouds?"cost: "+([...ca.costClouds].join(", ")||"none")+" &middot; revenue: "+([...ca.revClouds].join(", ")||"none"):"from the latest savings analysis");
+    const tr=hideM?'<div class="empty">Per-client margin is hidden by policy</div>':'<table class="dt"><tr><th>Month</th><th>'+esc(MN[m])+'</th><th></th></tr>'+ms.map(ym=>{const s=seriesFor(m,ym,c);return'<tr class="'+(ym===S.period?'sel':'')+'"><td>'+fmtM(ym)+'</td><td>'+(s.v==null?'<span class="nodata">no data</span>':s.v)+'</td><td style="color:var(--mut2);font-size:11.5px">'+(s.x||"")+'</td></tr>'}).join("")+'</table>';
+    body='<div class="kv"><span>Scope</span><span>'+scope+'</span><span>Selected</span><span>'+fmtM(S.period)+': <b>'+(hideM?'hidden':(cur.v==null?'no data':cur.v))+'</b></span><span>As of</span><span>'+(fmtTs(ca.as_of)||"&ndash;")+'</span><span>Source</span><span>'+esc([...(ca.srcs||[])].join("; ")||(m==="sav"?"Savings analysis (estimate)":"none"))+'</span><span>Coverage</span><span>'+cov+'</span>'+(m==="rev"&&agg(S.period,{cur:"INR"}).review?'<span>Review</span><span style="color:#8a5a00">&#9888; includes '+short(agg(S.period,{cur:"INR"}).review,"INR")+' line under review</span>':'')+'</div>'+tr+'<div class="note" style="font-size:11.5px;color:var(--mut2)">Monthly series over the selected trend range. "no data" means no figure exists; it is not zero.</div>';
+  }
+  document.getElementById("dk").innerHTML=(m==="mp"?"Gross margin":"Metric detail");document.getElementById("dt").innerHTML=title;
+  document.getElementById("db").innerHTML='<div class="flags">'+flags.join("")+'</div>'+body;
+  document.body.classList.add("dopen");document.getElementById("drawer").setAttribute("aria-hidden","false");
+  if(!silent)setTimeout(()=>document.getElementById("dclose").focus(),50);
+}
+function closeDrawer(){DR.open=false;document.body.classList.remove("dopen");document.getElementById("drawer").setAttribute("aria-hidden","true")}
+function onAct(el){const a=el.dataset.act;
+  if(a==="tile"){openDrawer(el.dataset.m);if(el.dataset.m==="cost"){const p=document.getElementById("p-monthly");if(p){p.scrollIntoView({behavior:"smooth",block:"center"});p.classList.remove("flash");void p.offsetWidth;p.classList.add("flash")}}return}
+  if(a==="month"){S.period=el.dataset.ym;render();return}
+  if(a==="cloud"){S.tab=el.dataset.cl;if(S.tab!=="Azure")S.cat="ALL";history.replaceState(null,"","#"+S.tab);render();return}
+  if(a==="mpoint"){openDrawer("mp",el.dataset.ym);return}
+  if(a==="client"){if(!D.clientsAllowed)return;S.client=el.dataset.c;render();return}
+  if(a==="cat"){S.tab="Azure";S.cat=el.dataset.c;render();return}
+  if(a==="clr"){const k=el.dataset.k;if(k==="all"){S.tab="ALL";S.client="ALL";S.cat="ALL";S.period=D.defaultPeriod;S.from=months[0];S.to=months[months.length-1];S.view="cvr";S.cur="INR";S.kind="all";if(!months.includes(S.period))S.period=months[months.length-1];history.replaceState(null,"","#ALL")}
+    else if(k==="tab"){S.tab="ALL";S.cat="ALL"}else if(k==="client")S.client="ALL";else if(k==="cat")S.cat="ALL";else if(k==="period"){S.period=months.includes(D.defaultPeriod)?D.defaultPeriod:months[months.length-1]}render()}
+}
+document.addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(el){onAct(el);return}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&DR.open){closeDrawer();return}
+  const el=e.target.closest&&e.target.closest("[data-act],.tab");if(el&&(e.key==="Enter"||e.key===" ")){e.preventDefault();if(el.classList.contains("tab"))el.click();else onAct(el)}});
+document.getElementById("ov").onclick=closeDrawer;document.getElementById("dclose").onclick=closeDrawer;
+render();
+};
+</script></body></html>
