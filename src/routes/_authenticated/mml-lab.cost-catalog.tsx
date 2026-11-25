@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/lib/auth-context";
 import { requireRouteRoles } from "@/lib/route-guard";
 import { customVmQuote, type RateMap } from "@/lib/cost-calculator";
@@ -169,14 +170,18 @@ function CostCatalogPage() {
       if (!d) continue;
       const selling = moneyOrNull(d.selling);
       const internal = moneyOrNull(d.internal);
-      const { error } = await supabase.rpc("save_vm_tier", {
-        p_id: tier.id,
-        p_price_per_day: selling,
-        p_selling_price_per_day: selling,
-        p_internal_cost_per_day: internal,
-        p_is_active: tier.is_active,
-        p_reason: reason.trim(),
-      });
+      const { error } = await supabase.rpc(
+        "save_vm_tier",
+        // Cast: generated Args types omit null, but these params are nullable in SQL; keep nulls (do not coerce).
+        {
+          p_id: tier.id,
+          p_price_per_day: selling,
+          p_selling_price_per_day: selling,
+          p_internal_cost_per_day: internal,
+          p_is_active: tier.is_active,
+          p_reason: reason.trim(),
+        } as unknown as Database["public"]["Functions"]["save_vm_tier"]["Args"],
+      );
       if (error) {
         toast.error(error.message);
         return;
@@ -184,11 +189,15 @@ function CostCatalogPage() {
     }
     for (const rate of rates) {
       if (!(rate.key in draftRates)) continue;
-      const { error } = await supabase.rpc("save_cost_rate", {
-        p_key: rate.key,
-        p_value: moneyOrNull(draftRates[rate.key]),
-        p_reason: reason.trim(),
-      });
+      const { error } = await supabase.rpc(
+        "save_cost_rate",
+        // Cast: generated Args types omit null, but these params are nullable in SQL; keep nulls (do not coerce).
+        {
+          p_key: rate.key,
+          p_value: moneyOrNull(draftRates[rate.key]),
+          p_reason: reason.trim(),
+        } as unknown as Database["public"]["Functions"]["save_cost_rate"]["Args"],
+      );
       if (error) {
         toast.error(error.message);
         return;
@@ -207,14 +216,18 @@ function CostCatalogPage() {
       toast.error("Enter a reason before deactivating a tier");
       return;
     }
-    const { error } = await supabase.rpc("save_vm_tier", {
-      p_id: tier.id,
-      p_price_per_day: tier.price_per_day,
-      p_selling_price_per_day: tier.selling_price_per_day,
-      p_internal_cost_per_day: tier.internal_cost_per_day,
-      p_is_active: false,
-      p_reason: reason.trim(),
-    });
+    const { error } = await supabase.rpc(
+      "save_vm_tier",
+      // Cast: generated Args types omit null, but these params are nullable in SQL; keep nulls (do not coerce).
+      {
+        p_id: tier.id,
+        p_price_per_day: tier.price_per_day,
+        p_selling_price_per_day: tier.selling_price_per_day,
+        p_internal_cost_per_day: tier.internal_cost_per_day,
+        p_is_active: false,
+        p_reason: reason.trim(),
+      } as unknown as Database["public"]["Functions"]["save_vm_tier"]["Args"],
+    );
     if (error) toast.error(error.message);
     else {
       toast.success(`${tier.code} deactivated`);
@@ -227,15 +240,19 @@ function CostCatalogPage() {
       toast.error("A reason of 5 to 300 characters is required");
       return;
     }
-    const { error } = await supabase.rpc("add_vm_tier", {
-      p_code: newTier.code,
-      p_vcpu: Number(newTier.vcpu),
-      p_ram_gb: Number(newTier.ram),
-      p_storage_gb: Number(newTier.storage),
-      p_selling_price_per_day: moneyOrNull(newTier.selling),
-      p_internal_cost_per_day: moneyOrNull(newTier.internal),
-      p_reason: reason.trim(),
-    });
+    const { error } = await supabase.rpc(
+      "add_vm_tier",
+      // Cast: generated Args types omit null, but these params are nullable in SQL; keep nulls (do not coerce).
+      {
+        p_code: newTier.code,
+        p_vcpu: Number(newTier.vcpu),
+        p_ram_gb: Number(newTier.ram),
+        p_storage_gb: Number(newTier.storage),
+        p_selling_price_per_day: moneyOrNull(newTier.selling),
+        p_internal_cost_per_day: moneyOrNull(newTier.internal),
+        p_reason: reason.trim(),
+      } as unknown as Database["public"]["Functions"]["add_vm_tier"]["Args"],
+    );
     if (error) toast.error(error.message);
     else {
       toast.success("Tier added");

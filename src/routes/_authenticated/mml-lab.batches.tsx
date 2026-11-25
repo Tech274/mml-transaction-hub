@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useAuth } from "@/lib/auth-context";
 import { requireRouteRoles } from "@/lib/route-guard";
 import { fmtCurrency } from "@/lib/format";
@@ -183,17 +184,21 @@ function BatchesPage() {
 
   async function recordInvoice() {
     if (!current) return;
-    const { error } = await supabase.rpc("record_lab_batch_invoice", {
-      p_batch_id: current.id,
-      p_vendor: invoice.vendor,
-      p_invoice_ref: invoice.ref,
-      p_invoice_date: invoice.date || new Date().toISOString().slice(0, 10),
-      p_currency: invoice.currency,
-      p_amount: Number(invoice.amount),
-      p_fx: invoice.currency === "USD" ? Number(invoice.fx) : null,
-      p_source: invoice.source,
-      p_note: null,
-    });
+    const { error } = await supabase.rpc(
+      "record_lab_batch_invoice",
+      // Cast: generated Args types omit null, but these params are nullable in SQL; keep nulls (do not coerce).
+      {
+        p_batch_id: current.id,
+        p_vendor: invoice.vendor,
+        p_invoice_ref: invoice.ref,
+        p_invoice_date: invoice.date || new Date().toISOString().slice(0, 10),
+        p_currency: invoice.currency,
+        p_amount: Number(invoice.amount),
+        p_fx: invoice.currency === "USD" ? Number(invoice.fx) : null,
+        p_source: invoice.source,
+        p_note: null,
+      } as unknown as Database["public"]["Functions"]["record_lab_batch_invoice"]["Args"],
+    );
     if (error) toast.error(error.message);
     else {
       toast.success("Invoice recorded. Profit now uses the actual cost.");

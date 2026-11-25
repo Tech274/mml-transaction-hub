@@ -203,14 +203,18 @@ export const adminCorrectTransactionCosts = createServerFn({ method: "POST" })
         "forbidden",
       );
     }
-    const { error } = await context.supabase.rpc("admin_correct_lab_transaction_costs", {
-      p_transaction_id: data.id,
-      p_selling_cost: data.selling_cost,
-      p_input_cost: data.input_cost,
-      p_public_actual_consumption: data.public_actual_consumption ?? null,
-      p_public_credit_allocated: data.public_credit_allocated ?? null,
-      p_reason: data.reason,
-    });
+    const { error } = await context.supabase.rpc(
+      "admin_correct_lab_transaction_costs",
+      // Cast: generated Args types omit null, but these params are nullable in SQL; keep nulls (do not coerce).
+      {
+        p_transaction_id: data.id,
+        p_selling_cost: data.selling_cost,
+        p_input_cost: data.input_cost,
+        p_public_actual_consumption: data.public_actual_consumption ?? null,
+        p_public_credit_allocated: data.public_credit_allocated ?? null,
+        p_reason: data.reason,
+      } as unknown as Database["public"]["Functions"]["admin_correct_lab_transaction_costs"]["Args"],
+    );
     if (error) throw dbError(error, "transactions.adminCorrectTransactionCosts");
     return { id: data.id };
   });
